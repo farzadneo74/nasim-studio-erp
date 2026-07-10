@@ -1,0 +1,728 @@
+// Studio ERP — Photography & Videography Studio
+// Adapted for SQLite (no @db.* modifiers, enums stored as String)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== USERS & ROLES =====================
+model User {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  firstName     String
+  lastName      String
+  email         String?
+  nationalId    String?
+  birthDate     DateTime?
+  address       String?
+  profileImage  String?
+  role          String   @default("manager") // admin | manager | sales | photographer | editor | qc | logistics
+  cardNumber    String?
+  iban          String?
+  bankName      String?
+  isAvailable   Boolean  @default(true)
+  personalMeta  String   @default("{}") // JSON
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  fieldProjects    Project[]      @relation("FieldTeam")
+  studioProjects   Project[]      @relation("StudioTeam")
+  deliveryProjects Project[]      @relation("DeliveryTeam")
+  assignedTasks    Task[]
+  leaveRequests    LeaveRequest[] @relation("Requester")
+  managedLeaves    LeaveRequest[] @relation("Approver")
+  notes            ProjectNote[]
+  salaryRecords    SalaryRecord[]
+  creditActions    CreditTransaction[] @relation("CreatedBy")
+  recordedPayments Payment[] @relation("PaymentRecorder")
+  workflowAssignments ProjectWorkflow[] @relation("WorkflowAssignee")
+}
+
+model LeaveRequest {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation("Requester", fields: [userId], references: [id])
+  approverId String?
+  approver   User?    @relation("Approver", fields: [approverId], references: [id])
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?
+  status     String   @default("pending") // pending | approved | rejected
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ===================== CRM =====================
+model Customer {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String   @unique
+  customerType   String   @default("individual") // individual | company
+  profileImage   String?  // URL or base64 data URL
+  extraPhones    String   @default("[]") // JSON: [{label:"همسر", phone:"0912..."}, ...]
+  city           String?
+  address        String?
+  birthDate      DateTime?
+  engagementDate DateTime?
+  weddingDate    DateTime?
+  referrerId     String?
+  referrer       Customer? @relation("CustomerReferrals", fields: [referrerId], references: [id])
+  referred       Customer[] @relation("CustomerReferrals")
+  familyMeta     String   @default("{}") // JSON { spouse, children }
+  creditBalance  Decimal  @default(0)  // credit customer has FROM us (referrals + manual)
+  totalRevenue   Decimal  @default(0)
+  totalProjects  Int      @default(0)
+  lastInteraction DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  contracts      Contract[]
+  creditTxs      CreditTransaction[] @relation("CustomerCreditTransactions")
+  referralCodes  ReferralCode[]
+  referralsFrom  Referral[] @relation("ReferralReferrer")
+  referralsTo    Referral[] @relation("ReferralReferred")
+  tags           Tag[]
+  notes          CustomerNote[]
+}
+
+model CustomerNote {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  authorId    String?
+  authorName  String?
+  content     String
+  attachments String   @default("[]") // JSON array of {type, url, name, size, mime, thumbUrl?}
+  createdAt   DateTime @default(now())
+}
+
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  color     String     @default("#94a3b8")
+  customers Customer[]
+}
+
+model ReferralCode {
+  id               String    @id @default(cuid())
+  ownerId          String
+  owner            Customer  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  code             String    @unique
+  discountPercent  Int       @default(10)
+  maxUses          Int       @default(1)
+  usedCount        Int       @default(0)
+  validFrom        DateTime  @default(now())
+  validUntil       DateTime?
+  isExpired        Boolean   @default(false)
+  relatedProjectId String?
+  relatedProject   Project?  @relation("ReferralCodesForProject", fields: [relatedProjectId], references: [id])
+  description      String?   // extra note for the code
+  referrals        Referral[]
+  createdAt        DateTime  @default(now())
+}
+
+model Referral {
+  id                String        @id @default(cuid())
+  referrerId        String
+  referrer          Customer      @relation("ReferralReferrer", fields: [referrerId], references: [id])
+  referredId        String
+  referred          Customer      @relation("ReferralReferred", fields: [referredId], references: [id])
+  usedCodeId        String?
+  usedCode          ReferralCode? @relation(fields: [usedCodeId], references: [id])
+  relatedProjectId  String?
+  relatedProject    Project?      @relation("ReferralProject", fields: [relatedProjectId], references: [id])
+  note              String?
+  createdAt         DateTime      @default(now())
+}
+
+model CreditTransaction {
+  id               String           @id @default(cuid())
+  customerId       String
+  customer         Customer         @relation("CustomerCreditTransactions", fields: [customerId], references: [id])
+  amount           Decimal
+  transactionType  String            // reward_referral | manual_adjustment | used
+  relatedContractId String?
+  relatedContract  Contract?         @relation(fields: [relatedContractId], references: [id])
+  createdById      String?
+  createdBy        User?             @relation("CreatedBy", fields: [createdById], references: [id])
+  note             String?
+  createdAt        DateTime          @default(now())
+}
+
+// ===================== WORKFLOW =====================
+model ServicePackage {
+  id                 String   @id @default(cuid())
+  title              String
+  quality            String   @default("fullhd") // fullhd | 4k
+  category           String   // photo | video | mix | other
+  basePrice          Decimal
+  currentPrice       Decimal
+  pricingStrategy    String   // variable | delayed
+  defaultDescription String?
+  defaultTasks       String   @default("[]") // JSON array of strings
+  defaultEquipment   String   @default("[]") // JSON array of equipment strings
+  isActive           Boolean  @default(true)
+  projects           Project[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// Print photo pricing — per-size/paper/laminate/location price list.
+// Studio admin defines these; they're selected per-project in the photo workflow.
+model PrintPhotoPrice {
+  id              String   @id @default(cuid())
+  size            String   // e.g. "10x15", "20x30", "A4"
+  paperType       String   // e.g. "مات", براق", "ک amoeba"
+  laminateType    String   @default("none") // "none" or custom laminate name
+  photoLocation   String   // studio | outdoor | customer
+  price           Decimal  // Rials per photo
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  projectPhotos   ProjectPrintPhoto[]
+
+  @@index([isActive])
+}
+
+// Per-project print photo selections (linked to PrintPhotoPrice with quantity).
+// Prices are "live" — when PrintPhotoPrice.price changes, all unpaid projects update.
+model ProjectPrintPhoto {
+  id                    String   @id @default(cuid())
+  projectId             String
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  printPhotoPriceId     String
+  printPhotoPrice       PrintPhotoPrice @relation(fields: [printPhotoPriceId], references: [id], onDelete: Cascade)
+  quantity              Int      @default(1)
+  exemptFromPriceUpdate Boolean  @default(false) // if true, price frozen at selection time
+  frozenPrice           Decimal? // if exempt, store the price at selection time
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([printPhotoPriceId])
+}
+
+model Contract {
+  id              String    @id @default(cuid())
+  contractNumber  String    @unique
+  customerId      String
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  dateCreated     DateTime  @default(now())
+  printedTerms    String?
+  isClosed        Boolean   @default(false)
+  projects        Project[]
+  invoice         Invoice?
+  creditTxs       CreditTransaction[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Project {
+  id                    String   @id @default(cuid())
+  contractId            String
+  contract              Contract @relation(fields: [contractId], references: [id])
+  servicePackageId      String
+  servicePackage        ServicePackage @relation(fields: [servicePackageId], references: [id])
+  pricingStrategy       String   // fixed | variable | delayed
+  calculatedPrice       Decimal
+  lockedPrice           Decimal?
+  isPriceFrozen         Boolean  @default(false)
+  discountAmount        Decimal  @default(0) // manual per-project discount (Rials)
+  startDatetime         DateTime?
+  endDatetime           DateTime?
+  deliveryDeadline      DateTime?
+  status                String   @default("scheduled") // overall status (for backward compat)
+  photoStatus           String   @default("scheduled") // photo track status
+  videoStatus           String   @default("scheduled") // video track status
+  printedDescription    String?
+  isReadyForDelivery    Boolean  @default(false)
+  readyDate             DateTime?
+  priceAtReadyTime      Decimal?
+  actualStartDatetime   DateTime?
+  actualEndDatetime     DateTime?
+  exemptFromPhotoPriceUpdate Boolean @default(false) // exempt from live print photo price changes
+  delayedPricingDaysOverride Int? // per-project override of the global delayed pricing window
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  fieldTeam    User[]  @relation("FieldTeam")
+  studioTeam   User[]  @relation("StudioTeam")
+  deliveryTeam User[]  @relation("DeliveryTeam")
+  workflows   ProjectWorkflow[]
+
+  tasks         Task[]
+  notes         ProjectNote[]
+  payments      Payment[]
+  printPhotos   ProjectPrintPhoto[]
+  salaryRecords SalaryRecord[]
+  referralCodes ReferralCode[] @relation("ReferralCodesForProject")
+  referrals     Referral[]     @relation("ReferralProject")
+  smsAssignments ProjectSmsAssignment[]
+}
+
+model Task {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title           String
+  assignedToId    String?
+  assignedTo      User?    @relation(fields: [assignedToId], references: [id])
+  status          String   @default("todo") // todo | in_progress | done
+  deadline        DateTime?
+  estimatedMinutes Int?
+  actualMinutes   Int?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ProjectNote {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  noteType      String   // text | voice | image | file
+  content       String?
+  attachmentUrl String?
+  previewUrl    String?
+  createdAt     DateTime @default(now())
+}
+
+// ===================== FINANCE =====================
+model Payment {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  amount       Decimal
+  paymentType  String   // deposit | installment | settlement
+  method       String   // cash | card | pos | cheque
+  datePaid     DateTime @default(now())
+  note         String?
+  isConfirmed  Boolean  @default(false)
+  recordedById String?  // user who recorded this payment (for traceability)
+  recordedBy   User?    @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expense {
+  id              String    @id @default(cuid())
+  title           String
+  amount          Decimal
+  category        String    // office | project_direct | salary_fixed | tax | other
+  description     String?
+  date            DateTime  @default(now())
+  receiptImage    String?
+  createdAt       DateTime  @default(now())
+}
+
+// ===================== PROJECT WORKFLOW (dual-track) =====================
+// Tracks per-project, per-track (photo/video), per-stage assignee + timing.
+// One row per (projectId, track, stage). Created lazily when an assignee is set
+// or a stage is started. The "completedAt" field drives auto-advance.
+model ProjectWorkflow {
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  track        String    // "photo" | "video"
+  stage        String    // scheduled | running | managing | editing | qc | render | ready | delivered
+  assigneeId   String?   // User.id of the employee responsible for this stage
+  assignee     User?     @relation("WorkflowAssignee", fields: [assigneeId], references: [id])
+  startedAt    DateTime?
+  completedAt  DateTime?
+  isAuto       Boolean   @default(false) // true = auto-managed (scheduled/running by date)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([projectId, track, stage])
+  @@index([projectId, track])
+  @@index([assigneeId])
+}
+
+model SalaryRule {
+  id              String   @id @default(cuid())
+  role            String   // photographer | editor | logistics
+  commissionType  String   // percent | fixed_per_project
+  commissionValue Decimal
+  applyOn         String   // field_work | studio_work | delivery
+  isActive        Boolean  @default(true)
+  salaryRecords   SalaryRecord[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SalaryRecord {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  projectId  String
+  project    Project     @relation(fields: [projectId], references: [id])
+  amount     Decimal
+  ruleUsedId String
+  ruleUsed   SalaryRule  @relation(fields: [ruleUsedId], references: [id])
+  isPaid     Boolean     @default(false)
+  period     String      @default("") // "1405-04" (Jalali year-month)
+  note       String?
+  paidAt     DateTime?
+  createdAt  DateTime    @default(now())
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  contractId    String   @unique
+  contract      Contract @relation(fields: [contractId], references: [id])
+  invoiceNumber String   @unique
+  totalAmount   Decimal
+  generatedAt   DateTime @default(now())
+  pdfFile       String?
+}
+
+// ===================== SYSTEM =====================
+model SMSTemplate {
+  id           String   @id @default(cuid())
+  name         String
+  templateText String
+  isActive     Boolean  @default(true)
+  automations  SmsAutomation[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String // JSON
+}
+
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String?  // null = broadcast to all; otherwise targeted
+  type            String   @default("info") // info | payment_approval | reminder | sms
+  title           String
+  message         String
+  read            Boolean  @default(false)
+  link            String?  // page id or route hint
+  refId           String?  // related entity id (e.g. payment id)
+  requiresAction  Boolean  @default(false) // true => action-required (cannot delete/mark-read until action done)
+  actionLabel     String?  // e.g. "تایید/رد پرداخت"
+  createdAt       DateTime @default(now())
+}
+
+// ===================== REMINDERS (user-set) =====================
+model Reminder {
+  id           String   @id @default(cuid())
+  userId       String   // owner (resolved by role in demo)
+  title        String
+  note         String?
+  dueAt        DateTime
+  done         Boolean  @default(false)
+  acknowledged Boolean  @default(false) // user dismissed the overdue blocking modal for this reminder; auto-deletes after 24h
+  order        Int      @default(0) // legacy manual ordering; not used by UI anymore (sort by dueAt)
+  // optional links — when linkType="multi", linkId is JSON {customerId?, projectId?, userId?}
+  linkType     String?  //project | customer | user | task | multi | none
+  linkId       String?
+  // JSON map: { customer: ISO|null, project: ISO|null, user: ISO|null }
+  // When a link is "ticked" via the UI, its value becomes the ISO time of the tick.
+  // Lazy auto-delete (on GET): links whose checkedAt < now-3d are removed from
+  // linkType/linkId and from this map.
+  linkCheckmarks String @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ===================== SMS AUTOMATION =====================
+// A reusable automation rule: "send template X, N days before/after project event"
+model SmsAutomation {
+  id            String   @id @default(cuid())
+  name          String
+  templateId    String
+  template      SMSTemplate @relation(fields: [templateId], references: [id])
+  triggerEvent  String   // before_event | after_event | after_ready | after_photo_select
+  offsetDays    Int      // number of days offset from the trigger event
+  isActive      Boolean  @default(true)
+  assignments   ProjectSmsAssignment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Assignment of an automation to a specific project
+model ProjectSmsAssignment {
+  id                  String   @id @default(cuid())
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  automationId        String
+  automation          SmsAutomation @relation(fields: [automationId], references: [id])
+  enabled             Boolean  @default(true)
+  offsetDaysOverride  Int?     // null = use automation.offsetDays, otherwise per-project override
+  createdAt           DateTime @default(now())
+}
+
+// ===================== DASHBOARD NOTES (iphone Notes-like) =====================
+model UserNote {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String   @default("")
+  body        String   @default("")  // for plain notes
+  kind        String   @default("note") // note | todo
+  // for todo kind: JSON array of {text, done}
+  items       String   @default("[]")
+  // JSON array of {type:"image"|"audio"|"video"|"file", url, name, size, mime, thumbUrl?}
+  attachments String   @default("[]")
+  color       String   @default("") // optional color tag
+  pinned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ===================== CITY PRESETS =====================
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  province  String?
+  createdAt DateTime @default(now())
+}
+
+// ===================== QR TEMPLATES =====================
+// Predefined templates for QR discount codes (like project packages).
+model QrTemplate {
+  id            String   @id @default(cuid())
+  name          String
+  discountPercent Int
+  maxUses       Int      @default(1)
+  pixelSize     Int      @default(300)
+  dpi           Int      @default(150)
+  layoutConfig  String   @default("{}") // JSON: colors, font sizes, etc.
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ===================== HOLIDAYS (DB-backed) =====================
+// Iranian official holidays stored in DB. Seeded from open-source dataset
+// (persian-calendar/events). Lunar (Hijri) holidays are converted to Gregorian
+// per year and marked isEstimated=true for future years (to be verified against
+// calendar.ut.ac.ir — the official source — each year).
+model Holiday {
+  id            String   @id @default(cuid())
+  gregorianDate DateTime // the actual date (midnight UTC); for recurring Persian holidays, a placeholder
+  jalaliYear    Int      // 0 = recurring (matched by month/day only)
+  jalaliMonth   Int
+  jalaliDay     Int
+  title         String
+  type          String   // fixed | lunar
+  isOfficial    Boolean  @default(true)
+  isEstimated   Boolean  @default(false) // true for lunar holidays in future years
+  source        String   @default("persian-calendar/events")
+  createdAt     DateTime @default(now())
+
+  @@unique([gregorianDate, title])
+}
+
+// ===================== PERSONAL KANBAN =====================
+model KanbanColumn {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  color     String   @default("#64748b")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cards     KanbanCard[]
+  @@index([userId])
+}
+
+model KanbanCard {
+  id              String   @id @default(cuid())
+  columnId        String
+  column          KanbanColumn @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  userId          String
+  title           String
+  description     String?
+  order           Int      @default(0)
+  priority        String   @default("none")
+  dueDate         DateTime?
+  labels          String   @default("[]")
+  linkType        String?
+  linkId          String?
+  completed       Boolean  @default(false)
+  assignedToName  String?
+  notifyUserId    String?
+  notifyUserName  String?
+  notifiedAt      DateTime?
+  sourceProjectId String?
+  sourceCustomerId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@index([userId])
+  @@index([columnId])
+}
+
+// ===================== MESSAGING =====================
+model Conversation {
+  id        String   @id @default(cuid())
+  type      String   @default("direct")
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  Message[]
+  participants ConversationParticipant[]
+}
+
+model ConversationParticipant {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId          String
+  userName        String
+  joinedAt        DateTime @default(now())
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String
+  senderName      String
+  body            String   @default("")
+  mentions        String   @default("[]")
+  attachments     String   @default("[]")
+  replyToId       String?
+  editedAt        DateTime?
+  createdAt       DateTime @default(now())
+  reactions       MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  userName  String
+  emoji     String
+  createdAt DateTime @default(now())
+  @@unique([messageId, userId, emoji])
+}
+
+// ===================== CUSTOM FIELDS =====================
+model CustomField {
+  id          String   @id @default(cuid())
+  name        String
+  label       String
+  type        String
+  options     String   @default("[]")
+  required    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  values      CustomFieldValue[]
+}
+
+model CustomFieldValue {
+  id          String   @id @default(cuid())
+  customerId  String
+  fieldId     String
+  value       String   @default("")
+  field       CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([customerId, fieldId])
+  @@index([customerId])
+}
+
+// ===================== ATTACHMENTS (centralized file management) =====================
+// Every uploaded file in the studio is tracked here, regardless of where it's used
+// (user notes, customer notes, project notes, messages, custom fields, etc.).
+// Files are stored on disk by the StorageDriver at: storage/studios/<studioId>/<category>/<uuid>
+// Only the storageKey (relative path) is stored here — never the absolute path.
+model Attachment {
+  id              String    @id @default(cuid())
+  studioId        String    // studio dbName (e.g. "studio-demo") — for isolation & backup
+  ownerType       String    // user_note | customer_note | project_note | message | custom_field | expense_receipt | qr_logo
+  ownerId         String    // the owning entity's ID (noteId, messageId, customerId, etc.)
+  uploadedById    String?
+  uploadedByName  String?
+  originalFilename String   // original filename as uploaded (for display/download)
+  storageKey      String    // relative path within the studio's storage root: <category>/<uuid>.<ext>
+  mimeType        String
+  extension       String    // lowercase, e.g. "jpg", "mp4", "pdf"
+  category        String    // image | audio | video | document
+  sizeBytes       Int
+  checksum        String?   // SHA-256 for dedup/integrity
+  thumbnailKey    String?   // relative path to thumbnail (images/video only)
+  width           Int?
+  height          Int?
+  duration        Int?      // seconds (audio/video)
+  downloadCount   Int       @default(0)
+  lastAccessAt    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime? // soft-delete (trash) — null = active
+  isDeleted       Boolean   @default(false) // denormalized for fast queries
+  metadata        String    @default("{}") // JSON: extra info (e.g. compression settings)
+  virusStatus     String    @default("pending") // pending | clean | infected | skipped
+
+  @@index([studioId, ownerType])
+  @@index([studioId, category])
+  @@index([ownerType, ownerId])
+  @@index([lastAccessAt])
+  @@index([isDeleted])
+  @@index([studioId, isDeleted])
+  @@index([checksum])
+}
+
+// Cached storage usage per studio + per category (avoids SUM on every request).
+// Updated atomically on upload/delete. One row per studio+category.
+model StorageUsage {
+  id          String   @id @default(cuid())
+  studioId    String   // studio dbName
+  category    String   // image | audio | video | document | thumbnail
+  usedBytes   BigInt   @default(0)
+  fileCount   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studioId, category])
+  @@index([studioId])
+}
+
+// Per-studio retention policy for each ownerType. Defines when the system
+// SUGGESTS deletion (never auto-deletes — manager decides).
+// retentionDays = null means "never suggest deletion".
+model RetentionPolicy {
+  id              String   @id @default(cuid())
+  studioId        String   // studio dbName
+  ownerType       String   // user_note | customer_note | project_note | message | ...
+  retentionDays   Int?     // null = never; N = suggest deletion after N days of no access
+  enabled         Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([studioId, ownerType])
+  @@index([studioId])
+}
+
+// Audit log for attachment operations (upload/delete/restore/cleanup/backup).
+// Useful for monitoring, compliance, and debugging.
+model AttachmentAuditLog {
+  id          String   @id @default(cuid())
+  studioId    String
+  attachmentId String?
+  action      String   // upload | download | delete | restore | cleanup | backup | quota_exceeded
+  actorId     String?
+  actorName   String?
+  details     String   @default("{}") // JSON
+  createdAt   DateTime @default(now())
+
+  @@index([studioId, createdAt])
+  @@index([attachmentId])
+  @@index([action])
+}

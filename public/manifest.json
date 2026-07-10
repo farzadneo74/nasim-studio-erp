@@ -1,0 +1,21 @@
+{
+  "name": "عکاسی نسیم — سامانه مدیریت استودیو",
+  "short_name": "عکاسی نسیم",
+  "description": "سامانه جامع مدیریت استودیو عکاسی و فیلم‌برداری: مشتریان، پروژه‌ها، مالی، تقویم و گزارش‌ها.",
+  "lang": "fa",
+  "dir": "rtl",
+  "orientation": "portrait-primary",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
