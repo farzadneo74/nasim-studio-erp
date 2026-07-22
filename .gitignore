@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Database (created on first run)
+db/*.db
+db/*.db-journal
+prisma/db/
+
+# Storage (user uploads)
+storage/studios/*
+!storage/studios/.gitkeep
+
+# Upload folder
+upload/*
+!upload/.gitkeep
+
+# Environment (keep .env for distribution)
+.env.local
+.env*.local
+
+# Logs
+*.log
+dev.log
+server.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Skills
+skills/
+
+# Build
+build/
+dist/
+
+# ZIP files
+download/
+*.zip

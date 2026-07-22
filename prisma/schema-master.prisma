@@ -1,0 +1,72 @@
+// Master DB — multi-tenant SaaS control plane
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/master-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../db/master.db"
+}
+
+model Studio {
+  id                  String   @id @default(cuid())
+  name                String
+  nameEn              String?
+  dbName              String   @unique
+  isActive            Boolean  @default(true)
+  plan                String   @default("trial")
+  // Storage quota management (SaaS billing)
+  storageQuotaBytes   BigInt   @default(1073741824) // 1 GB default quota
+  storageUsedBytes    BigInt   @default(0)           // cached total (refreshed on upload/delete)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  memberships         StudioMembership[]
+}
+
+model MasterUser {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  passwordHash String?
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  memberships StudioMembership[]
+  sessions    Session[]
+}
+
+model StudioMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      MasterUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId  String
+  studio    Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  role      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  @@unique([userId, studioId])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  hash      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  @@index([phone, createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      MasterUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId  String?
+  role      String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
