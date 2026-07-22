@@ -986,3 +986,4 @@ function renderPreview(text: string): string {
     .replace(/\{deadline\}/g, "۲۳ مرداد ۱۴۰۵")
     .replace(/\{amount\}/g, "۹٬۲۰۰٬۰۰۰")
 }
+

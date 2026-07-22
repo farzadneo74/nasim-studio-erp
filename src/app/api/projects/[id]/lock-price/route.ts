@@ -52,3 +52,4 @@ export async function PATCH(_req: Request, { params }: Ctx) {
     effectivePrice: eff,
   })
 }
+

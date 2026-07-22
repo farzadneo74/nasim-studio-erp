@@ -1,0 +1,7 @@
+# Extra dependencies for NASIM Studio ERP
+# ============================================
+# Add one package name per line below.
+# Lines starting with # are ignored.
+# Example:
+#   axios
+#   lodash

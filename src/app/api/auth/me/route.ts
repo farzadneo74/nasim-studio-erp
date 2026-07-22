@@ -13,3 +13,4 @@ export async function GET() {
     currentStudioId: user.studioId, currentRole: user.role,
   })
 }
+

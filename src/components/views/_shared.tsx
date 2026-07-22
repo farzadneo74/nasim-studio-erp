@@ -50,19 +50,31 @@ export function StatCard({
   trend?: { value: string; up: boolean }
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between">
+    <div
+      className="group relative overflow-hidden rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+      style={{ borderTopColor: accent, borderTopWidth: 3 }}
+    >
+      {/* Decorative gradient blob */}
+      <div
+        className="pointer-events-none absolute -left-8 -top-8 h-24 w-24 rounded-full opacity-10 blur-2xl transition-opacity duration-200 group-hover:opacity-20"
+        style={{ background: accent }}
+      />
+      <div className="relative flex items-start justify-between">
         <div className="min-w-0">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </div>
-          <div className="mt-1.5 text-2xl font-semibold tracking-tight">{value}</div>
+          <div className="mt-1.5 text-2xl font-bold tracking-tight">{value}</div>
           {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
         </div>
         {icon && (
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-            style={{ background: accent + "22", color: accent }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-110"
+            style={{
+              background: `linear-gradient(135deg, ${accent}28, ${accent}10)`,
+              color: accent,
+              border: `1px solid ${accent}20`,
+            }}
           >
             {icon}
           </div>
@@ -71,8 +83,8 @@ export function StatCard({
       {trend && (
         <div
           className={cn(
-            "mt-3 inline-flex items-center gap-1 text-xs font-medium",
-            trend.up ? "text-emerald-600" : "text-rose-600"
+            "relative mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+            trend.up ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
           )}
         >
           {trend.up ? "▲" : "▼"} {trend.value}
@@ -144,3 +156,4 @@ export function Placeholder({ name }: { name: string }) {
     </div>
   )
 }
+

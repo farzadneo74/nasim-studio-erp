@@ -7,3 +7,4 @@ export const masterDb =
   new PrismaClient({ log: ["error", "warn"] })
 
 if (process.env.NODE_ENV !== "production") globalForMaster.master = masterDb
+

@@ -106,3 +106,4 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   await db.notification.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

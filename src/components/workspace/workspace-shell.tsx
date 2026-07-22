@@ -1,8 +1,10 @@
 "use client"
 
+import * as React from "react"
 import { Sidebar } from "./sidebar"
 import { Topbar } from "./topbar"
 import { ViewRouter } from "./view-router"
+import { QuickSearch } from "./quick-search"
 import { useWorkspace } from "@/stores/workspace"
 import { Button } from "@/components/ui/button"
 import { PanelLeft } from "lucide-react"
@@ -10,10 +12,23 @@ import { PanelLeft } from "lucide-react"
 export function WorkspaceShell() {
   const { sidebarMode, toggleSidebar } = useWorkspace()
   const isHidden = sidebarMode === "hidden"
+  const [searchOpen, setSearchOpen] = React.useState(false)
+
+  // Global ⌘K / Ctrl+K shortcut to open quick search
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar />
+      <Sidebar onQuickSearch={() => setSearchOpen(true)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-thin">
@@ -32,6 +47,8 @@ export function WorkspaceShell() {
           <PanelLeft className="h-4 w-4" />
         </Button>
       )}
+      <QuickSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   )
 }
+

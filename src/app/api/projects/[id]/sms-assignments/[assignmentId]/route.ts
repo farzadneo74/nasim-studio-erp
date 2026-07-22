@@ -48,3 +48,4 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   await db.projectSmsAssignment.delete({ where: { id: assignmentId } })
   return NextResponse.json({ ok: true })
 }
+

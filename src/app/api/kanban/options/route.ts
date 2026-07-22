@@ -21,3 +21,4 @@ export async function GET(_req: NextRequest) {
     customers: customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone })),
   })
 }
+

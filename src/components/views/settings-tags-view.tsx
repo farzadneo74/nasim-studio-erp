@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLE_PERMISSIONS } from "@/lib/constants"
+import { hasPermission } from "@/lib/constants"
 
 import { PageHeader, EmptyState, SectionCard } from "./_shared"
 import { Button } from "@/components/ui/button"
@@ -47,7 +47,7 @@ const PRESET_COLORS = [
 
 export function SettingsTagsView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = ROLE_PERMISSIONS[role]?.tags
+  const canManage = hasPermission(role, "tags")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -305,3 +305,4 @@ export function SettingsTagsView() {
     </div>
   )
 }
+

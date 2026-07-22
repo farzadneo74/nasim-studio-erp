@@ -171,3 +171,4 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   await db.userNote.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

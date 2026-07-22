@@ -45,6 +45,10 @@ import {
   Video,
   Maximize2,
   File as FileIcon,
+  Camera,
+  UserCog,
+  Check,
+  Minus,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -63,6 +67,7 @@ import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
   ROLE_LABELS,
+  migrateRole,
   NOTE_TYPES,
   CUSTOMER_TYPES,
   TRIGGER_EVENT_LABELS,
@@ -654,6 +659,7 @@ interface PkgOption {
   id: string
   title: string
   category: string
+  quality: string
   basePrice: number
   currentPrice: number
   pricingStrategy: string
@@ -743,15 +749,22 @@ function NewProjectWizard({
   const [newTagIds, setNewTagIds] = React.useState<string[]>([])
   const [newReferrerId, setNewReferrerId] = React.useState<string | null>(null)
 
-  // ---- Step 2: package + pricing + sms ----
+  // ---- Step 2: package + pricing + sms + schedule ----
   const [packageId, setPackageId] = React.useState("")
   const [pricingStrategy, setPricingStrategy] = React.useState("")
-  const [printedDescription, setPrintedDescription] = React.useState("")
   const [discountToman, setDiscountToman] = React.useState(0)
+  const [priceAdjustmentToman, setPriceAdjustmentToman] = React.useState(0)
   // smsAssignments: { enabled, override (number | null = use default) }
   const [smsStates, setSmsStates] = React.useState<Record<string, { enabled: boolean; override: string }>>({})
+  // Editable description + tasks/equipment (with prices) — customized per-project
+  const [editedDescription, setEditedDescription] = React.useState("")
+  const [editedTasks, setEditedTasks] = React.useState<{ name: string; price: number }[]>([])
+  const [editedEquipment, setEditedEquipment] = React.useState<{ name: string; price: number }[]>([])
+  // Package filters
+  const [pkgCategoryFilter, setPkgCategoryFilter] = React.useState("all")
+  const [pkgQualityFilter, setPkgQualityFilter] = React.useState("all")
 
-  // ---- Step 3: schedule + team + freeze ----
+  // ---- Step 3: team + freeze ----
   const [startDate, setStartDate] = React.useState<string | null>(null)
   const [startTime, setStartTime] = React.useState("")
   const [endDate, setEndDate] = React.useState<string | null>(null)
@@ -759,7 +772,8 @@ function NewProjectWizard({
   const [deliveryDeadline, setDeliveryDeadline] = React.useState<string | null>(null)
   const [fieldTeamIds, setFieldTeamIds] = React.useState<string[]>([])
   const [studioTeamIds, setStudioTeamIds] = React.useState<string[]>([])
-  const [deliveryTeamIds, setDeliveryTeamIds] = React.useState<string[]>([])
+  const [
+setDeliveryTeamIds] = React.useState<string[]>([])
   const [isPriceFrozen, setIsPriceFrozen] = React.useState(false)
 
   // ---- Data fetches ----
@@ -835,14 +849,25 @@ function NewProjectWizard({
     }
   }, [open, customerMode, referrerQuery, role])
 
-  // Sync printedDescription when package changes (only if user hasn't customized it yet)
+  // Sync editable description/tasks/equipment when package changes
   const lastPkgIdRef = React.useRef<string>("")
   React.useEffect(() => {
     if (!packageId || packageId === lastPkgIdRef.current) return
     lastPkgIdRef.current = packageId
     const pkg = (packages ?? []).find((p) => p.id === packageId)
     if (pkg) {
-      setPrintedDescription(pkg.defaultDescription ?? "")
+      setEditedDescription(pkg.defaultDescription ?? "")
+      // Convert tasks/equipment to {name, price} format (handle both string and object)
+      setEditedTasks(
+        (pkg.defaultTasks || []).map((t: any) =>
+          typeof t === "string" ? { name: t, price: 0 } : { name: t.name || "", price: Number(t.price) || 0 }
+        )
+      )
+      setEditedEquipment(
+        (pkg.defaultEquipment || []).map((e: any) =>
+          typeof e === "string" ? { name: e, price: 0 } : { name: e.name || "", price: Number(e.price) || 0 }
+        )
+      )
       if (!pricingStrategy) setPricingStrategy(pkg.pricingStrategy)
     }
   }, [packageId, packages, pricingStrategy])
@@ -850,42 +875,34 @@ function NewProjectWizard({
   // ---- Pricing preview ----
   const selectedPkg = (packages ?? []).find((p) => p.id === packageId) ?? null
   const basePriceToman = selectedPkg ? Math.round(selectedPkg.currentPrice / 10) : 0
-  const finalPriceToman = Math.max(0, basePriceToman - discountToman)
+  const adjustedPriceToman = Math.max(0, basePriceToman + priceAdjustmentToman)
+  const finalPriceToman = Math.max(0, adjustedPriceToman - discountToman)
+
+  // Filtered packages for step 2 grid
+  const filteredPackages = (packages ?? []).filter((p) => {
+    if (pkgCategoryFilter !== "all" && p.category !== pkgCategoryFilter) return false
+    if (pkgQualityFilter !== "all" && p.quality !== pkgQualityFilter) return false
+    return true
+  })
 
   // ---- Submit ----
   const createMut = useMutation({
     mutationFn: async () => {
       const payload: Record<string, unknown> = {
+        customerId,
         servicePackageId: packageId,
         pricingStrategy: pricingStrategy || undefined,
-        printedDescription: printedDescription.trim() || undefined,
+        customDescription: editedDescription.trim() || undefined,
+        customTasks: editedTasks.filter((t) => t.name.trim().length > 0),
+        customEquipment: editedEquipment.filter((e) => e.name.trim().length > 0),
         discountAmount: discountToman > 0 ? discountToman : 0,
+        priceAdjustment: priceAdjustmentToman || 0,
         startDatetime: combineDateAndTime(startDate, startTime) || undefined,
         endDatetime: combineDateAndTime(endDate, endTime) || undefined,
         deliveryDeadline: deliveryDeadline || undefined,
         fieldTeamIds,
         studioTeamIds,
-        deliveryTeamIds,
-        isPriceFrozen,
-      }
-
-      if (customerMode === "existing") {
-        payload.customerId = customerId
-      } else {
-        payload.newCustomer = {
-          name: newName.trim(),
-          phone: newPhone.trim(),
-          customerType: newType,
-          profileImage: newProfileImage,
-          extraPhones: newExtraPhones.filter((p) => p.phone.trim().length > 0),
-          city: newCity.trim() || undefined,
-          address: newAddress.trim() || undefined,
-          birthDate: newBirthDate || undefined,
-          engagementDate: newEngagementDate || undefined,
-          weddingDate: newWeddingDate || undefined,
-          tags: newTagIds,
-          referrerId: newReferrerId || null,
-        }
+isPriceFrozen,
       }
 
       // SMS assignments: collect enabled ones (with override if provided)
@@ -924,24 +941,13 @@ function NewProjectWizard({
 
   function reset() {
     setStep(1)
-    setCustomerMode("existing")
     setCustomerId(null)
     setCustomerSearch("")
-    setNewName("")
-    setNewPhone("")
-    setNewType("individual")
-    setNewProfileImage(null)
-    setNewExtraPhones([])
-    setNewCity("")
-    setNewAddress("")
-    setNewBirthDate(null)
-    setNewEngagementDate(null)
-    setNewWeddingDate(null)
-    setNewTagIds([])
-    setNewReferrerId(null)
     setPackageId("")
     setPricingStrategy("")
-    setPrintedDescription("")
+    setEditedDescription("")
+    setEditedTasks([])
+    setEditedEquipment([])
     setDiscountToman(0)
     setSmsStates({})
     setStartDate(null)
@@ -951,7 +957,7 @@ function NewProjectWizard({
     setDeliveryDeadline(null)
     setFieldTeamIds([])
     setStudioTeamIds([])
-    setDeliveryTeamIds([])
+    
     setIsPriceFrozen(false)
     lastPkgIdRef.current = ""
   }
@@ -962,16 +968,16 @@ function NewProjectWizard({
   }
 
   // ---- Step validation ----
-  const step1Valid =
-    customerMode === "existing"
-      ? !!customerId
-      : newName.trim().length > 0 && newPhone.trim().length >= 4
+  const step1Valid = !!customerId
   const step2Valid = !!packageId
 
   // ---- Team filters ----
-  const photographers = (users ?? []).filter((u) => u.role === "photographer")
-  const editors = (users ?? []).filter((u) => u.role === "editor" || u.role === "qc")
-  const logistics = (users ?? []).filter((u) => u.role === "logistics")
+  // تیم اجرایی: عکاس، تصویربردار، کادر حرفه‌ای
+  const photographers = (users ?? []).filter((u) => ["photographer", "videographer", "pro_crew"].includes(migrateRole(u.role)))
+  // تیم استودیو/ادیت/تدوین: ادیتور، تدوین‌کار
+  const editors = (users ?? []).filter((u) => ["editor", "film_editor"].includes(migrateRole(u.role)))
+  // تیم تحویل: مسئول فروش
+  const logistics = (users ?? []).filter((u) => migrateRole(u.role) === "sales")
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? null : close())}>
@@ -985,8 +991,8 @@ function NewProjectWizard({
         <div className="mb-4 flex items-center justify-between gap-2">
           {[
             { n: 1, label: "مشتری" },
-            { n: 2, label: "پکیج و قیمت و پیامک" },
-            { n: 3, label: "زمان‌بندی و تیم" },
+            { n: 2, label: "پکیج، قیمت، زمان و پیامک" },
+            { n: 3, label: "تیم و تحویل" },
           ].map((s) => (
             <div key={s.n} className="flex flex-1 items-center gap-2">
               <div
@@ -1015,127 +1021,18 @@ function NewProjectWizard({
         ===================================================== */}
         {step === 1 && (
           <div className="space-y-4">
-            <RadioGroup
-              value={customerMode}
-              onValueChange={(v) => setCustomerMode(v as "existing" | "new")}
-              className="grid grid-cols-2 gap-2"
-            >
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm transition",
-                  customerMode === "existing" ? "border-primary/40 bg-primary/5" : "bg-card hover:bg-muted/40"
-                )}
-              >
-                <RadioGroupItem value="existing" />
-                <span className="font-medium">مشتری موجود</span>
-              </label>
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm transition",
-                  customerMode === "new" ? "border-primary/40 bg-primary/5" : "bg-card hover:bg-muted/40"
-                )}
-              >
-                <RadioGroupItem value="new" />
-                <span className="font-medium">مشتری جدید</span>
-              </label>
-            </RadioGroup>
-
-            {customerMode === "existing" ? (
-              <ExistingCustomerPicker
-                search={customerSearch}
-                onSearchChange={setCustomerSearch}
-                results={customerResults ?? []}
-                loading={customersLoading}
-                selectedId={customerId}
-                onSelect={(c) => setCustomerId(c.id)}
-                onClear={() => setCustomerId(null)}
-              />
-            ) : (
-              <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Label className="mb-1.5 block text-xs">نام مشتری *</Label>
-                    <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="مثال: علی رضایی" />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block text-xs">شماره تلفن *</Label>
-                    <Input dir="ltr" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="0912…" className="text-left" />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block text-xs">نوع مشتری</Label>
-                    <Select value={newType} onValueChange={(v) => setNewType(v as "individual" | "company")}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CUSTOMER_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t === "company" ? "🏢 حقوقی" : "👤 حقیقی"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Extra phones */}
-                <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold">شماره‌های تماس اضافی</span>
-                  </div>
-                  <MiniExtraPhonesEditor value={newExtraPhones} onChange={setNewExtraPhones} />
-                </div>
-
-                {/* City + address */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label className="mb-1.5 block text-xs">شهر</Label>
-                    <CityCombobox value={newCity} onChange={setNewCity} cities={cities ?? []} />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block text-xs">نشانی</Label>
-                    <Input value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="نشانی کامل" />
-                  </div>
-                </div>
-
-                {/* Dates */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <Label className="mb-1.5 block text-xs">تاریخ تولد</Label>
-                    <JalaliDatePicker value={newBirthDate} onChange={setNewBirthDate} placeholder="انتخاب تاریخ" />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block text-xs">تاریخ عقد</Label>
-                    <JalaliDatePicker value={newEngagementDate} onChange={setNewEngagementDate} placeholder="انتخاب تاریخ" />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block text-xs">تاریخ ازدواج</Label>
-                    <JalaliDatePicker value={newWeddingDate} onChange={setNewWeddingDate} placeholder="انتخاب تاریخ" />
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <Label className="mb-1.5 block text-xs">تگ‌ها (اختیاری)</Label>
-                  <MiniTagsPicker
-                    allTags={allTags ?? []}
-                    selected={newTagIds}
-                    onChange={setNewTagIds}
-                  />
-                </div>
-
-                {/* Referrer */}
-                <div>
-                  <Label className="mb-1.5 block text-xs">معرفی‌شده توسط (اختیاری)</Label>
-                  <MiniReferrerCombobox
-                    value={newReferrerId}
-                    onChange={setNewReferrerId}
-                    query={referrerQuery}
-                    onQueryChange={setReferrerQuery}
-                    results={referrerResults}
-                  />
-                </div>
+            <ExistingCustomerPicker
+              search={customerSearch}
+              onSearchChange={setCustomerSearch}
+              results={customerResults ?? []}
+              loading={customersLoading}
+              selectedId={customerId}
+              onSelect={(c) => setCustomerId(c.id)}
+              onClear={() => setCustomerId(null)}
+            />
+            {!customerId && (
+              <div className="rounded-lg border border-dashed bg-muted/20 p-3 text-center text-xs text-muted-foreground">
+                برای افزودن مشتری جدید، به بخش «مشتریان» مراجعه کنید.
               </div>
             )}
           </div>
@@ -1145,40 +1042,72 @@ function NewProjectWizard({
             Step 2: Package + Pricing + SMS
         ===================================================== */}
         {step === 2 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Package selector with filter */}
             <div>
-              <Label className="mb-1.5 block text-xs">انتخاب پکیج خدمت *</Label>
-              <Select
-                value={packageId}
-                onValueChange={(v) => {
-                  setPackageId(v)
-                  const pkg = (packages ?? []).find((p) => p.id === v)
-                  if (pkg && !pricingStrategy) setPricingStrategy(pkg.pricingStrategy)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="یک پکیج انتخاب کنید" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(packages ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{ background: CATEGORY_COLORS[p.category as keyof typeof CATEGORY_COLORS] }}
-                        />
-                        {p.title} — {formatRials(p.currentPrice)} تومان
+              <Label className="mb-2 block text-xs font-semibold">انتخاب پکیج خدمت *</Label>
+              {/* Filter bar */}
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Select value={pkgCategoryFilter} onValueChange={setPkgCategoryFilter}>
+                  <SelectTrigger className="h-8 w-full sm:w-[130px]">
+                    <SelectValue placeholder="دسته‌بندی" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">همه دسته‌ها</SelectItem>
+                    <SelectItem value="photo">عکس</SelectItem>
+                    <SelectItem value="video">فیلم</SelectItem>
+                    <SelectItem value="mix">عکس و فیلم</SelectItem>
+                    <SelectItem value="other">سایر</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={pkgQualityFilter} onValueChange={setPkgQualityFilter}>
+                  <SelectTrigger className="h-8 w-full sm:w-[110px]">
+                    <SelectValue placeholder="کیفیت" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">همه کیفیت‌ها</SelectItem>
+                    <SelectItem value="fullhd">Full HD</SelectItem>
+                    <SelectItem value="4k">4K</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Package cards grid */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredPackages.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setPackageId(p.id)
+                      setPricingStrategy(p.pricingStrategy)
+                    }}
+                    className={cn(
+                      "rounded-lg border p-3 text-right transition",
+                      packageId === p.id ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card hover:bg-muted/40"
+                    )}
+                  >
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold">{p.title}</span>
+                      <span
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: CATEGORY_COLORS[p.category as keyof typeof CATEGORY_COLORS] }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="font-bold text-emerald-600">{formatRials(p.currentPrice)} ت</span>
+                      <span className="text-muted-foreground">
+                        {p.quality === "4k" ? "4K" : "Full HD"} · {CATEGORY_LABELS[p.category as keyof typeof CATEGORY_LABELS] ?? p.category}
                       </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Package details panel */}
+            {/* Selected package details — editable */}
             {selectedPkg && (
-              <div className="rounded-lg border bg-muted/30 p-3 text-xs">
-                <div className="mb-2 flex items-center justify-between">
+              <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-block h-2.5 w-2.5 rounded-full"
@@ -1186,119 +1115,301 @@ function NewProjectWizard({
                     />
                     <span className="text-sm font-semibold">{selectedPkg.title}</span>
                   </div>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {CATEGORY_LABELS[selectedPkg.category as keyof typeof CATEGORY_LABELS] ?? selectedPkg.category}
-                  </Badge>
-                </div>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">قیمت پایه</span>
-                    <span className="font-medium">{formatRials(selectedPkg.basePrice)} تومان</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">قیمت فعلی</span>
-                    <span className="font-medium">{formatRials(selectedPkg.currentPrice)} تومان</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">استراتژی</span>
-                    <span className="font-medium">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Badge variant="secondary" className="text-[10px]">
+                      {CATEGORY_LABELS[selectedPkg.category as keyof typeof CATEGORY_LABELS] ?? selectedPkg.category}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {selectedPkg.quality === "4k" ? "4K" : "Full HD"}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
                       {PRICING_STRATEGY_LABELS[selectedPkg.pricingStrategy as keyof typeof PRICING_STRATEGY_LABELS] ?? selectedPkg.pricingStrategy}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">وضعیت</span>
-                    <span className="font-medium">{selectedPkg.isActive ? "فعال" : "غیرفعال"}</span>
+                    </Badge>
                   </div>
                 </div>
-                {selectedPkg.defaultDescription && (
-                  <div className="mt-2 border-t pt-2">
-                    <div className="mb-1 text-muted-foreground">توضیحات پیش‌فرض پکیج:</div>
-                    <div className="whitespace-pre-wrap leading-relaxed">{selectedPkg.defaultDescription}</div>
+
+                {/* Price — single price, bold */}
+                <div className="flex items-center justify-between rounded-md bg-background px-3 py-2">
+                  <span className="text-xs text-muted-foreground">قیمت پکیج</span>
+                  <span className="text-base font-bold text-emerald-600">{formatRials(selectedPkg.currentPrice)} تومان</span>
+                </div>
+
+                {/* Editable description */}
+                <div>
+                  <Label className="mb-1.5 block text-xs font-medium">توضیحات پکیج (قابل ویرایش برای این پروژه)</Label>
+                  <Textarea
+                    rows={3}
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    placeholder="توضیحات پکیج…"
+                    className="text-xs"
+                  />
+                </div>
+
+                {/* Editable tasks — with price */}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <Label className="text-xs font-medium">کارهای پیش‌فرض (با قیمت راهنما)</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={() => setEditedTasks([...editedTasks, { name: "", price: 0 }])}
+                    >
+                      <Plus className="ml-1 size-3" /> افزودن
+                    </Button>
                   </div>
-                )}
-                {selectedPkg.defaultTasks.length > 0 && (
-                  <div className="mt-2 border-t pt-2">
-                    <div className="mb-1 text-muted-foreground">کارهای پیش‌فرض:</div>
-                    <ul className="list-inside list-disc space-y-0.5">
-                      {selectedPkg.defaultTasks.map((t, i) => (
-                        <li key={i}>{t}</li>
-                      ))}
-                    </ul>
+                  <div className="space-y-1">
+                    {editedTasks.map((task, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <Input
+                          value={task.name}
+                          onChange={(e) => {
+                            const next = [...editedTasks]
+                            next[i] = { ...next[i], name: e.target.value }
+                            setEditedTasks(next)
+                          }}
+                          className="h-8 flex-1 text-xs"
+                          placeholder="نام کار…"
+                        />
+                        <Input
+                          type="number"
+                          dir="ltr"
+                          value={task.price || ""}
+                          onChange={(e) => {
+                            const next = [...editedTasks]
+                            next[i] = { ...next[i], price: Number(e.target.value) || 0 }
+                            setEditedTasks(next)
+                          }}
+                          className="h-8 w-28 text-left text-xs"
+                          placeholder="قیمت"
+                        />
+                        <span className="shrink-0 text-[9px] text-muted-foreground">ت</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0 text-muted-foreground hover:text-rose-600"
+                          onClick={() => setEditedTasks(editedTasks.filter((_, idx) => idx !== i))}
+                        >
+                          <X className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    {editedTasks.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground">کاری ثبت نشده.</p>
+                    )}
                   </div>
-                )}
-                {selectedPkg.defaultEquipment.length > 0 && (
-                  <div className="mt-2 border-t pt-2">
-                    <div className="mb-1 text-muted-foreground">تجهیزات پیش‌فرض:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedPkg.defaultEquipment.map((e, i) => (
-                        <span key={i} className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
-                          {e}
-                        </span>
-                      ))}
-                    </div>
+                </div>
+
+                {/* Editable equipment — with price */}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <Label className="text-xs font-medium">تجهیزات (با قیمت راهنما)</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={() => setEditedEquipment([...editedEquipment, { name: "", price: 0 }])}
+                    >
+                      <Plus className="ml-1 size-3" /> افزودن
+                    </Button>
                   </div>
-                )}
+                  <div className="space-y-1">
+                    {editedEquipment.map((eq, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <Input
+                          value={eq.name}
+                          onChange={(e) => {
+                            const next = [...editedEquipment]
+                            next[i] = { ...next[i], name: e.target.value }
+                            setEditedEquipment(next)
+                          }}
+                          className="h-8 flex-1 text-xs"
+                          placeholder="نام تجهیز…"
+                        />
+                        <Input
+                          type="number"
+                          dir="ltr"
+                          value={eq.price || ""}
+                          onChange={(e) => {
+                            const next = [...editedEquipment]
+                            next[i] = { ...next[i], price: Number(e.target.value) || 0 }
+                            setEditedEquipment(next)
+                          }}
+                          className="h-8 w-28 text-left text-xs"
+                          placeholder="قیمت"
+                        />
+                        <span className="shrink-0 text-[9px] text-muted-foreground">ت</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0 text-muted-foreground hover:text-rose-600"
+                          onClick={() => setEditedEquipment(editedEquipment.filter((_, idx) => idx !== i))}
+                        >
+                          <X className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    {editedEquipment.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground">تجهیزی ثبت نشده.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Pricing strategy */}
-            <div>
-              <Label className="mb-1.5 block text-xs">استراتژی قیمت‌گذاری</Label>
-              <Select value={pricingStrategy} onValueChange={setPricingStrategy}>
-                <SelectTrigger>
-                  <SelectValue placeholder="استراتژی" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRICING_STRATEGIES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {PRICING_STRATEGY_LABELS[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Printed description */}
-            <div>
-              <Label className="mb-1.5 block text-xs">توضیحات چاپی پروژه</Label>
-              <Textarea
-                rows={3}
-                value={printedDescription}
-                onChange={(e) => setPrintedDescription(e.target.value)}
-                placeholder="توضیحات پروژه (برای قرارداد و فاکتور)…"
-              />
-            </div>
-
-            {/* Discount + recalculated price */}
+            {/* Pricing strategy + discount + price adjustment + freeze */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label className="mb-1.5 block text-xs">تخفیف (تومان)</Label>
-                <TomanInput
-                  value={discountToman}
-                  onValueChange={setDiscountToman}
-                  placeholder="مبلغ تخفیف به تومان"
-                />
+                <Label className="mb-1.5 block text-xs">استراتژی قیمت‌گذاری</Label>
+                <Select value={pricingStrategy} onValueChange={setPricingStrategy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="استراتژی" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRICING_STRATEGIES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {PRICING_STRATEGY_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Price freeze — next to strategy, disabled initially */}
+                <label className="mt-1.5 flex cursor-pointer items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-1.5">
+                  <Checkbox
+                    checked={isPriceFrozen}
+                    onCheckedChange={(v) => setIsPriceFrozen(Boolean(v))}
+                  />
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[11px]">فریز قیمت (قفل قیمت در برابر تغییرات پکیج)</span>
+                </label>
               </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
-                <div className="text-[10px] text-muted-foreground">پیش‌نمایش قیمت</div>
-                <div className="mt-1.5 space-y-1 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">قیمت پایه</span>
-                    <span className="font-medium">{formatRials(selectedPkg ? selectedPkg.currentPrice : 0)} تومان</span>
+              <div className="space-y-2">
+                <div>
+                  <Label className="mb-1.5 block text-xs">اصلاح قیمت (تومان)</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-rose-600"
+                      onClick={() => setPriceAdjustmentToman(Math.max(-basePriceToman, priceAdjustmentToman - 50000))}
+                      title="کسر ۵۰ هزار"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      dir="ltr"
+                      value={priceAdjustmentToman ? Number(priceAdjustmentToman).toLocaleString("en-US") : ""}
+                      onChange={(e) => {
+                        const v = Number(e.target.value.replace(/[^0-9-]/g, "")) || 0
+                        setPriceAdjustmentToman(v)
+                      }}
+                      placeholder="0"
+                      className="h-9 flex-1 text-center font-mono text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-emerald-600"
+                      onClick={() => setPriceAdjustmentToman(priceAdjustmentToman + 50000)}
+                      title="افزایش ۵۰ هزار"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">تخفیف</span>
-                    <span className="font-medium text-amber-600">− {formatRials(discountToman * 10)} تومان</span>
-                  </div>
-                  <div className="mt-1.5 flex items-center justify-between border-t pt-1.5">
-                    <span className="font-semibold">قیمت نهایی</span>
-                    <span className="text-base font-bold text-emerald-600">
-                      {formatRials(finalPriceToman * 10)} <span className="text-xs font-normal">تومان</span>
-                    </span>
-                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    {priceAdjustmentToman > 0 ? "افزایش" : priceAdjustmentToman < 0 ? "کسر" : "بدون تغییر"} قیمت
+                    {priceAdjustmentToman !== 0 && `: ${toPersianDigits(Math.abs(priceAdjustmentToman).toLocaleString("fa-IR"))} تومان`}
+                  </p>
+                </div>
+                <div>
+                  <Label className="mb-1.5 block text-xs">تخفیف (تومان)</Label>
+                  <Input
+                    dir="ltr"
+                    value={discountToman ? Number(discountToman).toLocaleString("en-US") : ""}
+                    onChange={(e) => setDiscountToman(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                    placeholder="0"
+                    className="h-9 text-center font-mono text-sm"
+                  />
                 </div>
               </div>
             </div>
+
+            {/* Bold price preview */}
+            <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div>
+                  <div className="text-[10px] text-muted-foreground">قیمت پکیج</div>
+                  <div className="text-sm font-bold tabular-nums">{formatRials(selectedPkg ? selectedPkg.currentPrice : 0)} ت</div>
+                </div>
+                {priceAdjustmentToman !== 0 && (
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">اصلاح قیمت</div>
+                    <div className={cn("text-sm font-bold tabular-nums", priceAdjustmentToman > 0 ? "text-sky-600" : "text-rose-600")}>
+                      {priceAdjustmentToman > 0 ? "+ " : "− "}{formatRials(Math.abs(priceAdjustmentToman * 10))} ت
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-[10px] text-muted-foreground">تخفیف</div>
+                  <div className="text-sm font-bold tabular-nums text-amber-600">− {formatRials(discountToman * 10)} ت</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">قیمت نهایی</div>
+                  <div className="text-base font-bold tabular-nums text-emerald-600">{formatRials(finalPriceToman * 10)} ت</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Schedule — moved from step 3 */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <ScheduleField
+                label="شروع اجرا"
+                date={startDate}
+                onDateChange={setStartDate}
+                time={startTime}
+                onTimeChange={setStartTime}
+              />
+              <ScheduleField
+                label="پایان اجرا"
+                date={endDate}
+                onDateChange={setEndDate}
+                time={endTime}
+                onTimeChange={setEndTime}
+              />
+              <div>
+                <Label className="mb-1.5 block text-xs">مهلت تحویل</Label>
+                <JalaliDatePicker
+                  value={deliveryDeadline}
+                  onChange={setDeliveryDeadline}
+                  placeholder="انتخاب تاریخ"
+                />
+              </div>
+            </div>
+
+            {/* Freeze price — moved from step 3, disabled initially */}
+            {canFreeze && (
+              <label className={cn(
+                "flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3",
+                !packageId && "opacity-50"
+              )}>
+                <Checkbox
+                  checked={isPriceFrozen}
+                  onCheckedChange={(v) => setIsPriceFrozen(Boolean(v))}
+                  disabled={!packageId}
+                />
+                <span className="flex items-center gap-1.5 text-xs">
+                  <Snowflake className="h-3.5 w-3.5 text-sky-500" />
+                  فریز قیمت (قفل قیمت فعلی در برابر تغییرات پکیج)
+                </span>
+              </label>
+            )}
 
             {/* SMS Automation assignments */}
             <div className="rounded-lg border bg-card p-3">
@@ -1308,7 +1419,7 @@ function NewProjectWizard({
               </div>
               {(smsAutomations ?? []).length === 0 ? (
                 <p className="rounded-md border border-dashed py-3 text-center text-[11px] text-muted-foreground">
-                  هیچ اتوماسیون پیامکی تعریف نشده است.
+                  هیچ اتوماسیون پیامکی تعریف نشده است. به «تنظیمات ← قالب‌های پیامک» بروید.
                 </p>
               ) : (
                 <div className="max-h-56 space-y-1.5 overflow-y-auto scroll-thin pl-1">
@@ -1371,7 +1482,7 @@ function NewProjectWizard({
                 </div>
               )}
               <p className="mt-2 text-[10px] text-muted-foreground">
-                اگر فاصله (روز) را خالی بگذارید، مقدار پیش‌فرض اتوماسیون استفاده می‌شود.
+                برای مدیریت اتوماسیون‌ها به «تنظیمات ← قالب‌های پیامک» بروید.
               </p>
             </div>
           </div>
@@ -1382,62 +1493,26 @@ function NewProjectWizard({
         ===================================================== */}
         {step === 3 && (
           <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <ScheduleField
-                label="شروع اجرا"
-                date={startDate}
-                onDateChange={setStartDate}
-                time={startTime}
-                onTimeChange={setStartTime}
-              />
-              <ScheduleField
-                label="پایان اجرا"
-                date={endDate}
-                onDateChange={setEndDate}
-                time={endTime}
-                onTimeChange={setEndTime}
-              />
-              <div>
-                <Label className="mb-1.5 block text-xs">مهلت تحویل</Label>
-                <JalaliDatePicker
-                  value={deliveryDeadline}
-                  onChange={setDeliveryDeadline}
-                  placeholder="انتخاب تاریخ"
-                />
-              </div>
-            </div>
-
             {users && users.length > 0 && (
               <div className="grid gap-3 sm:grid-cols-3">
                 <TeamPicker
-                  label="تیم میدانی"
+                  label="تیم اجرایی (عکاس/تصویربردار)"
                   options={photographers}
                   selected={fieldTeamIds}
                   onChange={setFieldTeamIds}
                 />
                 <TeamPicker
-                  label="تیم استودیو/ادیت"
+                  label="تیم استودیو/ادیت و تدوین"
                   options={editors}
                   selected={studioTeamIds}
                   onChange={setStudioTeamIds}
                 />
-                <TeamPicker
-                  label="تیم تحویل"
-                  options={logistics}
-                  selected={deliveryTeamIds}
-                  onChange={setDeliveryTeamIds}
-                />
               </div>
             )}
-
-            {canFreeze && (
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
-                <Checkbox checked={isPriceFrozen} onCheckedChange={(v) => setIsPriceFrozen(Boolean(v))} />
-                <span className="flex items-center gap-1.5 text-xs">
-                  <Snowflake className="h-3.5 w-3.5 text-sky-500" />
-                  فریز قیمت (قفل قیمت فعلی در برابر تغییرات پکیج)
-                </span>
-              </label>
+            {users && users.length === 0 && (
+              <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+                کاربری برای انتخاب تیم وجود ندارد. به «تنظیمات ← کاربران» بروید.
+              </div>
             )}
           </div>
         )}
@@ -3561,7 +3636,7 @@ function NoteItemCard({
           <Icon className="h-3 w-3" />
           {note.author?.fullName ?? "ناشناس"}
           {note.author?.role && (
-            <span className="text-[9px] text-muted-foreground/70">({ROLE_LABELS[note.author.role as Role] ?? note.author.role})</span>
+            <span className="text-[9px] text-muted-foreground/70">({ROLE_LABELS[migrateRole(note.author.role) as Role] ?? note.author.role})</span>
           )}
         </span>
         <span>{timeAgo(note.createdAt)}</span>
@@ -3630,6 +3705,137 @@ function NoteItemCard({
 // ============================================================
 // Level 3: Project detail (overview, tasks, notes, financials, team)
 // ============================================================
+// ============================================================
+// Edit Project Dialog — admin/manager can edit schedule, discount, freeze
+// ============================================================
+function EditProjectDialog({ projectId, data }: { projectId: string; data: ProjectDetailData }) {
+  const api = useApi()
+  const qc = useQueryClient()
+  const [open, setOpen] = React.useState(false)
+  const p = data.project
+
+  const [startDate, setStartDate] = React.useState<string | null>(p.startDatetime)
+  const [startTime, setStartTime] = React.useState(p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : "")
+  const [endDate, setEndDate] = React.useState<string | null>(p.endDatetime)
+  const [endTime, setEndTime] = React.useState(p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : "")
+  const [deliveryDeadline, setDeliveryDeadline] = React.useState<string | null>(p.deliveryDeadline)
+  const [discountToman, setDiscountToman] = React.useState(Math.round((p.discountAmount ?? 0) / 10))
+  const [isPriceFrozen, setIsPriceFrozen] = React.useState(p.isPriceFrozen)
+
+  React.useEffect(() => {
+    if (open) {
+      setStartDate(p.startDatetime)
+      setStartTime(p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : "")
+      setEndDate(p.endDatetime)
+      setEndTime(p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : "")
+      setDeliveryDeadline(p.deliveryDeadline)
+      setDiscountToman(Math.round((p.discountAmount ?? 0) / 10))
+      setIsPriceFrozen(p.isPriceFrozen)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, unknown> = {
+        startDatetime: combineDateAndTime(startDate, startTime) || null,
+        endDatetime: combineDateAndTime(endDate, endTime) || null,
+        deliveryDeadline: deliveryDeadline || null,
+        discountAmount: Math.max(0, Number(discountToman || 0)),
+        isPriceFrozen,
+      }
+      return api.patch(`/api/projects/${projectId}`, payload)
+    },
+    onSuccess: () => {
+      toast.success("پروژه به‌روزرسانی شد")
+      qc.invalidateQueries({ queryKey: ["project", projectId] })
+      qc.invalidateQueries({ queryKey: ["project-workflow", projectId] })
+      qc.invalidateQueries({ queryKey: ["customer-projects"] })
+      setOpen(false)
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={() => setOpen(true)}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        ویرایش پروژه
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>ویرایش پروژه</DialogTitle>
+            <DialogDescription>
+              تاریخ‌ها، تخفیف و وضعیت فریز قیمت را ویرایش کنید.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ScheduleField
+                label="شروع اجرا"
+                date={startDate}
+                onDateChange={setStartDate}
+                time={startTime}
+                onTimeChange={setStartTime}
+              />
+              <ScheduleField
+                label="پایان اجرا"
+                date={endDate}
+                onDateChange={setEndDate}
+                time={endTime}
+                onTimeChange={setEndTime}
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block text-xs">مهلت تحویل</Label>
+              <JalaliDatePicker
+                value={deliveryDeadline}
+                onChange={setDeliveryDeadline}
+                placeholder="انتخاب تاریخ"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block text-xs">تخفیف (تومان)</Label>
+              <TomanInput
+                value={discountToman}
+                onValueChange={setDiscountToman}
+                placeholder="مبلغ تخفیف به تومان"
+              />
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
+              <Checkbox
+                checked={isPriceFrozen}
+                onCheckedChange={(v) => setIsPriceFrozen(Boolean(v))}
+              />
+              <span className="flex items-center gap-1.5 text-xs">
+                <Snowflake className="h-3.5 w-3.5 text-sky-500" />
+                فریز قیمت (قفل قیمت فعلی در برابر تغییرات پکیج)
+              </span>
+            </label>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>انصراف</Button>
+            <Button disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+              {saveMut.isPending ? "در حال ذخیره…" : "ذخیره تغییرات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function ProjectDetail() {
   const api = useApi()
   const qc = useQueryClient()
@@ -3680,7 +3886,6 @@ function ProjectDetail() {
         },
         fieldTeam: p.fieldTeam ?? [],
         studioTeam: p.studioTeam ?? [],
-        deliveryTeam: p.deliveryTeam ?? [],
         payments: (p.payments ?? []).map((pay: any) => ({
           id: pay.id,
           amount: Number(pay.amount),
@@ -3768,6 +3973,11 @@ function ProjectDetail() {
           >
             {STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
           </Badge>
+
+          {/* Edit project button — admin/manager only */}
+          {data.canManage && (data.role === "admin" || data.role === "manager") && (
+            <EditProjectDialog projectId={p.id} data={data} />
+          )}
         </div>
       </div>
 
@@ -3806,6 +4016,7 @@ interface ProjectDetailData {
     status: string
     pricingStrategy: string
     isPriceFrozen: boolean
+    exemptFromPhotoPriceUpdate: boolean
     isReadyForDelivery: boolean
     calculatedPrice: number | null
     lockedPrice: number | null
@@ -3819,6 +4030,7 @@ interface ProjectDetailData {
     effectivePrice: number | null
     totalPaid: number | null
     balance: number | null
+    printPhotoTotal?: number | null
     contract: { contractNumber: string; customer: { id: string; name: string } }
     servicePackage: {
       id: string
@@ -3832,8 +4044,7 @@ interface ProjectDetailData {
       defaultEquipment: string[]
     }
     fieldTeam: { id: string; firstName: string; lastName: string; role: string }[]
-    studioTeam: { id: string; firstName: string; lastName: string; role: string }[]
-    deliveryTeam: { id: string; firstName: string; lastName: string; role: string }[]
+    studioTeam: { id: string; firstName: string; lastName: string; role: string }[][]
     payments: {
       id: string
       amount: number
@@ -3872,51 +4083,42 @@ interface ProjectDetailData {
 
 function OverviewTab({ data }: { data: ProjectDetailData }) {
   const p = data.project
+  const seeBalance = data.seeBalance
+  const effectivePrice = p.effectivePrice ?? 0
+  const totalPaid = p.totalPaid ?? 0
+  const balance = p.balance ?? 0
+  const discount = p.discountAmount ?? 0
+  const calculatedPrice = p.calculatedPrice ?? 0
+  const paymentProgress = effectivePrice > 0 ? Math.min(100, Math.round((totalPaid / effectivePrice) * 100)) : 0
+  const isFullyPaid = balance <= 0 && totalPaid > 0
+
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* Package full description — shown FIRST per user request */}
-      {p.servicePackage.defaultDescription && (
-        <SectionCard title="توضیحات کامل پکیج" className="lg:col-span-2">
+    <div className="space-y-4">
+      {/* 1. توضیحات کامل پکیج */}
+      <SectionCard title="توضیحات کامل پکیج">
+        {p.servicePackage.defaultDescription ? (
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{p.servicePackage.defaultDescription}</p>
-        </SectionCard>
-      )}
-
-      {/* Project description (entered at creation time) */}
-      {p.printedDescription && (
-        <SectionCard title="توضیحات پروژه (ثبت‌شده هنگام ساخت)" className="lg:col-span-2">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{p.printedDescription}</p>
-        </SectionCard>
-      )}
-
-      <SectionCard title="زمان‌بندی">
-        <dl className="space-y-2 text-sm">
-          <Row label="شروع اجرا" value={formatDateTime(p.startDatetime)} />
-          <Row label="پایان اجرا" value={formatDateTime(p.endDatetime)} />
-          <Row label="مهلت تحویل" value={formatDate(p.deliveryDeadline)} />
-          <Row label="شروع واقعی" value={formatDateTime(p.actualStartDatetime)} />
-          <Row label="پایان واقعی" value={formatDateTime(p.actualEndDatetime)} />
-        </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">توضیحاتی برای این پکیج ثبت نشده است.</p>
+        )}
       </SectionCard>
 
-      <PricingCard data={data} />
-
-      {/* Real execution times — editable by admin/manager */}
-      <ActualTimesEditor projectId={p.id} data={data} />
-
-      {/* Package default tasks */}
-      {p.servicePackage.defaultTasks.length > 0 && (
-        <SectionCard title="کارهای پیش‌فرض پکیج" className="lg:col-span-2">
+      {/* 2. کارهای پیش‌فرض پکیج */}
+      <SectionCard title="کارهای پیش‌فرض پکیج">
+        {p.servicePackage.defaultTasks.length > 0 ? (
           <ul className="list-inside list-disc space-y-1 text-sm leading-relaxed">
             {p.servicePackage.defaultTasks.map((t, i) => (
               <li key={i}>{t}</li>
             ))}
           </ul>
-        </SectionCard>
-      )}
+        ) : (
+          <p className="text-sm text-muted-foreground">کاری برای این پکیج تعریف نشده است.</p>
+        )}
+      </SectionCard>
 
-      {/* Package default equipment */}
-      {p.servicePackage.defaultEquipment.length > 0 && (
-        <SectionCard title="تجهیزات پیش‌فرض پکیج" className="lg:col-span-2">
+      {/* 3. تجهیزات پیش‌فرض پکیج */}
+      <SectionCard title="تجهیزات پیش‌فرض پکیج">
+        {p.servicePackage.defaultEquipment.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
             {p.servicePackage.defaultEquipment.map((e, i) => (
               <span
@@ -3927,8 +4129,24 @@ function OverviewTab({ data }: { data: ProjectDetailData }) {
               </span>
             ))}
           </div>
-        </SectionCard>
-      )}
+        ) : (
+          <p className="text-sm text-muted-foreground">تجهیزی برای این پکیج تعریف نشده است.</p>
+        )}
+      </SectionCard>
+
+      {/* 4. زمان‌بندی */}
+      <SectionCard title="زمان‌بندی">
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <Row label="شروع اجرا" value={formatDateTime(p.startDatetime)} />
+          <Row label="پایان اجرا" value={formatDateTime(p.endDatetime)} />
+          <Row label="مهلت تحویل" value={formatDate(p.deliveryDeadline)} />
+          <Row label="شروع واقعی" value={formatDateTime(p.actualStartDatetime)} />
+          <Row label="پایان واقعی" value={formatDateTime(p.actualEndDatetime)} />
+        </dl>
+      </SectionCard>
+
+      {/* 5. ساعت‌های واقعی اجرا */}
+      <ActualTimesEditor projectId={p.id} data={data} />
     </div>
   )
 }
@@ -4219,29 +4437,152 @@ function ActualTimesEditor({ projectId, data }: { projectId: string; data: Proje
   )
 }
 
+// Quick "record payment" button with inline dialog for the FinancialsTab
+function RecordPaymentButton({ projectId }: { projectId: string }) {
+  const api = useApi()
+  const qc = useQueryClient()
+  const [open, setOpen] = React.useState(false)
+  const [amount, setAmount] = React.useState("")
+  const [paymentType, setPaymentType] = React.useState("installment")
+  const [method, setMethod] = React.useState("card")
+  const [note, setNote] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+
+  // Format number with thousand separators
+  const formatNum = (val: string) => {
+    const raw = val.replace(/[^0-9]/g, "")
+    if (!raw) return ""
+    return Number(raw).toLocaleString("en-US")
+  }
+
+  const submit = async () => {
+    const toman = Number(amount.replace(/,/g, ""))
+    if (!toman || toman <= 0) { toast.error("مبلغ معتبر وارد کنید"); return }
+    if (!note.trim()) { toast.error("یادداشت الزامی است"); return }
+    setSubmitting(true)
+    try {
+      await api.post(`/api/projects/${projectId}/payments`, {
+        amount: Math.round(toman * 10),
+        paymentType,
+        method,
+        note: note.trim(),
+        isConfirmed: true,
+      })
+      toast.success("پرداخت ثبت شد")
+      qc.invalidateQueries({ queryKey: ["project", projectId] })
+      setOpen(false)
+      setAmount("")
+      setNote("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "ثبت ناموفق بود")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Plus className="h-3.5 w-3.5" /> ثبت پرداخت
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>ثبت پرداخت</DialogTitle>
+            <DialogDescription>مبلغ به تومان وارد می‌شود.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>مبلغ (تومان) <span className="text-rose-500">*</span></Label>
+              <Input
+                dir="ltr"
+                value={formatNum(amount)}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="5,000,000"
+                className="text-left font-mono"
+              />
+              {amount && Number(amount.replace(/,/g, "")) > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {toPersianDigits(Number(amount.replace(/,/g, "")).toLocaleString("fa-IR"))} تومان
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>نوع</Label>
+                <Select value={paymentType} onValueChange={setPaymentType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="deposit">پیش‌پرداخت</SelectItem>
+                    <SelectItem value="installment">قسط</SelectItem>
+                    <SelectItem value="settlement">تسویه</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>روش</Label>
+                <Select value={method} onValueChange={setMethod}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">نقدی</SelectItem>
+                    <SelectItem value="card">کارت به کارت</SelectItem>
+                    <SelectItem value="pos">پوز</SelectItem>
+                    <SelectItem value="cheque">چک</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>یادداشت <span className="text-rose-500">*</span></Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثلاً: پرداخت قسط دوم" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>انصراف</Button>
+            <Button onClick={submit} disabled={submitting || !amount || !note.trim()}>
+              {submitting ? "در حال ذخیره..." : "ثبت"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function FinancialsTab({ data }: { data: ProjectDetailData }) {
   const p = data.project
   if (!data.seeFinance && !data.seeBalance) {
     return <EmptyState icon="🔒" title="دسترسی محدود" description="اطلاعات مالی فقط برای مدیران و مدیران سیستم قابل مشاهده است." />
   }
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      {data.seeBalance && p.effectivePrice != null && (
-        <StatCard label="قیمت مؤثر" value={`${formatRialsShort(p.effectivePrice)} تومان`} accent="#0ea5e9" />
-      )}
-      {data.seeBalance && (
-        <StatCard label="پرداخت‌شده" value={`${formatRialsShort(p.totalPaid ?? 0)} تومان`} accent="#10b981" />
-      )}
-      {data.seeBalance && (
-        <StatCard label="مانده" value={`${formatRialsShort(p.balance ?? 0)} تومان`} accent="#f59e0b" />
-      )}
-      {data.seeFinance && p.discountAmount > 0 && (
-        <StatCard label="تخفیف" value={`− ${formatRialsShort(p.discountAmount)} تومان`} accent="#a855f7" />
-      )}
+    <div className="space-y-4">
+      {/* Pricing card (moved from Overview) */}
+      <PricingCard data={data} />
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {data.seeBalance && p.effectivePrice != null && (
+          <StatCard label="قیمت مؤثر" value={`${formatRialsShort(p.effectivePrice)} تومان`} accent="#0ea5e9" />
+        )}
+        {data.seeBalance && (
+          <StatCard label="پرداخت‌شده" value={`${formatRialsShort(p.totalPaid ?? 0)} تومان`} accent="#10b981" />
+        )}
+        {data.seeBalance && (
+          <StatCard label="مانده" value={`${formatRialsShort(p.balance ?? 0)} تومان`} accent="#f59e0b" />
+        )}
+        {data.seeFinance && p.discountAmount > 0 && (
+          <StatCard label="تخفیف" value={`− ${formatRialsShort(p.discountAmount)} تومان`} accent="#a855f7" />
+        )}
+      </div>
+
       <SectionCard
         title="پرداخت‌ها"
         description="لیست پرداخت‌های ثبت‌شده برای این پروژه"
-        className="lg:col-span-3"
+      
+        actions={
+          data.seeBalance && data.canManage ? (
+            <RecordPaymentButton projectId={p.id} />
+          ) : undefined
+        }
       >
         {p.payments.length === 0 ? (
           <EmptyState icon="💰" title="پرداختی ثبت نشده" />
@@ -4297,11 +4638,39 @@ function FinancialsTab({ data }: { data: ProjectDetailData }) {
 
 function TeamTab({ data }: { data: ProjectDetailData }) {
   const p = data.project
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = role === "admin" || role === "manager"
+
+  const { data: usersData } = useQuery<{ items: { id: string; firstName: string; lastName: string; role: string; isAvailable?: boolean }[] }>({
+    queryKey: ["users-for-team"],
+    queryFn: async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+      const res = await fetch("/api/users", { credentials: "include", headers: { "x-demo-role": role, ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
+      const d = await res.json()
+      return { items: Array.isArray(d) ? d : (d.items || []) }
+    },
+  })
+  const allUsers = usersData?.items ?? []
+
+  const assignMut = useMutation({
+    mutationFn: async (body: { teamType: "fieldTeam" | "studioTeam"; userIds: string[] }) => {
+      return api.patch(`/api/projects/${p.id}`, { [body.teamType]: body.userIds })
+    },
+    onSuccess: () => {
+      toast.success("تیم به‌روزرسانی شد")
+      qc.invalidateQueries({ queryKey: ["project", p.id] })
+    },
+    onError: (e: Error) => toast.error(e.message || "به‌روزرسانی ناموفق بود"),
+  })
+
   const groups = [
-    { label: "تیم میدانی", team: p.fieldTeam, icon: "📸" },
-    { label: "تیم استودیو", team: p.studioTeam, icon: "🎨" },
-    { label: "تیم تحویل", team: p.deliveryTeam, icon: "🚚" },
+    { label: "تیم میدانی", team: p.fieldTeam, icon: "📸", key: "fieldTeam" as const },
+    { label: "تیم استودیو", team: p.studioTeam, icon: "🎨", key: "studioTeam" as const },
+    
   ]
+
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       {groups.map((g) => (
@@ -4322,11 +4691,38 @@ function TeamTab({ data }: { data: ProjectDetailData }) {
                       {u.firstName} {u.lastName}
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                      {ROLE_LABELS[u.role as Role] ?? u.role}
+                      {ROLE_LABELS[migrateRole(u.role) as Role] ?? u.role}
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {canManage && (
+            <div className="mt-3 border-t pt-2">
+              <Select
+                value=""
+                onValueChange={(userId) => {
+                  if (!userId) return
+                  assignMut.mutate({
+                    teamType: g.key,
+                    userIds: [...g.team.map((t) => t.id), userId],
+                  })
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="+ افزودن عضو" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allUsers
+                    .filter((u) => !g.team.some((t) => t.id === u.id))
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName} ({ROLE_LABELS[u.role as Role] ?? u.role})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </SectionCard>
@@ -4337,63 +4733,139 @@ function TeamTab({ data }: { data: ProjectDetailData }) {
 
 function SmsTab({ data }: { data: ProjectDetailData }) {
   const p = data.project
-  if (p.smsAssignments.length === 0) {
-    return (
-      <EmptyState
-        icon="💬"
-        title="اتوماسیون پیامکی اختصاص نیافته"
-        description="برای این پروژه هیچ اتوماسیون پیامکی در زمان ساخت انتخاب نشده است."
-      />
-    )
-  }
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = role === "admin" || role === "manager"
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [selectedAutomation, setSelectedAutomation] = React.useState("")
+
+  const { data: automationsData } = useQuery<{ items: { id: string; name: string; triggerEvent: string; templateName: string; offsetDays: number }[] }>({
+    queryKey: ["sms-automations-for-project"],
+    queryFn: async () => {
+      const res = await fetch("/api/sms-automations", { credentials: "include", headers: { "x-demo-role": role, ...((typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null) ? { Authorization: `Bearer ${localStorage.getItem("nasim-session-token")}` } : {}) } })
+      const d = await res.json()
+      return { items: Array.isArray(d) ? d : (d.items || []) }
+    },
+  })
+  const allAutomations = automationsData?.items ?? []
+  const availableAutomations = allAutomations.filter(
+    (a) => !p.smsAssignments.some((sa) => sa.automationId === a.id || sa.automationName === a.name)
+  )
+
+  const addAssignMut = useMutation({
+    mutationFn: async (automationId: string) => {
+      return api.post(`/api/projects/${p.id}/sms-assignments`, { automationId })
+    },
+    onSuccess: () => {
+      toast.success("اتوماسیون پیامک اضافه شد")
+      qc.invalidateQueries({ queryKey: ["project", p.id] })
+      setAddOpen(false)
+      setSelectedAutomation("")
+    },
+    onError: (e: Error) => toast.error(e.message || "افزودن ناموفق بود"),
+  })
+
+  const toggleAssignMut = useMutation({
+    mutationFn: async ({ assignmentId, enabled }: { assignmentId: string; enabled: boolean }) => {
+      return api.patch(`/api/projects/${p.id}/sms-assignments/${assignmentId}`, { enabled })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project", p.id] })
+    },
+    onError: (e: Error) => toast.error(e.message || "به‌روزرسانی ناموفق بود"),
+  })
+
   return (
-    <SectionCard
-      title="اتوماسیون‌های پیامک اختصاص‌یافته"
-      description="این پیامک‌ها بر اساس رویدادهای پروژه و فاصلهٔ زمانی مشخص‌شده ارسال می‌شوند."
-    >
-      <div className="space-y-2">
-        {p.smsAssignments.map((a) => (
-          <div
-            key={a.id}
-            className={cn(
-              "rounded-lg border p-3",
-              a.enabled ? "bg-emerald-500/5" : "bg-muted/30 opacity-70"
-            )}
-          >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{a.automationName}</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {TRIGGER_EVENT_LABELS[a.triggerEvent as keyof typeof TRIGGER_EVENT_LABELS] ?? a.triggerEvent}
-                  </Badge>
-                  {!a.enabled && <span className="text-[10px] text-amber-600">غیرفعال</span>}
+    <div className="space-y-4">
+      <SectionCard
+        title="اتوماسیون‌های پیامک"
+        description="مدیریت پیامک‌های خودکار این پروژه"
+        actions={
+          canManage && availableAutomations.length > 0 ? (
+            <Popover open={addOpen} onOpenChange={setAddOpen}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" /> افزودن اتوماسیون
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-2">
+                <div className="space-y-1">
+                  <div className="px-1 py-1 text-xs font-semibold text-muted-foreground">اتوماسیون‌های موجود</div>
+                  {availableAutomations.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => addAssignMut.mutate(a.id)}
+                      className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-right text-xs hover:bg-muted"
+                    >
+                      <span className="font-medium">{a.name}</span>
+                      <Badge variant="outline" className="text-[9px]">
+                        {TRIGGER_EVENT_LABELS[a.triggerEvent as keyof typeof TRIGGER_EVENT_LABELS] ?? a.triggerEvent}
+                      </Badge>
+                    </button>
+                  ))}
                 </div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  قالب: {a.templateName}
-                </div>
-                {a.templateText && (
-                  <div className="mt-1 line-clamp-2 whitespace-pre-wrap text-[11px] leading-relaxed">
-                    {a.templateText}
-                  </div>
+              </PopoverContent>
+            </Popover>
+          ) : undefined
+        }
+      >
+        {p.smsAssignments.length === 0 ? (
+          <EmptyState
+            icon="💬"
+            title="اتوماسیون پیامکی اختصاص نیافته"
+            description="برای این پروژه هیچ اتوماسیون پیامکی انتخاب نشده است."
+          />
+        ) : (
+          <div className="space-y-2">
+            {p.smsAssignments.map((a) => (
+              <div
+                key={a.id}
+                className={cn(
+                  "rounded-lg border p-3",
+                  a.enabled ? "bg-emerald-500/5" : "bg-muted/30 opacity-70"
                 )}
-              </div>
-              <div className="shrink-0 text-left text-[11px]">
-                <div className="text-muted-foreground">فاصله از رویداد</div>
-                <div className="font-medium">
-                  {toPersianDigits(String(a.effectiveOffsetDays))} روز
-                </div>
-                {a.offsetDaysOverride != null && a.offsetDaysOverride !== a.defaultOffsetDays && (
-                  <div className="text-[10px] text-amber-600">
-                    پیش‌فرض: {toPersianDigits(String(a.defaultOffsetDays))} روز
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold">{a.automationName}</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {TRIGGER_EVENT_LABELS[a.triggerEvent as keyof typeof TRIGGER_EVENT_LABELS] ?? a.triggerEvent}
+                      </Badge>
+                      {!a.enabled && <span className="text-[10px] text-amber-600">غیرفعال</span>}
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      قالب: {a.templateName}
+                    </div>
+                    {a.templateText && (
+                      <div className="mt-1 line-clamp-2 whitespace-pre-wrap text-[11px] leading-relaxed">
+                        {a.templateText}
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <div className="text-left text-[11px]">
+                      <div className="text-muted-foreground">فاصله از رویداد</div>
+                      <div className="font-medium">
+                        {toPersianDigits(String(a.effectiveOffsetDays))} روز
+                      </div>
+                    </div>
+                    {canManage && (
+                      <Switch
+                        checked={a.enabled}
+                        onCheckedChange={(v) => toggleAssignMut.mutate({ assignmentId: a.id, enabled: v })}
+                        className="scale-75"
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </SectionCard>
+        )}
+      </SectionCard>
+    </div>
   )
 }
 
@@ -4434,6 +4906,10 @@ interface WorkflowTrackInfo {
 interface WorkflowData {
   tracks: WorkflowTrackInfo[]
   category: string
+  project?: {
+    exemptFromPhotoPriceUpdate?: boolean
+    isPriceFrozen?: boolean
+  }
 }
 
 function WorkflowTab({ projectId, category }: { projectId: string; category: string }) {
@@ -4451,7 +4927,7 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
   const { data: usersData } = useQuery<{ items: { id: string; firstName: string; lastName: string; role: string }[] }>({
     queryKey: ["users-for-workflow"],
     queryFn: async () => {
-      const res = await fetch("/api/users", { credentials: "include", headers: { "x-demo-role": role } })
+      const res = await fetch("/api/users", { credentials: "include", headers: { "x-demo-role": role, ...((typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null) ? { Authorization: `Bearer ${localStorage.getItem("nasim-session-token")}` } : {}) } })
       const data = await res.json()
       // API returns a flat array, wrap it in { items: [...] }
       return { items: Array.isArray(data) ? data : (data.items || []) }
@@ -4483,7 +4959,7 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
   const { data: printPricesData } = useQuery<{ items: { id: string; size: string; paperType: string; laminateType: string; photoLocation: string; price: number; isActive: boolean }[] }>({
     queryKey: ["print-photo-prices"],
     queryFn: async () => {
-      const res = await fetch("/api/print-photo-prices", { credentials: "include", headers: { "x-demo-role": role } })
+      const res = await fetch("/api/print-photo-prices", { credentials: "include", headers: { "x-demo-role": role, ...((typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null) ? { Authorization: `Bearer ${localStorage.getItem("nasim-session-token")}` } : {}) } })
       const data = await res.json()
       // API returns a flat array, wrap it in { items: [...] }
       return { items: Array.isArray(data) ? data : (data.items || []) }
@@ -4532,7 +5008,7 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
   const isMix = category === "mix"
   const printPhotos = projectPrintPhotos?.items ?? []
   const printPhotoTotal = printPhotos.reduce((s, p) => s + p.total, 0)
-  const isExempt = false // will be set from project data
+  const isExempt = (data.project?.exemptFromPhotoPriceUpdate) ?? false
 
   return (
     <div className="space-y-6">
@@ -4560,6 +5036,61 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
           />
         ))}
       </div>
+
+      {/* Price freeze controls — both project + print photos, side by side */}
+      {canManage && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* Freeze project price */}
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
+            <Checkbox
+              checked={data.project?.isPriceFrozen ?? false}
+              onCheckedChange={(v) => {
+                api.patch(`/api/projects/${projectId}`, { isPriceFrozen: Boolean(v) })
+                  .then(() => {
+                    toast.success(Boolean(v) ? "قیمت پروژه فریز شد" : "فریز قیمت پروژه لغو شد")
+                    qc.invalidateQueries({ queryKey: ["project-workflow", projectId] })
+                    qc.invalidateQueries({ queryKey: ["project", projectId] })
+                  })
+                  .catch(() => toast.error("عملیات ناموفق بود"))
+              }}
+            />
+            <span className="flex items-center gap-1.5 text-xs">
+              <Snowflake className="h-3.5 w-3.5 text-sky-500" />
+              فریز قیمت پروژه
+            </span>
+          </label>
+
+          {/* Freeze print photo price (only for photo projects) */}
+          {hasPhotoTrack && (
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
+              <Checkbox
+                checked={isExempt}
+                onCheckedChange={(v) => exemptMut.mutate(Boolean(v))}
+                disabled={exemptMut.isPending}
+              />
+              <span className="flex items-center gap-1.5 text-xs">
+                <Snowflake className="h-3.5 w-3.5 text-sky-500" />
+                فریز قیمت عکس‌های چاپی
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Print photo total summary */}
+      {hasPhotoTrack && printPhotos.length > 0 && (
+        <div className="rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">جمع عکس‌های چاپی</span>
+            <span className="text-base font-bold text-emerald-600">
+              {formatRials(printPhotoTotal)} تومان
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            این مبلغ به قیمت پروژه افزوده می‌شود و از استراتژی قیمت متغیر تبعیت می‌کند.
+          </p>
+        </div>
+      )}
 
       {/* Print photo selection — only for projects with a photo track */}
       {hasPhotoTrack && (
@@ -4615,7 +5146,7 @@ function PrintPhotoSection({
 }) {
   const [addOpen, setAddOpen] = React.useState(false)
   const [selectedPriceId, setSelectedPriceId] = React.useState<string>("")
-  const [quantity, setQuantity] = React.useState(1)
+  const [quantity, setQuantity] = React.useState<string>("1")
 
   const activePrices = printPrices.filter((p) => p.isActive)
 
@@ -4624,10 +5155,15 @@ function PrintPhotoSection({
       toast.error("یک عکس چاپی انتخاب کنید")
       return
     }
-    onAdd(selectedPriceId, quantity)
+    const qty = parseInt(quantity) || 1
+    if (qty < 1) {
+      toast.error("تعداد باید حداقل ۱ باشد")
+      return
+    }
+    onAdd(selectedPriceId, qty)
     setAddOpen(false)
     setSelectedPriceId("")
-    setQuantity(1)
+    setQuantity("1")
   }
 
   return (
@@ -4718,8 +5254,9 @@ function PrintPhotoSection({
                 type="number"
                 dir="ltr"
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
                 className="w-full"
+                min={1}
               />
             </div>
           </div>
@@ -4756,116 +5293,221 @@ function TrackColumn({
   const trackLabel = trackInfo.track === "photo" ? "مسیر عکس" : "مسیر فیلم"
   const trackColor = trackInfo.track === "photo" ? "#0ea5e9" : "#ef4444"
   const currentStatus = normalizeStatus(trackInfo.currentStatus) as ProjectStatus
+  const currentIdx = STATUS_FLOW.indexOf(currentStatus)
+  const progressPercent = Math.round(((currentIdx + 1) / STATUS_FLOW.length) * 100)
+  const completedCount = currentIdx + (currentStatus === "delivered" ? 0 : 0)
+  const isDelivered = currentStatus === "delivered"
 
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="size-3 rounded-full" style={{ background: trackColor }} />
-        <h4 className="text-sm font-semibold">{trackLabel}</h4>
-        <Badge
-          variant="secondary"
-          className="mr-auto text-[10px]"
-          style={{ background: STATUS_COLORS[currentStatus] + "22", color: STATUS_COLORS[currentStatus] }}
-        >
-          {STATUS_LABELS[currentStatus] ?? currentStatus}
-        </Badge>
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      {/* Header with gradient accent */}
+      <div
+        className="relative px-4 pb-3 pt-4"
+        style={{ background: `linear-gradient(135deg, ${trackColor}10, transparent)` }}
+      >
+        <div className="mb-3 flex items-center gap-2">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg shadow-sm"
+            style={{ background: trackColor + "22", color: trackColor }}
+          >
+            <Camera className="h-4 w-4" />
+          </div>
+          <h4 className="text-sm font-bold">{trackLabel}</h4>
+          <Badge
+            variant="secondary"
+            className="mr-auto text-[10px] font-medium"
+            style={{ background: STATUS_COLORS[currentStatus] + "22", color: STATUS_COLORS[currentStatus] }}
+          >
+            {STATUS_LABELS[currentStatus] ?? currentStatus}
+          </Badge>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>پیشرفت کلی</span>
+          <span className="font-semibold" style={{ color: trackColor }}>
+            {toPersianDigits(progressPercent)}٪
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progressPercent}%`,
+              background: `linear-gradient(90deg, ${trackColor}, ${trackColor}dd)`,
+            }}
+          />
+        </div>
+        <div className="mt-1 text-[10px] text-muted-foreground">
+          {toPersianDigits(completedCount)} از {toPersianDigits(STATUS_FLOW.length)} مرحله تکمیل شده
+          {isDelivered && " · ✅ تحویل داده شد"}
+        </div>
       </div>
 
-      <div className="space-y-2">
+      {/* Timeline stages — vertical connected timeline */}
+      <div className="relative p-4">
         {STATUS_FLOW.map((stage, idx) => {
           const stageInfo = trackInfo.stages.find((s) => s.stage === stage)
           const isCurrent = stage === currentStatus
-          const isPast = STATUS_FLOW.indexOf(currentStatus) > idx
-          const isFuture = STATUS_FLOW.indexOf(currentStatus) < idx
+          const isPast = currentIdx > idx
+          const isFuture = currentIdx < idx
           const isAuto = ["scheduled", "running"].includes(stage)
           const nextStage = NEXT_STAGE[stage]
           const canAdvance = isCurrent && nextStage && (canManage || stageInfo?.assigneeId === currentRole || isAuto)
           const isQC = stage === "qc"
+          const isLast = idx === STATUS_FLOW.length - 1
+          const stageColor = isPast ? "#22c55e" : STATUS_COLORS[stage]
 
           return (
-            <div
-              key={stage}
-              className={cn(
-                "rounded-lg border p-2.5 transition-colors",
-                isCurrent && "border-primary/40 bg-primary/5",
-                isPast && "opacity-60",
-                isFuture && "opacity-50"
-              )}
-            >
-              <div className="flex items-center gap-2">
+            <div key={stage} className="relative flex gap-3 pb-4 last:pb-0">
+              {/* Vertical connector line */}
+              {!isLast && (
                 <div
-                  className="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ background: isPast ? "#22c55e" : STATUS_COLORS[stage] }}
+                  className="absolute right-[15px] top-8 h-[calc(100%-1rem)] w-0.5"
+                  style={{
+                    background: isPast ? "#22c55e55" : "var(--border, #e2e8f0)",
+                  }}
+                />
+              )}
+
+              {/* Stage indicator dot */}
+              <div className="relative z-10 shrink-0">
+                <div
+                  className={cn(
+                    "flex size-8 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-all",
+                    isCurrent && "scale-110 shadow-md",
+                    isPast && "border-transparent text-white",
+                    isCurrent && "border-transparent text-white",
+                    isFuture && "border-border bg-card text-muted-foreground"
+                  )}
+                  style={{
+                    background: (isPast || isCurrent) ? stageColor : undefined,
+                    borderColor: isFuture ? undefined : stageColor,
+                  }}
                 >
-                  {isPast ? "✓" : toPersianDigits(idx + 1)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium">{STATUS_LABELS[stage]}</span>
-                    {isAuto && (
-                      <Badge variant="outline" className="h-4 px-1 text-[8px] text-muted-foreground">خودکار</Badge>
-                    )}
-                    {stageInfo?.completedAt && (
-                      <Badge variant="outline" className="h-4 px-1 text-[8px] text-emerald-600">انجام شد</Badge>
-                    )}
-                  </div>
-                  {stageInfo?.assignee && (
-                    <div className="text-[10px] text-muted-foreground">
-                      مسئول: {stageInfo.assignee.firstName} {stageInfo.assignee.lastName}
-                    </div>
+                  {isPast ? (
+                    <Check className="size-3.5" />
+                  ) : isCurrent ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    toPersianDigits(idx + 1)
                   )}
                 </div>
-                {/* Assignee selector (admin/manager only, manual stages only) */}
-                {!isAuto && canManage && (
-                  <Select
-                    value={stageInfo?.assigneeId ?? "__none__"}
-                    onValueChange={(v) => onAssign(stage, v === "__none__" ? null : v)}
-                  >
-                    <SelectTrigger className="h-7 w-[140px] text-[10px]">
-                      <SelectValue placeholder="انتخاب مسئول" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— بدون مسئول —</SelectItem>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.firstName} {u.lastName} ({ROLE_LABELS[u.role as Role] ?? u.role})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {isCurrent && (
+                  <div
+                    className="absolute -inset-1 -z-10 animate-ping rounded-full opacity-20"
+                    style={{ background: stageColor }}
+                  />
                 )}
               </div>
 
-              {/* Action buttons */}
-              {canAdvance && (
-                <div className="mt-2 flex gap-1.5">
-                  {nextStage && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 gap-1 text-[10px]"
-                      disabled={isTransitioning}
-                      onClick={() => onTransition(nextStage)}
+              {/* Stage content */}
+              <div
+                className={cn(
+                  "min-w-0 flex-1 rounded-lg border p-2.5 transition-all",
+                  isCurrent && "border-primary/30 bg-primary/5 shadow-sm",
+                  isPast && "border-transparent bg-muted/20",
+                  isFuture && "border-dashed border-border/50 opacity-60"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn("text-xs font-semibold", isPast && "text-muted-foreground line-through")}
+                        style={isCurrent ? { color: stageColor } : undefined}
+                      >
+                        {STATUS_LABELS[stage]}
+                      </span>
+                      {isAuto && (
+                        <Badge variant="outline" className="h-4 px-1 text-[8px] text-muted-foreground">
+                          خودکار
+                        </Badge>
+                      )}
+                      {stageInfo?.completedAt && (
+                        <Badge variant="outline" className="h-4 gap-0.5 px-1 text-[8px] text-emerald-600">
+                          <Check className="size-2.5" /> انجام شد
+                        </Badge>
+                      )}
+                      {isCurrent && (
+                        <Badge
+                          variant="outline"
+                          className="h-4 px-1 text-[8px] font-medium"
+                          style={{ background: stageColor + "15", color: stageColor, borderColor: stageColor + "30" }}
+                        >
+                          در حال انجام
+                        </Badge>
+                      )}
+                    </div>
+                    {stageInfo?.assignee && (
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <UserCog className="size-2.5" />
+                        مسئول: {stageInfo.assignee.firstName} {stageInfo.assignee.lastName}
+                      </div>
+                    )}
+                    {stageInfo?.startedAt && (
+                      <div className="text-[9px] text-muted-foreground/70">
+                        شروع: {formatDateTime(stageInfo.startedAt)}
+                      </div>
+                    )}
+                    {stageInfo?.completedAt && (
+                      <div className="text-[9px] text-emerald-600/70">
+                        تکمیل: {formatDateTime(stageInfo.completedAt)}
+                      </div>
+                    )}
+                  </div>
+                  {/* Assignee selector (admin/manager only, manual stages only) */}
+                  {!isAuto && canManage && (
+                    <Select
+                      value={stageInfo?.assigneeId ?? "__none__"}
+                      onValueChange={(v) => onAssign(stage, v === "__none__" ? null : v)}
                     >
-                      <ArrowLeft className="size-3" />
-                      تکمیل و رفتن به {STATUS_LABELS[nextStage]}
-                    </Button>
-                  )}
-                  {/* QC can send back to editing */}
-                  {isQC && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1 text-[10px] text-amber-600"
-                      disabled={isTransitioning}
-                      onClick={() => onTransition("editing")}
-                    >
-                      <ArrowRight className="size-3" />
-                      بازگرداندن به ادیت
-                    </Button>
+                      <SelectTrigger className="h-7 w-[130px] shrink-0 text-[10px]">
+                        <SelectValue placeholder="انتخاب مسئول" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— بدون مسئول —</SelectItem>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.firstName} {u.lastName} ({ROLE_LABELS[migrateRole(u.role) as Role] ?? u.role})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
-              )}
+
+                {/* Action buttons */}
+                {canAdvance && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {nextStage && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 gap-1 text-[10px]"
+                        disabled={isTransitioning}
+                        onClick={() => onTransition(nextStage)}
+                      >
+                        <ArrowLeft className="size-3" />
+                        تکمیل و رفتن به {STATUS_LABELS[nextStage]}
+                      </Button>
+                    )}
+                    {/* QC can send back to editing */}
+                    {isQC && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 text-[10px] text-amber-600"
+                        disabled={isTransitioning}
+                        onClick={() => onTransition("editing")}
+                      >
+                        <ArrowRight className="size-3" />
+                        بازگرداندن به ادیت
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
@@ -4873,3 +5515,4 @@ function TrackColumn({
     </div>
   )
 }
+

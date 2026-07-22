@@ -98,3 +98,4 @@ export async function PATCH(
     userMarkedUnavailable: status === "approved" && overlapsToday(existing.startDate, existing.endDate),
   })
 }
+

@@ -18,3 +18,4 @@ export async function ensureStudioDb(dbName: string): Promise<void> {
   const dbPath = path.join(process.cwd(), "db", dbName)
   try { await fs.access(dbPath) } catch { await fs.writeFile(dbPath, "") }
 }
+

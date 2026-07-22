@@ -13,14 +13,13 @@ export async function GET() {
   const seeFinance = CAN_ACCESS_FULL_FINANCE.includes(role)
   const seeBalance = CAN_SEE_BALANCE.includes(role)
 
-  const [projects, payments, expenses, customers, salaryRecords, notifications, leavePending] = await Promise.all([
+  const [projects, payments, expenses, customers, salaryRecords, notifications, leavePending, allCustomers] = await Promise.all([
     db.project.findMany({
       include: {
         servicePackage: true,
         contract: { include: { customer: true } },
         fieldTeam: true,
         studioTeam: true,
-        deliveryTeam: true,
         payments: true,
       },
     }),
@@ -30,6 +29,7 @@ export async function GET() {
     db.salaryRecord.findMany({ include: { user: true } }),
     db.notification.findMany({ orderBy: { createdAt: "desc" }, take: 6 }),
     db.leaveRequest.count({ where: { status: "pending" } }),
+    db.customer.findMany({ select: { id: true, name: true, phone: true, birthDate: true, engagementDate: true, weddingDate: true, profileImage: true } }),
   ])
 
   // KPIs
@@ -115,7 +115,7 @@ export async function GET() {
         startDatetime: p.startDatetime,
         effectivePrice: seeBalance ? eff : null,
         balance: seeBalance ? Math.max(0, eff - paid) : null,
-        team: [...p.fieldTeam, ...p.studioTeam, ...p.deliveryTeam].map((u) => ({
+        team: [...p.fieldTeam, ...p.studioTeam, ].map((u) => ({
           id: u.id,
           name: u.firstName + " " + u.lastName,
         })),
@@ -135,6 +135,65 @@ export async function GET() {
       start: p.startDatetime,
       end: p.endDatetime,
     }))
+
+  // Upcoming birthdays & anniversaries (next 60 days + just passed within 7 days)
+  // Computes the nearest occurrence of each date (past or future).
+  type OccasionItem = {
+    customerId: string
+    name: string
+    phone: string | null
+    profileImage: string | null
+    type: "birthday" | "engagement" | "wedding"
+    date: string // ISO of the nearest occurrence
+    daysUntil: number // negative = already passed
+    years: number | null
+  }
+  const occasions: OccasionItem[] = []
+  const now = new Date()
+  for (const c of allCustomers) {
+    const dates: Array<{ date: Date | null; type: OccasionItem["type"] }> = [
+      { date: c.birthDate, type: "birthday" },
+      { date: c.engagementDate, type: "engagement" },
+      { date: c.weddingDate, type: "wedding" },
+    ]
+    for (const { date, type } of dates) {
+      if (!date) continue
+      // Compute the nearest occurrence of this month-day
+      const thisYear = new Date(date)
+      thisYear.setFullYear(now.getFullYear())
+      const nextYear = new Date(date)
+      nextYear.setFullYear(now.getFullYear() + 1)
+      const lastYear = new Date(date)
+      lastYear.setFullYear(now.getFullYear() - 1)
+      // Pick the closest occurrence to now
+      const candidates = [thisYear, nextYear, lastYear]
+      let nearest = candidates[0]
+      let minDiff = Math.abs(nearest.getTime() - now.getTime())
+      for (const cand of candidates) {
+        const diff = Math.abs(cand.getTime() - now.getTime())
+        if (diff < minDiff) {
+          minDiff = diff
+          nearest = cand
+        }
+      }
+      const daysUntil = Math.round((nearest.getTime() - now.getTime()) / 86400000)
+      // Show occasions within -14 to +90 days
+      if (daysUntil < -14 || daysUntil > 90) continue
+      const years = date.getFullYear() > 1900 ? nearest.getFullYear() - date.getFullYear() : null
+      occasions.push({
+        customerId: c.id,
+        name: c.name,
+        phone: c.phone,
+        profileImage: c.profileImage,
+        type,
+        date: nearest.toISOString(),
+        daysUntil,
+        years,
+      })
+    }
+  }
+  occasions.sort((a, b) => Math.abs(a.daysUntil) - Math.abs(b.daysUntil))
+  const upcomingOccasions = occasions.slice(0, 8)
 
   return NextResponse.json({
     role,
@@ -156,6 +215,7 @@ export async function GET() {
     revenueTrend: seeFinance ? months : null,
     recentProjects,
     upcoming,
+    upcomingOccasions,
     notifications,
     seeFinance,
     seeBalance,
@@ -167,3 +227,4 @@ export async function GET() {
     },
   })
 }
+

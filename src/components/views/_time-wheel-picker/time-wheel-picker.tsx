@@ -166,3 +166,4 @@ export function formatTime12h(hhmm: string): string {
   if (h12 === 0) h12 = 12
   return `${toPersianDigits(h12)}:${toPersianDigits(String(m).padStart(2, "0"))} ${period}`
 }
+

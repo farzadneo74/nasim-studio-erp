@@ -21,3 +21,4 @@ export async function notifyPaymentApproval(paymentId: string, amount: number, c
 export async function notifyBroadcast(title: string, message: string, link?: string) {
   try { await db.notification.create({ data: { type: "info", title, message, link, userId: null } }) } catch { /* best-effort */ }
 }
+

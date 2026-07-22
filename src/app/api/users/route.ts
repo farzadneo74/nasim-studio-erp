@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { ROLES } from "@/lib/constants"
+import { ROLES, migrateRole } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
@@ -16,20 +16,26 @@ function publicUser(u: {
   iban: string | null
   cardNumber: string | null
   address: string | null
+  permissions: string | null
   createdAt: Date
 }) {
+  // Legacy role strings (qc, logistics) are auto-migrated on read so old DB
+  // rows render with the new 8-role names without mutating the DB.
   return {
     id: u.id,
     firstName: u.firstName,
     lastName: u.lastName,
     phone: u.phone,
     email: u.email,
-    role: u.role,
+    role: migrateRole(u.role),
     isAvailable: u.isAvailable,
     bankName: u.bankName,
     iban: u.iban,
     cardNumber: u.cardNumber,
     address: u.address,
+    // Raw per-user permission overrides JSON string (e.g. `{"overrides":{...}}`).
+    // The client can parse this to render effective permissions per user.
+    permissions: u.permissions ?? "{}",
     createdAt: u.createdAt,
   }
 }
@@ -58,6 +64,7 @@ export async function GET() {
       iban: true,
       cardNumber: true,
       address: true,
+      permissions: true,
       createdAt: true,
     },
   })
@@ -90,7 +97,9 @@ export async function POST(req: NextRequest) {
   if (!phone) return NextResponse.json({ error: "Phone is required" }, { status: 400 })
 
   const userRole = String(body.role || "")
-  if (!ROLES.includes(userRole as never)) {
+  // Migrate legacy roles (qc, logistics) to the new system before validating.
+  const migratedRole = migrateRole(userRole)
+  if (!ROLES.includes(migratedRole as never)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 })
   }
 
@@ -111,7 +120,8 @@ export async function POST(req: NextRequest) {
       lastName,
       phone,
       email,
-      role: userRole,
+      // Persist the migrated (canonical) role — avoids creating new legacy rows.
+      role: migratedRole,
       isAvailable,
       personalMeta: "{}",
     },
@@ -127,9 +137,11 @@ export async function POST(req: NextRequest) {
       iban: true,
       cardNumber: true,
       address: true,
+      permissions: true,
       createdAt: true,
     },
   })
 
   return NextResponse.json(publicUser(created), { status: 201 })
 }
+

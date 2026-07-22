@@ -142,3 +142,4 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     notifiedAt: updated.notifiedAt ? updated.notifiedAt.toISOString() : null,
   })
 }
+

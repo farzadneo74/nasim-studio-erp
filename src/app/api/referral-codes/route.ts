@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { ROLE_PERMISSIONS, type Role } from "@/lib/constants"
+import { hasPermission, type Role } from "@/lib/constants"
 import { PrismaClient } from "@prisma/client"
 
 export const dynamic = "force-dynamic"
@@ -28,7 +28,7 @@ function iso(d: Date | null): string | null {
 // GET /api/referral-codes?ownerId=&status=&page=&limit=
 export async function GET(req: NextRequest) {
   const role = await getCurrentRole()
-  if (!ROLE_PERMISSIONS[role].qr) {
+  if (!hasPermission(role, "qr_factory")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   // دریافت دیتابیس استودیوی فعال
@@ -128,7 +128,7 @@ interface CreateBody {
 // POST /api/referral-codes {ownerId, quantity, discountPercent, maxUses, relatedProjectId?, validUntil?}
 export async function POST(req: NextRequest) {
   const role = await getCurrentRole()
-  if (!ROLE_PERMISSIONS[role].qr) {
+  if (!hasPermission(role, "qr_factory")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   // دریافت دیتابیس استودیوی فعال
@@ -216,3 +216,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ items: created }, { status: 201 })
 }
+

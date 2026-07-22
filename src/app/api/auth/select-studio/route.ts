@@ -21,3 +21,4 @@ export async function POST(req: Request) {
   await masterDb.session.update({ where: { token }, data: { studioId, role: membership.role } })
   return NextResponse.json({ ok: true, studio: { id: membership.studio.id, name: membership.studio.name, dbName: membership.studio.dbName }, role: membership.role })
 }
+

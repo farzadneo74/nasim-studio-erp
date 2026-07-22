@@ -17,12 +17,10 @@ const REGISTRY: Record<string, React.LazyExoticComponent<React.ComponentType>> =
   scanner: React.lazy(() => import("@/components/views/scanner-view").then(m => ({ default: m.ScannerView }))),
   "settings-packages": React.lazy(() => import("@/components/views/settings-packages-view").then(m => ({ default: m.SettingsPackagesView }))),
   "settings-tags": React.lazy(() => import("@/components/views/settings-tags-view").then(m => ({ default: m.SettingsTagsView }))),
-  "settings-users": React.lazy(() => import("@/components/views/settings-users-view").then(m => ({ default: m.SettingsUsersView }))),
-  "settings-salary-rules": React.lazy(() => import("@/components/views/settings-salary-rules-view").then(m => ({ default: m.SettingsSalaryRulesView }))),
+  "settings-employees": React.lazy(() => import("@/components/views/settings-employees-view").then(m => ({ default: m.SettingsEmployeesView }))),
   "settings-print-photo-prices": React.lazy(() => import("@/components/views/settings-print-photo-prices-view").then(m => ({ default: m.SettingsPrintPhotoPricesView }))),
   "settings-sms-templates": React.lazy(() => import("@/components/views/settings-sms-templates-view").then(m => ({ default: m.SettingsSmsTemplatesView }))),
   "settings-system": React.lazy(() => import("@/components/views/settings-system-view").then(m => ({ default: m.SettingsSystemView }))),
-  "settings-leaves": React.lazy(() => import("@/components/views/settings-leaves-view").then(m => ({ default: m.SettingsLeavesView }))),
   "settings-custom-fields": React.lazy(() => import("@/components/views/settings-custom-fields-view").then(m => ({ default: m.SettingsCustomFieldsView }))),
   "settings-storage": React.lazy(() => import("@/components/views/storage-management-view").then(m => ({ default: m.StorageManagementView }))),
 }
@@ -44,3 +42,4 @@ export function ViewRouter() {
     </div>
   )
 }
+

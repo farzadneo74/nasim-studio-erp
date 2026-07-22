@@ -88,3 +88,4 @@ export function jalaliTodayString(): string {
 }
 
 export { toPersianDigits, formatJalaliDate, formatJalaliDateTime }
+

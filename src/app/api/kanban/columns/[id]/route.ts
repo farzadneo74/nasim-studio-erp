@@ -29,3 +29,4 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   await db.kanbanColumn.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

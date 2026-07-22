@@ -443,26 +443,35 @@ interface MultiLink {
   projectId: string | null
 }
 
-function parseMultiLink(card: { linkType: string | null; linkId: string | null }): MultiLink {
-  if (!card.linkType || !card.linkId) return { customerId: null, projectId: null }
-  if (card.linkType === "multi") {
-    try {
-      const parsed = JSON.parse(card.linkId) as Partial<MultiLink>
-      return {
-        customerId: typeof parsed.customerId === "string" ? parsed.customerId : null,
-        projectId: typeof parsed.projectId === "string" ? parsed.projectId : null,
+function parseMultiLink(card: { linkType: string | null; linkId: string | null; sourceProjectId?: string | null; sourceCustomerId?: string | null }): MultiLink {
+  // First check explicit multi-link
+  if (card.linkType && card.linkId) {
+    if (card.linkType === "multi") {
+      try {
+        const parsed = JSON.parse(card.linkId) as Partial<MultiLink>
+        return {
+          customerId: typeof parsed.customerId === "string" ? parsed.customerId : null,
+          projectId: typeof parsed.projectId === "string" ? parsed.projectId : null,
+        }
+      } catch {
+        // fall through
       }
-    } catch {
-      return { customerId: null, projectId: null }
+    }
+    // Legacy formats
+    if (card.linkType === "customer") return { customerId: card.linkId, projectId: null }
+    if (card.linkType === "project") return { customerId: null, projectId: card.linkId }
+  }
+  // Fall back to sourceProjectId / sourceCustomerId (from workflow assignment)
+  if (card.sourceProjectId || card.sourceCustomerId) {
+    return {
+      customerId: card.sourceCustomerId ?? null,
+      projectId: card.sourceProjectId ?? null,
     }
   }
-  // Legacy formats — preserve backward compatibility with cards stored before the redesign.
-  if (card.linkType === "customer") return { customerId: card.linkId, projectId: null }
-  if (card.linkType === "project") return { customerId: null, projectId: card.linkId }
   return { customerId: null, projectId: null }
 }
 
-function hasMultiLink(card: { linkType: string | null; linkId: string | null }): boolean {
+function hasMultiLink(card: { linkType: string | null; linkId: string | null; sourceProjectId?: string | null; sourceCustomerId?: string | null }): boolean {
   const { customerId, projectId } = parseMultiLink(card)
   return Boolean(customerId || projectId)
 }
@@ -707,6 +716,8 @@ function CustomerCombobox({
   placeholder?: string
 }) {
   const api = useApi()
+  const apiRef = React.useRef(api)
+  React.useEffect(() => { apiRef.current = api }, [api])
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [results, setResults] = React.useState<KanbanOptionsCustomer[]>([])
@@ -725,14 +736,14 @@ function CustomerCombobox({
     const params = new URLSearchParams({ limit: "20" })
     if (query.trim()) params.set("search", query.trim())
     const t = setTimeout(() => {
-      api
+      apiRef.current
         .get<{ items?: KanbanOptionsCustomer[] }>(`/api/customers?${params.toString()}`)
         .then((d) => { if (!cancelled) setResults(d.items || []) })
         .catch(() => { if (!cancelled) setResults([]) })
         .finally(() => !cancelled && setLoading(false))
     }, 220)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [open, query, api])
+  }, [open, query])
 
   const selected = results.find((r) => r.id === value) || known
 
@@ -823,6 +834,8 @@ function ProjectCombobox({
   placeholder?: string
 }) {
   const api = useApi()
+  const apiRef = React.useRef(api)
+  React.useEffect(() => { apiRef.current = api }, [api])
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [results, setResults] = React.useState<ProjectSearchItem[]>([])
@@ -843,7 +856,7 @@ function ProjectCombobox({
     const url = customerId
       ? `/api/customers/${customerId}/projects`
       : `/api/projects?limit=50`
-    api
+    apiRef.current
       .get<
         | { items?: Array<{ id: string; contractNumber: string; customer: { name: string }; package: { title: string } }> }
         | { projects?: Array<{ id: string; contractNumber: string; title: string }> }
@@ -871,7 +884,7 @@ function ProjectCombobox({
       .catch(() => { if (!cancelled) setResults([]) })
       .finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
-  }, [open, customerId, api])
+  }, [open, customerId])
 
   // Client-side filter (the customer-scoped endpoint doesn't support server-side search).
   const filtered = React.useMemo(() => {
@@ -1199,6 +1212,22 @@ function SortableCard({
               {card.description}
             </div>
           )}
+
+          {/* Source project/customer info (from workflow assignment) */}
+          {(() => {
+            const { customerId: cid, projectId: pid } = parseMultiLink(card)
+            if (!cid && !pid) return null
+            const cust = cid ? options?.customers.find((x) => x.id === cid) : null
+            const proj = pid ? options?.projects.find((x) => x.id === pid) : null
+            if (!cust && !proj) return null
+            return (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                {cust && <span>مشتری: {cust.name}</span>}
+                {cust && proj && <span> · </span>}
+                {proj && <span>پروژه: {proj.contractNumber}</span>}
+              </div>
+            )
+          })()}
 
           {/* Badges */}
           {(card.priority !== "none" || card.dueDate || card.labels.length > 0 || hasMultiLink(card)) && (
@@ -2501,3 +2530,4 @@ export function MyTasksView() {
     </div>
   )
 }
+

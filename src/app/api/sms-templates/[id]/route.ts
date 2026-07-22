@@ -81,3 +81,4 @@ export async function DELETE(
   await db.sMSTemplate.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

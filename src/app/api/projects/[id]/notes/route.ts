@@ -11,13 +11,12 @@ async function assertOnTeam(db: PrismaClient, role: Role, projectId: string) {
   if (!userId) return false
   const p = await db.project.findUnique({
     where: { id: projectId },
-    include: { fieldTeam: { select: { id: true } }, studioTeam: { select: { id: true } }, deliveryTeam: { select: { id: true } } },
+    include: { fieldTeam: { select: { id: true } }, studioTeam: { select: { id: true } } },
   })
   if (!p) return false
   return (
     p.fieldTeam.some((u) => u.id === userId) ||
-    p.studioTeam.some((u) => u.id === userId) ||
-    p.deliveryTeam.some((u) => u.id === userId)
+    p.studioTeam.some((u) => u.id === userId)
   )
 }
 
@@ -174,3 +173,4 @@ export async function POST(req: Request, { params }: Ctx) {
     { status: 201 }
   )
 }
+

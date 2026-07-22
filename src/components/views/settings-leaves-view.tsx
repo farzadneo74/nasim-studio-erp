@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLES, ROLE_LABELS, LEAVE_STATUSES, LEAVE_STATUS_LABELS } from "@/lib/constants"
+import { ROLES, ROLE_LABELS, ROLE_BADGE_COLORS, hasPermission, LEAVE_STATUSES, LEAVE_STATUS_LABELS } from "@/lib/constants"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -62,15 +62,7 @@ interface LeaveRequest {
   updatedAt: string
 }
 
-const ROLE_BADGE: Record<Role, string> = {
-  admin: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-  manager: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  sales: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  photographer: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  editor: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  qc: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
-  logistics: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-}
+const ROLE_BADGE = ROLE_BADGE_COLORS
 
 const STATUS_BADGE: Record<LeaveStatus, string> = {
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
@@ -84,7 +76,7 @@ function initials(u: { firstName: string; lastName: string }) {
 
 export function SettingsLeavesView() {
   const role = useWorkspace((s) => s.role)
-  const canView = role === "admin" || role === "manager"
+  const canView = hasPermission(role, "employees")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -361,3 +353,4 @@ function CountCard({
     </div>
   )
 }
+

@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 
 import { useWorkspace } from "@/stores/workspace"
-import { ROLE_PERMISSIONS, type Role } from "@/lib/constants"
+import { hasPermission, type Role } from "@/lib/constants"
 import { formatDate } from "@/lib/format"
 
 import { PageHeader, EmptyState, SectionCard } from "./_shared"
@@ -301,7 +301,7 @@ export function ScannerView() {
   const setPage = useWorkspace((s) => s.setPage)
   const mutate = useMutate()
 
-  const canAccess = ROLE_PERMISSIONS[role].scanner
+  const canAccess = hasPermission(role, "scanner")
 
   const [input, setInput] = React.useState("")
   const [result, setResult] = React.useState<ValidateResponse | null>(null)
@@ -580,3 +580,4 @@ export function ScannerView() {
     </div>
   )
 }
+

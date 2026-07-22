@@ -171,12 +171,17 @@ function CustomerCombobox({
   const [results, setResults] = React.useState<CustomerOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<CustomerOption | null>(null)
+  // Track the last value we attempted to resolve, to avoid re-fetching
+  // the same value in an infinite loop (known was previously in deps).
+  const resolvedRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
-    if (!value) { setKnown(null); return }
-    if (known?.id === value) return
+    if (!value) { resolvedRef.current = null; setKnown(null); return }
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     let cancelled = false
-    fetch(`/api/customers?limit=50&search=`, { headers: { "x-demo-role": role } })
+    const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+    fetch(`/api/customers?limit=50&search=`, { credentials: "include", headers: { "x-demo-role": role, ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return
@@ -185,16 +190,17 @@ function CustomerCombobox({
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [value, known, role])
+  }, [value, role])
 
   React.useEffect(() => {
     if (!open) return
     let cancelled = false
     setLoading(true)
+    const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
     const params = new URLSearchParams({ limit: "20" })
     if (query) params.set("search", query)
     const t = setTimeout(() => {
-      fetch(`/api/customers?${params.toString()}`, { headers: { "x-demo-role": role } })
+      fetch(`/api/customers?${params.toString()}`, { credentials: "include", headers: { "x-demo-role": role, ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
         .then((r) => r.json())
         .then((d) => { if (!cancelled) setResults((d.items || []) as CustomerOption[]) })
         .catch(() => {})
@@ -281,13 +287,16 @@ function ProjectCombobox({
   const [results, setResults] = React.useState<ProjectOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<ProjectOption | null>(null)
+  const resolvedRef = React.useRef<string | null>(null)
 
   // Hydrate the selected project's name from /api/projects (lightweight list)
   React.useEffect(() => {
-    if (!value) { setKnown(null); return }
-    if (known?.id === value) return
+    if (!value) { resolvedRef.current = null; setKnown(null); return }
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     let cancelled = false
-    fetch(`/api/projects?limit=100`, { headers: { "x-demo-role": role } })
+    const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+    fetch(`/api/projects?limit=100`, { credentials: "include", headers: { "x-demo-role": role, ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return
@@ -303,7 +312,7 @@ function ProjectCombobox({
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [value, known, role])
+  }, [value, role])
 
   // If a customer is selected, fetch only that customer's projects.
   // Otherwise, fetch the general project list.
@@ -314,7 +323,8 @@ function ProjectCombobox({
     const url = customerId
       ? `/api/customers/${customerId}/projects`
       : `/api/projects?limit=50`
-    fetch(url, { headers: { "x-demo-role": role } })
+    const token2 = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+    fetch(url, { credentials: "include", headers: { "x-demo-role": role, ...(token2 ? { Authorization: `Bearer ${token2}` } : {}) } })
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return
@@ -421,13 +431,16 @@ function UserCombobox({
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<UserOption | null>(null)
   const [forbidden, setForbidden] = React.useState(false)
+  const resolvedRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
-    if (!value) { setKnown(null); return }
-    if (known?.id === value) return
+    if (!value) { resolvedRef.current = null; setKnown(null); return }
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     // We need the users list to resolve the name; fetch once.
     let cancelled = false
-    fetch(`/api/users`, { headers: { "x-demo-role": role } })
+    const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+    fetch(`/api/users`, { credentials: "include", headers: { "x-demo-role": role, ...(token ? { Authorization: `Bearer ${token}` } : {}) } })
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return
@@ -439,14 +452,15 @@ function UserCombobox({
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [value, known, role])
+  }, [value, role])
 
   React.useEffect(() => {
     if (!open) return
     if (all.length > 0) return // already loaded
     let cancelled = false
     setLoading(true)
-    fetch(`/api/users`, { headers: { "x-demo-role": role } })
+    const token2 = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+    fetch(`/api/users`, { credentials: "include", headers: { "x-demo-role": role, ...(token2 ? { Authorization: `Bearer ${token2}` } : {}) } })
       .then((r) => {
         if (r.status === 403) { setForbidden(true); return [] }
         return r.json()
@@ -1752,3 +1766,4 @@ export function NotificationsPanel({ onNavigate, className }: NotificationsPanel
 
 // Re-export for convenience.
 export { ReminderDialog as ReminderDialogComponent }
+

@@ -184,3 +184,4 @@ export async function DELETE(
   await db.servicePackage.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

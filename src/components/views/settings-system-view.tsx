@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Save, Image as ImageIcon, MessageSquare, Info, FileText, Bell, Volume2, Play, Square } from "lucide-react"
+import { Save, Image as ImageIcon, MessageSquare, Info, Bell, Volume2, Play, Square, Upload, Bold, Italic, Underline, Smile } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLE_PERMISSIONS } from "@/lib/constants"
+import { hasPermission } from "@/lib/constants"
 import {
   previewAlarm,
   reloadReminderSettings,
@@ -45,8 +46,8 @@ const SMS_PROVIDERS = [
 
 export function SettingsSystemView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = ROLE_PERMISSIONS[role]?.system
-  const canView = role === "admin" || role === "manager"
+  const canManage = hasPermission(role, "system")
+  const canView = hasPermission(role, "system")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -61,10 +62,15 @@ export function SettingsSystemView() {
   const [img, setImg] = React.useState(defaultImg)
   const [imgDirty, setImgDirty] = React.useState(false)
 
-  // SMS form
-  const defaultSms = { active: false, provider: "disabled" as string }
+  // SMS form — extended with Kavenegar config
+  const defaultSms = { active: false, provider: "disabled" as string, apiKey: "", sender: "", senderNumber: "" }
   const [sms, setSms] = React.useState(defaultSms)
   const [smsDirty, setSmsDirty] = React.useState(false)
+
+  // Logo form
+  const [logoUrl, setLogoUrl] = React.useState<string | null>(null)
+  const [logoDirty, setLogoDirty] = React.useState(false)
+  const logoFileRef = React.useRef<HTMLInputElement | null>(null)
 
   // Default contract text form
   const [contractText, setContractText] = React.useState("")
@@ -94,11 +100,25 @@ export function SettingsSystemView() {
         setSms({
           active: Boolean(parsed.active),
           provider: String(parsed.provider || "disabled"),
+          apiKey: String(parsed.apiKey || ""),
+          sender: String(parsed.sender || ""),
+          senderNumber: String(parsed.senderNumber || ""),
         })
         setSmsDirty(false)
       } catch {
         /* ignore */
       }
+    }
+    // Logo
+    const logoSetting = data.find((s) => s.key === "studio_logo")
+    if (logoSetting) {
+      try {
+        const parsed = JSON.parse(logoSetting.value)
+        setLogoUrl(parsed.url || null)
+      } catch {
+        setLogoUrl(logoSetting.value || null)
+      }
+      setLogoDirty(false)
     }
     const contractSetting = data.find((s) => s.key === "contract_default_text")
     if (contractSetting) {
@@ -167,6 +187,45 @@ export function SettingsSystemView() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const saveLogoMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/system", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-demo-role": role },
+        body: JSON.stringify({
+          key: "studio_logo",
+          value: JSON.stringify({ url: logoUrl }),
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error((d as { error?: string })?.error || `Request failed (${res.status})`)
+      }
+      return d
+    },
+    onSuccess: () => {
+      toast.success("لوگو ذخیره شد")
+      setLogoDirty(false)
+      qc.invalidateQueries({ queryKey: ["system-settings"] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("حجم فایل باید کمتر از ۲ مگابایت باشد")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoUrl(reader.result as string)
+      setLogoDirty(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const saveContractMut = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/system", {
@@ -216,6 +275,72 @@ export function SettingsSystemView() {
       {/* Studio name */}
       <div className="mb-4">
         <StudioNameCard />
+      </div>
+
+      {/* Studio Logo */}
+      <div className="mb-4">
+        <SectionCard
+          title="لوگوی استودیو"
+          description="لوگو در قراردادها و خروجی‌های چاپی استفاده می‌شود"
+        >
+          <div className="flex items-center gap-4">
+            {logoUrl ? (
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border bg-white p-1">
+                <img src={logoUrl} alt="logo" className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed bg-muted/30">
+                <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+            )}
+            <div className="flex-1 space-y-2">
+              <input
+                ref={logoFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoFileRef.current?.click()}
+                  disabled={!canManage}
+                >
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                  انتخاب فایل
+                </Button>
+                {logoUrl && canManage && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-rose-600"
+                    onClick={() => { setLogoUrl(null); setLogoDirty(true) }}
+                  >
+                    حذف لوگو
+                  </Button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                فرمت: PNG, JPG, SVG — حداکثر ۲ مگابایت
+              </p>
+              {logoDirty && canManage && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => saveLogoMut.mutate()}
+                  disabled={saveLogoMut.isPending}
+                >
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {saveLogoMut.isPending ? "در حال ذخیره..." : "ذخیره لوگو"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </SectionCard>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -308,10 +433,10 @@ export function SettingsSystemView() {
           )}
         </SectionCard>
 
-        {/* SMS provider */}
+        {/* SMS provider — with Kavenegar config */}
         <SectionCard
           title="سرویس پیامک"
-          description="درگاه خروجی پیامک برای اعلان‌های مشتری"
+          description="پیکربندی کاوه‌نگار برای ارسال پیامک به مشتریان"
         >
           {isLoading ? (
             <div className="space-y-4">
@@ -319,7 +444,7 @@ export function SettingsSystemView() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 پیکربندی سرویس
@@ -364,10 +489,67 @@ export function SettingsSystemView() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  در حالت غیرفعال، عملیات «ارسال آزمایشی» در صفحه قالب‌های پیامک فقط یک پیام دمو نمایش می‌دهد.
-                </p>
               </div>
+
+              {/* Kavenegar config — show when provider is kavenegar or kavenegar-v2 */}
+              {(sms.provider === "kavenegar" || sms.provider === "kavenegar-v2") && (
+                <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                  <div className="text-xs font-semibold text-muted-foreground">
+                    تنظیمات کاوه‌نگار
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">API Key</Label>
+                    <Input
+                      dir="ltr"
+                      value={sms.apiKey}
+                      disabled={!canManage}
+                      onChange={(e) => {
+                        setSms((f) => ({ ...f, apiKey: e.target.value }))
+                        setSmsDirty(true)
+                      }}
+                      placeholder="کلید API از پنل کاوه‌نگار"
+                      className="text-left text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      از پنل کاوه‌نگار → تنظیمات → API Key دریافت کنید
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">شماره فرستنده (Sender)</Label>
+                    <Input
+                      dir="ltr"
+                      value={sms.sender}
+                      disabled={!canManage}
+                      onChange={(e) => {
+                        setSms((f) => ({ ...f, sender: e.target.value }))
+                        setSmsDirty(true)
+                      }}
+                      placeholder="مثلاً 10004346"
+                      className="text-left text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      شماره خط فرستنده که از کاوه‌نگار خریداری کرده‌اید
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">شماره تلفن استودیو (اختیاری)</Label>
+                    <Input
+                      dir="ltr"
+                      value={sms.senderNumber}
+                      disabled={!canManage}
+                      onChange={(e) => {
+                        setSms((f) => ({ ...f, senderNumber: e.target.value }))
+                        setSmsDirty(true)
+                      }}
+                      placeholder="09120000000"
+                      className="text-left text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      شماره تماس استودیو که در متن پیامک‌ها استفاده می‌شود
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {canManage && (
                 <div className="flex justify-end">
@@ -385,11 +567,16 @@ export function SettingsSystemView() {
         </SectionCard>
       </div>
 
-      {/* Default contract text */}
+      {/* Pricing settings — delayed pricing delay */}
+      <div className="mt-4">
+        <PricingSettingsCard />
+      </div>
+
+      {/* Default contract text — rich text editor */}
       <div className="mt-4">
         <SectionCard
           title="تنظیمات قرارداد"
-          description="متن پیش‌فرض شروط و شرایط — در پایین هر قرارداد قابل‌چاپ نمایش داده می‌شود."
+          description="متن پیش‌فرض شروط و شرایط — با امکان فرمت‌بندی (بولد، ایتالیک، ایموجی)"
         >
           {isLoading ? (
             <div className="space-y-4">
@@ -397,41 +584,14 @@ export function SettingsSystemView() {
               <Skeleton className="h-24 w-full" />
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                متن پیش‌فرض قرارداد
-              </div>
-
-              <Textarea
-                value={contractText}
-                disabled={!canManage}
-                onChange={(e) => {
-                  setContractText(e.target.value)
-                  setContractDirty(true)
-                }}
-                placeholder={
-                  "مثال:\n۱. تمامی تصاویر و فیلم‌ها حداکثر تا ۶۰ روز پس از رویداد تحویل مشتری خواهد شد.\n۲. بیعانه دریافتی غیرقابل بازگشت است.\n۳. هرگونه تغییر در پکیج باید پیش از تاریخ اجرا اعلام گردد."
-                }
-                className="min-h-[180px] resize-y leading-7"
-              />
-
-              <p className="text-xs text-muted-foreground">
-                این متن در پایین هر قرارداد (بخش «شروط و شرایط») ظاهر می‌شود و در زمان چاپ توسط کاربر قابل ویرایش خواهد بود.
-              </p>
-
-              {canManage && (
-                <div className="flex justify-end">
-                  <Button
-                    onClick={() => saveContractMut.mutate()}
-                    disabled={saveContractMut.isPending || !contractDirty}
-                  >
-                    <Save className="mr-1.5 h-4 w-4" />
-                    {saveContractMut.isPending ? "در حال ذخیره…" : "ذخیره متن قرارداد"}
-                  </Button>
-                </div>
-              )}
-            </div>
+            <RichTextEditor
+              value={contractText}
+              onChange={(v) => { setContractText(v); setContractDirty(true) }}
+              onSave={() => saveContractMut.mutate()}
+              canManage={!!canManage}
+              saving={saveContractMut.isPending}
+              dirty={contractDirty}
+            />
           )}
         </SectionCard>
       </div>
@@ -786,5 +946,285 @@ function ReminderSettingsCard({ canManage }: { canManage: boolean }) {
         </div>
       )}
     </SectionCard>
+  )
+}
+
+// ============================================================
+// Pricing settings — delayed pricing delay (days)
+// ============================================================
+function PricingSettingsCard() {
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = hasPermission(role, "system")
+
+  const { data, isLoading } = useQuery<Setting[]>({
+    queryKey: ["system-settings"],
+    queryFn: () => api.get("/api/system"),
+  })
+
+  const [delayedDays, setDelayedDays] = React.useState(30)
+
+  React.useEffect(() => {
+    const s = data?.find((x) => x.key === "delayed_pricing_days")
+    if (s) {
+      try {
+        const val = JSON.parse(s.value)
+        setDelayedDays(Number(val.days) || 30)
+      } catch {
+        setDelayedDays(30)
+      }
+    }
+  }, [data])
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      return api.patch("/api/system", {
+        key: "delayed_pricing_days",
+        value: JSON.stringify({ days: delayedDays }),
+      })
+    },
+    onSuccess: () => {
+      toast.success("تنظیمات قیمت‌گذاری ذخیره شد")
+      qc.invalidateQueries({ queryKey: ["system-settings"] })
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
+
+  return (
+    <SectionCard
+      title="تنظیمات قیمت‌گذاری"
+      description="مدت زمان مهلت قیمت‌گذاری برای استراتژی «مهلت‌دار»"
+    >
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg border bg-amber-500/5 p-3 text-xs text-muted-foreground">
+            <strong className="text-amber-700 dark:text-amber-400">استراتژی مهلت‌دار:</strong>{" "}
+            وقتی قیمت پکیج تغییر می‌کند، برای پروژه‌های جدید قیمت جدید اعمال می‌شود.
+            برای پروژه‌های قبلی، وقتی به حالت «آماده تحویل» می‌رسند، به مدت{" "}
+            <strong>{delayedDays} روز</strong> قیمت قدیمی حفظ می‌شود و بعد از آن قیمت جدید اعمال می‌گردد.
+          </div>
+          <div>
+            <Label className="mb-2 block text-sm font-medium">مدت زمان مهلت (روز)</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={1}
+                max={365}
+                value={delayedDays}
+                onChange={(e) => setDelayedDays(Math.max(1, Number(e.target.value) || 30))}
+                disabled={!canManage}
+                className="w-32"
+                dir="ltr"
+              />
+              <span className="text-sm text-muted-foreground">روز</span>
+            </div>
+          </div>
+          {canManage && (
+            <div className="flex justify-end">
+              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+                <Save className="mr-1.5 h-4 w-4" />
+                {saveMut.isPending ? "در حال ذخیره…" : "ذخیره"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
+
+// ============================================================
+// Rich Text Editor — simple contentEditable with toolbar
+// Supports: bold, italic, underline, emoji, font size
+// ============================================================
+const EMOJIS = ["😀", "😎", "🥰", "😍", "🤗", "😊", "👋", "👍", "👏", "🙌", "🎉", "🎊", "✨", "⭐", "🌟", "💫", "💖", "❤️", "💕", "🌹", "🌸", "🌺", "🎯", "📸", "🎥", "🎬", "🎵", "🎶", "💎", "🏆", "🎁", "🎈", "🎂", "🥳", "💍", "👰", "🤵", "💑", "👨‍👩‍👧‍👦", "📅", "⏰", "📍", "📞", "✅", "❌", "⚠️", "📞", "📱", "💬", "📧", "🏠", "🏢", "💵", "💰", "💳", "🧾", "📋", "📝", "📌", "🔍", "✏️", "🎨", "🖼️", "🌈", "🔥", "💡", "🔔", "📢"]
+
+function RichTextEditor({
+  value,
+  onChange,
+  onSave,
+  canManage,
+  saving,
+  dirty,
+}: {
+  value: string
+  onChange: (v: string) => void
+  onSave: () => void
+  canManage: boolean
+  saving: boolean
+  dirty: boolean
+}) {
+  const editorRef = React.useRef<HTMLDivElement | null>(null)
+  const [showEmojis, setShowEmojis] = React.useState(false)
+
+  // Set initial content
+  React.useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || ""
+    }
+  }, [value])
+
+  const exec = (cmd: string, val?: string) => {
+    document.execCommand(cmd, false, val)
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
+    }
+  }
+
+  const insertEmoji = (emoji: string) => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      range.insertNode(document.createTextNode(emoji))
+      range.collapse(false)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    } else if (editorRef.current) {
+      editorRef.current.innerHTML += emoji
+    }
+    if (editorRef.current) onChange(editorRef.current.innerHTML)
+    setShowEmojis(false)
+  }
+
+  const fontSize = (size: string) => {
+    exec("fontSize", size)
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      {canManage && (
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-lg border bg-muted/50 p-2">
+          <button
+            type="button"
+            onClick={() => exec("bold")}
+            className="flex h-7 w-7 items-center justify-center rounded hover:bg-background"
+            title="بولد"
+          >
+            <Bold className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => exec("italic")}
+            className="flex h-7 w-7 items-center justify-center rounded hover:bg-background"
+            title="ایتالیک"
+          >
+            <Italic className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => exec("underline")}
+            className="flex h-7 w-7 items-center justify-center rounded hover:bg-background"
+            title="زیرخط"
+          >
+            <Underline className="h-3.5 w-3.5" />
+          </button>
+          <div className="mx-1 h-5 w-px bg-border" />
+          {/* Font size */}
+          <Select value="" onValueChange={(v) => fontSize(v)}>
+            <SelectTrigger className="h-7 w-[80px] text-[11px]">
+              <span className="text-muted-foreground">اندازه</span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">کوچک</SelectItem>
+              <SelectItem value="3">معمولی</SelectItem>
+              <SelectItem value="5">بزرگ</SelectItem>
+              <SelectItem value="7">خیلی بزرگ</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="mx-1 h-5 w-px bg-border" />
+          {/* Emoji */}
+          <button
+            type="button"
+            onClick={() => setShowEmojis(!showEmojis)}
+            className={cn("flex h-7 w-7 items-center justify-center rounded hover:bg-background", showEmojis && "bg-background")}
+            title="ایموجی"
+          >
+            <Smile className="h-3.5 w-3.5" />
+          </button>
+          {showEmojis && (
+            <div className="absolute right-0 top-9 z-20 max-h-48 w-72 overflow-y-auto rounded-lg border bg-popover p-2 shadow-lg">
+              <div className="flex flex-wrap gap-1">
+                {EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => insertEmoji(e)}
+                    className="flex h-7 w-7 items-center justify-center rounded text-base hover:bg-accent"
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mx-1 h-5 w-px bg-border" />
+          <button
+            type="button"
+            onClick={() => exec("insertUnorderedList")}
+            className="flex h-7 items-center justify-center rounded px-2 text-[11px] hover:bg-background"
+            title="لیست نقطه‌ای"
+          >
+            • لیست
+          </button>
+          <button
+            type="button"
+            onClick={() => exec("insertOrderedList")}
+            className="flex h-7 items-center justify-center rounded px-2 text-[11px] hover:bg-background"
+            title="لیست شماره‌ای"
+          >
+            ۱. لیست
+          </button>
+          <div className="mx-1 h-5 w-px bg-border" />
+          <button
+            type="button"
+            onClick={() => exec("justifyRight")}
+            className="flex h-7 items-center justify-center rounded px-2 text-[11px] hover:bg-background"
+            title="راست‌چین"
+          >
+            راست
+          </button>
+          <button
+            type="button"
+            onClick={() => exec("justifyCenter")}
+            className="flex h-7 items-center justify-center rounded px-2 text-[11px] hover:bg-background"
+            title="وسط‌چین"
+          >
+            وسط
+          </button>
+        </div>
+      )}
+
+      {/* Editor area */}
+      <div
+        ref={editorRef}
+        contentEditable={canManage}
+        onInput={(e) => onChange((e.target as HTMLDivElement).innerHTML)}
+        className={cn(
+          "min-h-[200px] resize-y overflow-y-auto rounded-lg border bg-background p-3 text-sm leading-7 outline-none focus:ring-2 focus:ring-ring",
+          !canManage && "cursor-not-allowed opacity-80"
+        )}
+        dir="rtl"
+        suppressContentEditableWarning
+      />
+
+      <p className="text-xs text-muted-foreground">
+        این متن در پایین هر قرارداد (بخش «شروط و شرایط») ظاهر می‌شود و در زمان چاپ توسط کاربر قابل ویرایش خواهد بود.
+      </p>
+
+      {canManage && dirty && (
+        <div className="flex justify-end">
+          <Button onClick={onSave} disabled={saving}>
+            <Save className="mr-1.5 h-4 w-4" />
+            {saving ? "در حال ذخیره…" : "ذخیره متن قرارداد"}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

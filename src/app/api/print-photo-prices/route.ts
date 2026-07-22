@@ -12,6 +12,8 @@ function shape(p: {
   paperType: string
   laminateType: string
   photoLocation: string
+  isFormal: boolean
+  printOrder: string
   price: { toString(): string }
   isActive: boolean
   createdAt: Date
@@ -23,6 +25,8 @@ function shape(p: {
     paperType: p.paperType,
     laminateType: p.laminateType,
     photoLocation: p.photoLocation,
+    isFormal: p.isFormal,
+    printOrder: p.printOrder,
     price: Number(p.price.toString()), // Rials
     isActive: p.isActive,
     createdAt: p.createdAt,
@@ -109,12 +113,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const isFormal = Boolean(body.isFormal)
+  const printOrder = ["none", "first", "second"].includes(body.printOrder) ? body.printOrder : "none"
+
   const created = await db.printPhotoPrice.create({
     data: {
       size,
       paperType,
       laminateType,
       photoLocation,
+      isFormal,
+      printOrder,
       price: priceNum,
       isActive,
     },
@@ -122,3 +131,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(shape(created), { status: 201 })
 }
+

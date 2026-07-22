@@ -4,6 +4,7 @@ import {
   CAN_SEE_BALANCE,
   CAN_ACCESS_FULL_FINANCE,
   PRICING_STRATEGIES,
+  isTechnicalRole,
   type Role,
 } from "@/lib/constants"
 import { getEffectivePrice } from "@/lib/pricing"
@@ -21,7 +22,7 @@ function userBrief(u: { id: string; firstName: string; lastName: string; role: s
   }
 }
 
-async function scopeProjectForRole(role: Role, project: any) {
+async function scopeProjectForRole(role: Role, project: any, db: Awaited<ReturnType<typeof getCurrentStudioDb>> & {}, params: { id: string }) {
   const seeBalance = CAN_SEE_BALANCE.includes(role)
   const seeFinance = CAN_ACCESS_FULL_FINANCE.includes(role)
   const canSeePhone = role === "admin" || role === "manager" || role === "sales" || role === "photographer"
@@ -75,6 +76,7 @@ async function scopeProjectForRole(role: Role, project: any) {
     calculatedPrice: seeFinance ? Number(project.calculatedPrice) : null,
     lockedPrice: seeFinance ? (project.lockedPrice ? Number(project.lockedPrice) : null) : null,
     isPriceFrozen: seeFinance ? project.isPriceFrozen : null,
+    exemptFromPhotoPriceUpdate: project.exemptFromPhotoPriceUpdate ?? false,
     discountAmount: seeFinance ? Number(project.discountAmount ?? 0) : null,
     startDatetime: project.startDatetime,
     endDatetime: project.endDatetime,
@@ -89,9 +91,12 @@ async function scopeProjectForRole(role: Role, project: any) {
     effectivePrice: seeBalance ? eff : null,
     totalPaid: seeBalance ? totalPaid : null,
     balance: seeBalance ? Math.max(0, eff - totalPaid) : null,
+    printPhotoTotal: seeBalance ? await db.projectPrintPhoto.aggregate({
+      where: { projectId: params.id },
+      _sum: { total: true },
+    }).then((r) => Number(r._sum.total ?? 0)).catch(() => 0) : null,
     fieldTeam: project.fieldTeam.map(userBrief),
     studioTeam: project.studioTeam.map(userBrief),
-    deliveryTeam: project.deliveryTeam.map(userBrief),
     tasks: (project.tasks || []).map((t: any) => ({
       id: t.id,
       title: t.title,
@@ -189,7 +194,6 @@ export async function GET(_req: Request, { params }: Ctx) {
         servicePackage: true,
         fieldTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
         studioTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
-        deliveryTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
         tasks: {
           orderBy: { order: "asc" },
           include: {
@@ -227,7 +231,6 @@ export async function GET(_req: Request, { params }: Ctx) {
         servicePackage: true,
         fieldTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
         studioTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
-        deliveryTeam: { select: { id: true, firstName: true, lastName: true, role: true, isAvailable: true } },
         tasks: {
           orderBy: { order: "asc" },
           include: {
@@ -294,18 +297,17 @@ export async function GET(_req: Request, { params }: Ctx) {
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   // Scope check for technical roles
-  if (["photographer", "editor", "qc", "logistics"].includes(role)) {
+  if (isTechnicalRole(role)) {
     const userId = (await db.user.findFirst({ where: { role }, select: { id: true } }))?.id
     if (userId) {
       const onTeam =
         project.fieldTeam.some((u) => u.id === userId) ||
-        project.studioTeam.some((u) => u.id === userId) ||
-        project.deliveryTeam.some((u) => u.id === userId)
+        project.studioTeam.some((u) => u.id === userId)
       if (!onTeam) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
   }
 
-  return NextResponse.json(await scopeProjectForRole(role, project))
+  return NextResponse.json(await scopeProjectForRole(role, project, db!, { id }))
 }
 
 // ---- PATCH: update schedule/description/teams/pricing strategy/discount/actual times ----
@@ -316,7 +318,6 @@ interface PatchBody {
   printedDescription?: string
   fieldTeamIds?: string[]
   studioTeamIds?: string[]
-  deliveryTeamIds?: string[]
   pricingStrategy?: string
   discountAmount?: number // Toman; will be converted to Rials × 10
   actualStartDatetime?: string | null
@@ -373,7 +374,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
   // Team reassignments (full replace)
   if (body.fieldTeamIds !== undefined) data.fieldTeam = { set: body.fieldTeamIds.map((uid) => ({ id: uid })) }
   if (body.studioTeamIds !== undefined) data.studioTeam = { set: body.studioTeamIds.map((uid) => ({ id: uid })) }
-  if (body.deliveryTeamIds !== undefined) data.deliveryTeam = { set: body.deliveryTeamIds.map((uid) => ({ id: uid })) }
 
   const updated = await db.project.update({ where: { id }, data })
 
@@ -438,7 +438,6 @@ export async function DELETE(_req: Request, { params }: Ctx) {
       data: {
         fieldTeam: { set: [] },
         studioTeam: { set: [] },
-        deliveryTeam: { set: [] },
       },
     })
   } catch {}
@@ -454,3 +453,4 @@ export async function DELETE(_req: Request, { params }: Ctx) {
 
   return NextResponse.json({ ok: true, id })
 }
+

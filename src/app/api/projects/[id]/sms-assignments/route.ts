@@ -62,3 +62,4 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     enabled: row.enabled, createdAt: row.createdAt,
   }, { status: existing ? 200 : 201 })
 }
+

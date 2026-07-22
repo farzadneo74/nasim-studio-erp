@@ -30,7 +30,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react"
 import { useWorkspace, PageId } from "@/stores/workspace"
-import { ROLE_PERMISSIONS, ROLE_LABELS, Role, ROLES } from "@/lib/constants"
+import { ROLE_LABELS, Role, ROLES, hasPermission } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -97,11 +97,9 @@ const SECTIONS: NavSection[] = [
       { id: "settings-packages", label: "پکیج‌ها", emoji: "📦", icon: Package },
       { id: "settings-tags", label: "تگ‌ها", emoji: "🏷️", icon: Tag },
       { id: "settings-print-photo-prices", label: "قیمت عکس چاپی", emoji: "🖼️", icon: ImageIcon },
-      { id: "settings-salary-rules", label: "قوانین حقوق", emoji: "🧮", icon: Calculator },
+      { id: "settings-employees", label: "کارمندان", emoji: "👥", icon: UserCog },
       { id: "settings-sms-templates", label: "قالب پیامک", emoji: "💬", icon: MessageSquareText },
       { id: "settings-custom-fields", label: "فیلدهای سفارشی", emoji: "🎛️", icon: Settings2 },
-      { id: "settings-users", label: "کاربران و مرخصی", emoji: "👥", icon: UserCog },
-      { id: "settings-leaves", label: "درخواست مرخصی", emoji: "🌴", icon: CalendarDays },
       { id: "settings-system", label: "سیستم", emoji: "⚙️", icon: Settings2 },
       { id: "settings-storage", label: "فضای ذخیره‌سازی", emoji: "💾", icon: HardDrive },
     ],
@@ -143,28 +141,31 @@ const sectionThemes = [
 ]
 
 function itemAllowed(id: PageId, role: Role): boolean {
-  const p = ROLE_PERMISSIONS[role]
-  if (!p) return true
+  // Use new permission system
   switch (id) {
-    case "finances": return p.finance
-    case "customers": return p.customers
-    case "qr-factory": return p.qr
-    case "scanner": return p.scanner
-    case "settings-packages": return p.packages
-    case "settings-tags": return p.tags
-    case "settings-print-photo-prices": return role === "admin" || role === "manager"
-    case "settings-salary-rules": return p.salaryRules
-    case "settings-users": return p.users
-    case "settings-system": return p.system
-    case "settings-sms-templates": return role === "admin" || role === "manager"
-    case "settings-leaves": return role === "admin" || role === "manager"
-    case "settings-custom-fields": return role === "admin" || role === "manager" || role === "sales"
-    case "reports": return p.finance
+    case "dashboard": return hasPermission(role, "dashboard")
+    case "calendar": return hasPermission(role, "calendar")
+    case "reports": return hasPermission(role, "reports")
+    case "customers": return hasPermission(role, "customers")
+    case "qr-factory": return hasPermission(role, "qr_factory")
+    case "scanner": return hasPermission(role, "scanner")
+    case "projects": return hasPermission(role, "projects")
+    case "my-tasks": return hasPermission(role, "my_tasks")
+    case "messages": return hasPermission(role, "messages")
+    case "finances": return hasPermission(role, "finances")
+    case "settings-packages": return hasPermission(role, "packages")
+    case "settings-tags": return hasPermission(role, "tags")
+    case "settings-print-photo-prices": return hasPermission(role, "print_photo_prices")
+    case "settings-employees": return hasPermission(role, "employees")
+    case "settings-system": return hasPermission(role, "system")
+    case "settings-sms-templates": return hasPermission(role, "sms_templates")
+    case "settings-custom-fields": return hasPermission(role, "custom_fields")
+    case "settings-storage": return hasPermission(role, "storage")
     default: return true
   }
 }
 
-export function Sidebar() {
+export function Sidebar({ onQuickSearch }: { onQuickSearch?: () => void }) {
   const {
     activePage,
     setPage,
@@ -234,8 +235,8 @@ export function Sidebar() {
         {/* Search */}
         <div className="px-3 py-2">
           <button
-            onClick={() => setPage("dashboard")}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent"
+            onClick={() => onQuickSearch?.()}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <Search className="h-4 w-4" />
             <span>جستجوی سریع…</span>
@@ -317,6 +318,3 @@ export function Sidebar() {
   )
 }
 
-function roleEmoji(r: Role): string {
-  return { admin: "👑", manager: "🧭", sales: "💼", photographer: "📸", editor: "🎨", qc: "🔍", logistics: "🚚" }[r]
-}

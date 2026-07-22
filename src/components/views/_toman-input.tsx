@@ -45,3 +45,4 @@ export function TomanInput({ value = 0, onValueChange, ...props }: TomanInputPro
 function formatGrouped(n: number): string {
   return toPersianDigits(new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n))
 }
+

@@ -48,7 +48,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         servicePackage: true,
         fieldTeam: true,
         studioTeam: true,
-        deliveryTeam: true,
         payments: { where: { isConfirmed: true } },
         workflows: true,
       },
@@ -166,7 +165,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const teamMap = [
         ...project.fieldTeam.map((u) => ({ userId: u.id, role: u.role, applyOn: "field_work" as const })),
         ...project.studioTeam.map((u) => ({ userId: u.id, role: u.role, applyOn: "studio_work" as const })),
-        ...project.deliveryTeam.map((u) => ({ userId: u.id, role: u.role, applyOn: "delivery" as const })),
       ]
       for (const t of teamMap) {
         const rule = activeRules.find((r) => r.role === t.role && r.applyOn === t.applyOn)
@@ -293,3 +291,4 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

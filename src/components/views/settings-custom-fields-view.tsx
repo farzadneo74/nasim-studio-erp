@@ -16,7 +16,7 @@ import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLE_PERMISSIONS } from "@/lib/constants"
+import { hasPermission } from "@/lib/constants"
 import { toPersianDigits } from "@/lib/format"
 
 import { PageHeader, EmptyState, SectionCard } from "./_shared"
@@ -174,8 +174,8 @@ function slugify(s: string): string {
 // ============================================================
 export function SettingsCustomFieldsView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = role === "admin" || role === "manager"
-  const canView = ROLE_PERMISSIONS[role]?.tags || role === "admin" || role === "manager"
+  const canManage = hasPermission(role, "custom_fields")
+  const canView = hasPermission(role, "custom_fields") || hasPermission(role, "tags")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -843,3 +843,4 @@ function FieldDialog({
     </Dialog>
   )
 }
+

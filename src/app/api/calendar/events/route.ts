@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
+import { TECHNICAL_ROLES } from "@/lib/constants"
 
 /**
  * GET /api/calendar/events
@@ -63,17 +64,14 @@ export async function GET(req: NextRequest) {
     where.OR = [
       { fieldTeam: { some: { id: teamMemberId } } },
       { studioTeam: { some: { id: teamMemberId } } },
-      { deliveryTeam: { some: { id: teamMemberId } } },
     ]
   }
 
   // For technical roles, narrow to projects where someone of their role is on a team
-  const techRoles = ["photographer", "editor", "qc", "logistics"]
-  if (techRoles.includes(role)) {
+  if ((TECHNICAL_ROLES as readonly string[]).includes(role)) {
     where.OR = [
       { fieldTeam: { some: { role } } },
       { studioTeam: { some: { role } } },
-      { deliveryTeam: { some: { role } } },
     ]
   }
 
@@ -84,7 +82,6 @@ export async function GET(req: NextRequest) {
       contract: { include: { customer: { select: { id: true, name: true } } } },
       fieldTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
       studioTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
-      deliveryTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
     },
     orderBy: { startDatetime: "asc" },
   })
@@ -93,7 +90,6 @@ export async function GET(req: NextRequest) {
     const team = [
       ...p.fieldTeam.map((u) => ({ ...u, team: "field" as const })),
       ...p.studioTeam.map((u) => ({ ...u, team: "studio" as const })),
-      ...p.deliveryTeam.map((u) => ({ ...u, team: "delivery" as const })),
     ]
     return {
       id: p.id,
@@ -147,3 +143,4 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json([...events, ...leaves])
 }
+

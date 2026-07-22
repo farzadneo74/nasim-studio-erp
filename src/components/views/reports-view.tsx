@@ -32,18 +32,34 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
   CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  ROLE_LABELS,
   type ProjectStatus,
   type PackageCategory,
+  type Role,
 } from "@/lib/constants"
 import { formatRials, formatRialsShort } from "@/lib/format"
 import { formatJalaliShort } from "@/lib/jalali"
 
 import { PageHeader, StatCard, SectionCard, EmptyState } from "./_shared"
+import { JalaliDatePicker } from "./_jalali-date-picker/jalali-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Role-based colors for salary chart
+const ROLE_COLORS: Record<string, string> = {
+  admin: "#ef4444",
+  manager: "#f59e0b",
+  sales: "#10b981",
+  photographer: "#0ea5e9",
+  editor: "#8b5cf6",
+  qc: "#ec4899",
+  logistics: "#6366f1",
+}
 import {
   Table,
   TableBody,
@@ -52,13 +68,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 interface ReportData {
   kpis: {
@@ -80,7 +89,7 @@ interface ReportData {
     balance: number
     status: string
   }[]
-  unpaidSalaries: { name: string; amount: number }[]
+  unpaidSalaries: { name: string; amount: number; role?: string; userId?: string }[]
   topCustomers: { name: string; revenue: number }[]
   range: { from: string; to: string }
 }
@@ -221,49 +230,35 @@ export function ReportsView() {
         }
       />
 
-      {/* Date range selector */}
+      {/* Date range selector — Jalali (Shamsi) calendar */}
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3 shadow-sm">
         <div>
-          <Label htmlFor="from" className="text-xs text-muted-foreground">
-            از (میلادی)
+          <Label className="mb-1.5 block text-xs text-muted-foreground">
+            از تاریخ
           </Label>
-          <Input
-            id="from"
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              setFromDate(e.target.value)
+          <JalaliDatePicker
+            value={fromDate || null}
+            onChange={(iso) => {
+              setFromDate(iso || "")
               setPreset("all")
             }}
-            className="mt-1 h-8 w-[160px] text-xs"
-            dir="ltr"
+            placeholder="انتخاب تاریخ شروع"
+            className="h-8 w-[160px] text-xs"
           />
-          {fromDate && (
-            <div className="mt-1 text-[10px] text-muted-foreground">
-              {formatJalaliShort(new Date(fromDate))}
-            </div>
-          )}
         </div>
         <div>
-          <Label htmlFor="to" className="text-xs text-muted-foreground">
-            تا (میلادی)
+          <Label className="mb-1.5 block text-xs text-muted-foreground">
+            تا تاریخ
           </Label>
-          <Input
-            id="to"
-            type="date"
-            value={toDate}
-            onChange={(e) => {
-              setToDate(e.target.value)
+          <JalaliDatePicker
+            value={toDate || null}
+            onChange={(iso) => {
+              setToDate(iso || "")
               setPreset("all")
             }}
-            className="mt-1 h-8 w-[160px] text-xs"
-            dir="ltr"
+            placeholder="انتخاب تاریخ پایان"
+            className="h-8 w-[160px] text-xs"
           />
-          {toDate && (
-            <div className="mt-1 text-[10px] text-muted-foreground">
-              {formatJalaliShort(new Date(toDate))}
-            </div>
-          )}
         </div>
         <Button
           variant="outline"
@@ -275,18 +270,7 @@ export function ReportsView() {
         </Button>
         {data?.range && (
           <div className="ml-auto text-xs text-muted-foreground">
-            نمایش{" "}
-            {new Date(data.range.from).toLocaleDateString("fa-IR", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}{" "}
-            –{" "}
-            {new Date(data.range.to).toLocaleDateString("fa-IR", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            نمایش {formatJalaliShort(new Date(data.range.from))} – {formatJalaliShort(new Date(data.range.to))}
           </div>
         )}
       </div>
@@ -403,7 +387,10 @@ export function ReportsView() {
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
-                      data={data.revenueByCategory}
+                      data={data.revenueByCategory.map((d) => ({
+                        ...d,
+                        name: CATEGORY_LABELS[d.name as PackageCategory] ?? d.name,
+                      }))}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
@@ -411,6 +398,10 @@ export function ReportsView() {
                       innerRadius={55}
                       outerRadius={90}
                       paddingAngle={2}
+                      label={({ name, value }: { name: string; value: number }) =>
+                        `${name}: ${formatRialsShort(value)}`
+                      }
+                      labelLine={false}
                     >
                       {data.revenueByCategory.map((d) => (
                         <Cell
@@ -421,11 +412,11 @@ export function ReportsView() {
                     </Pie>
                     <Tooltip
                       contentStyle={TOOLTIP_STYLE}
-                      formatter={(v: number) => formatRials(v) + " تومان"}
+                      formatter={(v: number, n: string) => [formatRials(v) + " تومان", n]}
                     />
                     <Legend
                       iconType="circle"
-                      wrapperStyle={{ fontSize: 11, textTransform: "capitalize" }}
+                      wrapperStyle={{ fontSize: 11 }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -437,7 +428,7 @@ export function ReportsView() {
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <SectionCard
               title="درآمد بر اساس پکیج"
-              description="پکیج‌های برتر از نظر درآمد"
+              description="پکیج‌های برتر از نظر درآمد — عنوان پکیج در راست، نمودار از راست به چپ"
               className="lg:col-span-2"
             >
               {data.revenueByPackage.length === 0 ? (
@@ -447,7 +438,7 @@ export function ReportsView() {
                   <BarChart
                     data={data.revenueByPackage}
                     layout="vertical"
-                    margin={{ left: 20, right: 16, top: 4 }}
+                    margin={{ left: 16, right: 60, top: 4 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                     <XAxis
@@ -457,6 +448,7 @@ export function ReportsView() {
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(v) => formatRialsShort(v)}
+                      reversed
                     />
                     <YAxis
                       type="category"
@@ -465,9 +457,10 @@ export function ReportsView() {
                       fontSize={11}
                       tickLine={false}
                       axisLine={false}
-                      width={170}
+                      width={180}
+                      orientation="right"
                       tickFormatter={(v: string) =>
-                        v.length > 24 ? v.slice(0, 22) + "…" : v
+                        v.length > 28 ? v.slice(0, 26) + "…" : v
                       }
                     />
                     <Tooltip
@@ -479,8 +472,14 @@ export function ReportsView() {
                       dataKey="value"
                       name="درآمد"
                       fill="#0ea5e9"
-                      radius={[0, 4, 4, 0]}
+                      radius={[4, 0, 0, 4]}
                       barSize={18}
+                      label={{
+                        position: "right",
+                        fill: "var(--foreground)",
+                        fontSize: 10,
+                        formatter: (v: number) => formatRialsShort(v),
+                      }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -489,10 +488,10 @@ export function ReportsView() {
 
             <SectionCard
               title="توزیع وضعیت‌های پروژه"
-              description="تعداد در هر مرحله (همه پروژه‌ها)"
+              description="تعداد در هر مرحله (برچسب‌ها چرخیده برای خوانایی)"
             >
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={data.statusDist} margin={{ left: -16, right: 8, top: 8 }}>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={data.statusDist} margin={{ left: 20, right: 8, top: 8, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis
                     dataKey="status"
@@ -500,8 +499,12 @@ export function ReportsView() {
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
+                    interval={0}
+                    angle={-90}
+                    textAnchor="end"
+                    height={80}
                     tickFormatter={(v: string) =>
-                      (STATUS_LABELS[v as ProjectStatus] ?? v).slice(0, 4)
+                      STATUS_LABELS[v as ProjectStatus] ?? v
                     }
                   />
                   <YAxis
@@ -596,7 +599,7 @@ export function ReportsView() {
 
             <SectionCard
               title="مشتریان برتر"
-              description="بر اساس درآمد در بازه انتخاب‌شده"
+              description="بر اساس درآمد در بازه انتخاب‌شده — نام در راست، نمودار از راست به چپ"
             >
               {data.topCustomers.length === 0 ? (
                 <EmptyState title="هنوز مشتری‌ای وجود ندارد" />
@@ -605,7 +608,7 @@ export function ReportsView() {
                   <BarChart
                     data={data.topCustomers}
                     layout="vertical"
-                    margin={{ left: 8, right: 16, top: 4 }}
+                    margin={{ left: 16, right: 60, top: 4 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                     <XAxis
@@ -615,6 +618,7 @@ export function ReportsView() {
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(v) => formatRialsShort(v)}
+                      reversed
                     />
                     <YAxis
                       type="category"
@@ -623,9 +627,10 @@ export function ReportsView() {
                       fontSize={11}
                       tickLine={false}
                       axisLine={false}
-                      width={110}
+                      width={120}
+                      orientation="right"
                       tickFormatter={(v: string) =>
-                        v.length > 14 ? v.slice(0, 12) + "…" : v
+                        v.length > 16 ? v.slice(0, 14) + "…" : v
                       }
                     />
                     <Tooltip
@@ -637,8 +642,14 @@ export function ReportsView() {
                       dataKey="revenue"
                       name="درآمد"
                       fill="#a855f7"
-                      radius={[0, 4, 4, 0]}
+                      radius={[4, 0, 0, 4]}
                       barSize={20}
+                      label={{
+                        position: "right",
+                        fill: "var(--foreground)",
+                        fontSize: 10,
+                        formatter: (v: number) => formatRialsShort(v),
+                      }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -646,11 +657,11 @@ export function ReportsView() {
             </SectionCard>
           </div>
 
-          {/* Unpaid salaries */}
+          {/* Unpaid salaries — colored by role, RTL like other charts */}
           <div className="mt-4">
             <SectionCard
               title="حقوق پرداخت‌نشده بر اساس کاربر"
-              description="پورسانت و پرداخت‌های هر پروژه در انتظار پرداخت"
+              description="پورسانت و پرداخت‌های هر پروژه در انتظار پرداخت — رنگ بر اساس نقش"
             >
               {data.unpaidSalaries.length === 0 ? (
                 <EmptyState
@@ -659,47 +670,72 @@ export function ReportsView() {
                   description="هیچ پرداخت پورسانت معوقی وجود ندارد."
                 />
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(200, data.unpaidSalaries.length * 44)}>
-                  <BarChart
-                    data={data.unpaidSalaries}
-                    layout="vertical"
-                    margin={{ left: 8, right: 16, top: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => formatRialsShort(v)}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      width={130}
-                      tickFormatter={(v: string) =>
-                        v.length > 16 ? v.slice(0, 14) + "…" : v
-                      }
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      formatter={(v: number) => formatRials(v) + " تومان"}
-                      cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      name="پرداخت‌نشده"
-                      fill="#f59e0b"
-                      radius={[0, 4, 4, 0]}
-                      barSize={20}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <>
+                  {/* Legend by role */}
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {Object.entries(ROLE_COLORS).map(([role, color]) => (
+                      <div key={role} className="flex items-center gap-1 text-[10px]">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+                        <span className="text-muted-foreground">{ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <ResponsiveContainer width="100%" height={Math.max(200, data.unpaidSalaries.length * 44)}>
+                    <BarChart
+                      data={data.unpaidSalaries}
+                      layout="vertical"
+                      margin={{ left: 16, right: 60, top: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        stroke="var(--muted-foreground)"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => formatRialsShort(v)}
+                        reversed
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        stroke="var(--muted-foreground)"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        width={140}
+                        orientation="right"
+                        tickFormatter={(v: string) =>
+                          v.length > 18 ? v.slice(0, 16) + "…" : v
+                        }
+                      />
+                      <Tooltip
+                        contentStyle={TOOLTIP_STYLE}
+                        formatter={(v: number) => formatRials(v) + " تومان"}
+                        cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+                      />
+                      <Bar
+                        dataKey="amount"
+                        name="پرداخت‌نشده"
+                        radius={[4, 0, 0, 4]}
+                        barSize={20}
+                        label={{
+                          position: "right",
+                          fill: "var(--foreground)",
+                          fontSize: 10,
+                          formatter: (v: number) => formatRialsShort(v),
+                        }}
+                      >
+                        {data.unpaidSalaries.map((s, i) => (
+                          <Cell
+                            key={i}
+                            fill={ROLE_COLORS[s.role as keyof typeof ROLE_COLORS] ?? "#f59e0b"}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </>
               )}
             </SectionCard>
           </div>
@@ -728,3 +764,4 @@ function ReportsSkeleton() {
     </>
   )
 }
+

@@ -45,3 +45,4 @@ export async function POST(req: NextRequest) {
     isActive: created.isActive, createdAt: created.createdAt, updatedAt: created.updatedAt,
   }, { status: 201 })
 }
+

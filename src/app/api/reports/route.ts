@@ -45,7 +45,6 @@ export async function GET(req: NextRequest) {
         contract: { include: { customer: true } },
         fieldTeam: true,
         studioTeam: true,
-        deliveryTeam: true,
         payments: true,
       },
     }),
@@ -184,16 +183,18 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.balance - a.balance)
 
   // Unpaid salaries by user
-  const unpaidMap: Record<string, number> = {}
+  const unpaidMap: Record<string, { name: string; amount: number; role?: string; userId?: string }> = {}
   for (const s of salaryRecords) {
     if (s.isPaid) continue
     const name = `${s.user.firstName} ${s.user.lastName}`
-    unpaidMap[name] = (unpaidMap[name] ?? 0) + Number(s.amount)
+    if (!unpaidMap[s.userId]) {
+      unpaidMap[s.userId] = { name, amount: 0, role: s.user.role, userId: s.userId }
+    }
+    unpaidMap[s.userId].amount += Number(s.amount)
   }
-  const unpaidSalaries = Object.entries(unpaidMap).map(([name, amount]) => ({
-    name,
-    amount,
-  }))
+  const unpaidSalaries = Object.values(unpaidMap)
+    .filter((d) => d.amount > 0)
+    .sort((a, b) => b.amount - a.amount)
 
   // Top customers by revenue (from confirmed payments in range)
   const custMap: Record<string, { name: string; revenue: number }> = {}
@@ -226,3 +227,4 @@ export async function GET(req: NextRequest) {
     range: { from: fromDate.toISOString(), to: toDate.toISOString() },
   })
 }
+

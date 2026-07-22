@@ -43,7 +43,14 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       }
     })
 
-    return NextResponse.json({ tracks: result, category: project.servicePackage.category })
+    return NextResponse.json({
+      tracks: result,
+      category: project.servicePackage.category,
+      project: {
+        isPriceFrozen: project.isPriceFrozen,
+        exemptFromPhotoPriceUpdate: project.exemptFromPhotoPriceUpdate,
+      },
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "خطای ناشناخته"
     return NextResponse.json({ error: msg }, { status: 500 })
@@ -175,3 +182,4 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

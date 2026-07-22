@@ -93,3 +93,4 @@ export async function DELETE(
   await db.tag.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

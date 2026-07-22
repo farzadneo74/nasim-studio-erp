@@ -8,6 +8,7 @@ import {
   PROJECT_STATUSES,
   PACKAGE_CATEGORIES,
   PRICING_STRATEGIES,
+  isTechnicalRole,
   type ProjectStatus,
   type Role,
 } from "@/lib/constants"
@@ -38,7 +39,7 @@ function iso(d: Date | null): string | null {
 
 async function getUserByRole(db: PrismaClient, role: Role) {
   // For technical roles, find the first user of that role to scope projects.
-  if (role === "photographer" || role === "editor" || role === "qc" || role === "logistics") {
+  if (isTechnicalRole(role)) {
     const u = await db.user.findFirst({ where: { role }, select: { id: true } })
     return u?.id ?? null
   }
@@ -90,7 +91,6 @@ export async function GET(req: Request) {
     where.OR = [
       { fieldTeam: { some: { id: teamMemberId } } },
       { studioTeam: { some: { id: teamMemberId } } },
-      { deliveryTeam: { some: { id: teamMemberId } } },
     ]
   }
 
@@ -100,7 +100,6 @@ export async function GET(req: Request) {
     where.OR = [
       { fieldTeam: { some: { id: scopedUserId } } },
       { studioTeam: { some: { id: scopedUserId } } },
-      { deliveryTeam: { some: { id: scopedUserId } } },
     ]
   }
 
@@ -113,7 +112,6 @@ export async function GET(req: Request) {
         servicePackage: true,
         fieldTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
         studioTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
-        deliveryTeam: { select: { id: true, firstName: true, lastName: true, role: true } },
         payments: { where: { isConfirmed: true }, select: { amount: true } },
       },
       orderBy: { startDatetime: "asc" },
@@ -139,7 +137,7 @@ export async function GET(req: Request) {
     const team = [
       ...p.fieldTeam,
       ...p.studioTeam,
-      ...p.deliveryTeam,
+      
     ].map((u) => ({
       id: u.id,
       firstName: u.firstName,
@@ -217,8 +215,10 @@ interface CreateBody {
   deliveryDeadline?: string
   fieldTeamIds?: string[]
   studioTeamIds?: string[]
-  deliveryTeamIds?: string[]
   printedDescription?: string
+  customDescription?: string
+  customTasks?: string[]
+  customEquipment?: string[]
   isPriceFrozen?: boolean
   pricingStrategy?: string
   smsAssignments?: SmsAssignmentInput[]
@@ -332,7 +332,11 @@ export async function POST(req: Request) {
   const discountRialsLegacy = Math.max(0, Number(body.manualDiscount || 0))
   // If discountAmount was sent, prefer it (×10 for Rials); otherwise fall back to legacy.
   const discountRials = discountToman > 0 ? discountToman * 10 : discountRialsLegacy
-  const calculatedPrice = Math.max(0, basePrice - discountRials)
+  // Price adjustment (positive = increase, negative = decrease) — sent in Toman
+  const priceAdjustmentToman = Number(body.priceAdjustment || 0)
+  const priceAdjustmentRials = priceAdjustmentToman * 10
+  const adjustedBasePrice = Math.max(0, basePrice + priceAdjustmentRials)
+  const calculatedPrice = Math.max(0, adjustedBasePrice - discountRials)
 
   // --- Referral code validation ---
   let referralCodeId: string | null = null
@@ -374,13 +378,17 @@ export async function POST(req: Request) {
     if (!c) return NextResponse.json({ error: "Contract not found" }, { status: 400 })
   }
 
-  // --- Tasks (default from package) ---
+  // --- Tasks (from customTasks or default from package) ---
   let defaultTasks: string[] = []
-  try {
-    defaultTasks = JSON.parse(pkg.defaultTasks || "[]")
-    if (!Array.isArray(defaultTasks)) defaultTasks = []
-  } catch {
-    defaultTasks = []
+  if (Array.isArray(body.customTasks) && body.customTasks.length > 0) {
+    defaultTasks = body.customTasks.filter((t) => typeof t === "string" && t.trim())
+  } else {
+    try {
+      defaultTasks = JSON.parse(pkg.defaultTasks || "[]")
+      if (!Array.isArray(defaultTasks)) defaultTasks = []
+    } catch {
+      defaultTasks = []
+    }
   }
 
   // --- Create project + side effects in transaction ---
@@ -398,10 +406,9 @@ export async function POST(req: Request) {
         endDatetime: body.endDatetime ? new Date(body.endDatetime) : null,
         deliveryDeadline: body.deliveryDeadline ? new Date(body.deliveryDeadline) : null,
         status: "scheduled",
-        printedDescription: body.printedDescription || pkg.defaultDescription,
+        printedDescription: body.customDescription || body.printedDescription || pkg.defaultDescription,
         fieldTeam: body.fieldTeamIds?.length ? { connect: body.fieldTeamIds.map((id) => ({ id })) } : undefined,
         studioTeam: body.studioTeamIds?.length ? { connect: body.studioTeamIds.map((id) => ({ id })) } : undefined,
-        deliveryTeam: body.deliveryTeamIds?.length ? { connect: body.deliveryTeamIds.map((id) => ({ id })) } : undefined,
       },
     })
 
@@ -495,3 +502,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ id: project.id, status: project.status, customerId }, { status: 201 })
 }
+

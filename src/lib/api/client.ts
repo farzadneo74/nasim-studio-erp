@@ -49,6 +49,16 @@ export function useApi() {
       if (!res.ok) throw new Error(`API ${res.status}`)
       return res.json()
     },
+    put: async <T = unknown>(url: string, body?: unknown): Promise<T> => {
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: authHeaders({ "Content-Type": "application/json", "x-demo-role": role }),
+        credentials: "include",
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      if (!res.ok) throw new Error(`API ${res.status}`)
+      return res.json()
+    },
     del: async <T = unknown>(url: string): Promise<T> => {
       const res = await fetch(url, {
         method: "DELETE",
@@ -60,3 +70,4 @@ export function useApi() {
     },
   }
 }
+

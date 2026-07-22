@@ -10,7 +10,9 @@ import { useWorkspace } from "@/stores/workspace"
 import {
   COMMISSION_TYPES,
   APPLY_ON,
-  ROLE_PERMISSIONS,
+  ROLE_LABELS,
+  ROLE_BADGE_COLORS,
+  hasPermission,
 } from "@/lib/constants"
 import { formatRials } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -58,7 +60,7 @@ import {
 
 type CommissionType = (typeof COMMISSION_TYPES)[number]
 type ApplyOn = (typeof APPLY_ON)[number]
-type SalaryRole = "photographer" | "editor" | "logistics"
+type SalaryRole = "photographer" | "videographer" | "pro_crew" | "editor" | "film_editor" | "sales"
 
 interface SalaryRule {
   id: string
@@ -69,17 +71,7 @@ interface SalaryRule {
   isActive: boolean
 }
 
-const ROLE_LABELS: Record<SalaryRole, string> = {
-  photographer: "عکاس",
-  editor: "ادیتور",
-  logistics: "تدارکات",
-}
-
-const ROLE_BADGE: Record<SalaryRole, string> = {
-  photographer: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  editor: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  logistics: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-}
+const ROLE_BADGE = ROLE_BADGE_COLORS
 
 const APPLY_ON_LABELS: Record<ApplyOn, string> = {
   field_work: "کار میدانی",
@@ -93,7 +85,7 @@ const APPLY_ON_BADGE: Record<ApplyOn, string> = {
   delivery: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
 }
 
-const SALARY_ROLES: SalaryRole[] = ["photographer", "editor", "logistics"]
+const SALARY_ROLES: SalaryRole[] = ["photographer", "videographer", "pro_crew", "editor", "film_editor", "sales"]
 
 interface FormState {
   role: SalaryRole
@@ -113,8 +105,8 @@ const EMPTY_FORM: FormState = {
 
 export function SettingsSalaryRulesView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = ROLE_PERMISSIONS[role]?.salaryRules
-  const canView = role === "admin" || role === "manager"
+  const canManage = hasPermission(role, "salary_rules")
+  const canView = hasPermission(role, "salary_rules")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -502,3 +494,4 @@ export function SettingsSalaryRulesView() {
     </div>
   )
 }
+

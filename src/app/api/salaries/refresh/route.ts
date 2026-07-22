@@ -52,7 +52,6 @@ export async function POST() {
       servicePackage: true,
       fieldTeam: true,
       studioTeam: true,
-      deliveryTeam: true,
       payments: { where: { isConfirmed: true } },
     },
   })
@@ -92,11 +91,6 @@ export async function POST() {
         userId: u.id,
         role: u.role,
         applyOn: "studio_work" as const,
-      })),
-      ...project.deliveryTeam.map((u) => ({
-        userId: u.id,
-        role: u.role,
-        applyOn: "delivery" as const,
       })),
     ]
 
@@ -138,3 +132,4 @@ export async function POST() {
 
   return NextResponse.json({ created, period })
 }
+

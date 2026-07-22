@@ -86,3 +86,4 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   await db.expense.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

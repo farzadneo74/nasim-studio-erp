@@ -21,18 +21,24 @@ model User {
   birthDate     DateTime?
   address       String?
   profileImage  String?
-  role          String   @default("manager") // admin | manager | sales | photographer | editor | qc | logistics
+  role          String   @default("manager") // admin | manager | sales | photographer | videographer | pro_crew | editor | film_editor
+  secondaryRoles String  @default("[]") // JSON array of additional roles
+  permissions   String   @default("{}") // JSON { overrides: { permKey: bool, ... } } — per-user overrides on top of role defaults
   cardNumber    String?
   iban          String?
   bankName      String?
+  instagramId   String?  // Instagram handle (without @)
+  weddingDate   DateTime?
   isAvailable   Boolean  @default(true)
-  personalMeta  String   @default("{}") // JSON
+  autoCalcSalary Boolean @default(true) // auto-calculate salary based on rules
+  salaryType    String   @default("per_attendance") // "fixed" | "fixed_plus_bonus" | "per_attendance"
+  fixedSalary   Decimal  @default(0) // monthly fixed salary in Rials (for "fixed" and "fixed_plus_bonus")
+  personalMeta  String   @default("{}") // JSON { spouse, children, rewards, penalties }
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   fieldProjects    Project[]      @relation("FieldTeam")
   studioProjects   Project[]      @relation("StudioTeam")
-  deliveryProjects Project[]      @relation("DeliveryTeam")
   assignedTasks    Task[]
   leaveRequests    LeaveRequest[] @relation("Requester")
   managedLeaves    LeaveRequest[] @relation("Approver")
@@ -41,6 +47,21 @@ model User {
   creditActions    CreditTransaction[] @relation("CreatedBy")
   recordedPayments Payment[] @relation("PaymentRecorder")
   workflowAssignments ProjectWorkflow[] @relation("WorkflowAssignee")
+}
+
+// Studio-level role permission overrides.
+// Each row overrides the DEFAULT_ROLE_PERMISSIONS for a specific role within a studio.
+// (E.g. the studio manager decides that all `photographer` users can also see finances.)
+model RolePermission {
+  id          String   @id @default(cuid())
+  role        String   // one of ROLES
+  permission  String   // one of PERMISSION_KEYS
+  granted     Boolean  // true = grant; false = revoke
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([role, permission])
+  @@index([role])
 }
 
 model LeaveRequest {
@@ -64,7 +85,8 @@ model Customer {
   phone          String   @unique
   customerType   String   @default("individual") // individual | company
   profileImage   String?  // URL or base64 data URL
-  extraPhones    String   @default("[]") // JSON: [{label:"همسر", phone:"0912..."}, ...]
+  extraPhones    String   @default("[]") // JSON: [{label:"نام", phone:"0912..."}, ...]
+  instagramId    String?  // Instagram handle (without @)
   city           String?
   address        String?
   birthDate      DateTime?
@@ -177,9 +199,11 @@ model ServicePackage {
 model PrintPhotoPrice {
   id              String   @id @default(cuid())
   size            String   // e.g. "10x15", "20x30", "A4"
-  paperType       String   // e.g. "مات", براق", "ک amoeba"
-  laminateType    String   @default("none") // "none" or custom laminate name
+  paperType       String   // e.g. "مات", "براق"
+  laminateType    String   @default("none") // "none" | "glossy" | "matte"
   photoLocation   String   // studio | outdoor | customer
+  isFormal        Boolean  @default(false) // سرمجلسی است یا نه
+  printOrder      String   @default("none") // "none" | "first" | "second" — چاپ اول یا دوم
   price           Decimal  // Rials per photo
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -253,7 +277,6 @@ model Project {
 
   fieldTeam    User[]  @relation("FieldTeam")
   studioTeam   User[]  @relation("StudioTeam")
-  deliveryTeam User[]  @relation("DeliveryTeam")
   workflows   ProjectWorkflow[]
 
   tasks         Task[]
@@ -346,12 +369,28 @@ model ProjectWorkflow {
   @@index([assigneeId])
 }
 
+// Role pricing — configurable roles with levels and per-attendance prices
+// Each role has a team (field/edit), a name, a level, and a price in Rials
+model RolePrice {
+  id          String   @id @default(cuid())
+  team        String   // "field" | "edit"
+  roleName    String   // "videographer" | "helishot" | "photographer" | "film_editor" | "photo_editor"
+  level       Int      @default(1) // 1, 2, 3 (levels of expertise)
+  pricePerProject Decimal @default(0) // Rials — price for one project attendance
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([team, roleName, level])
+  @@index([team, isActive])
+}
+
 model SalaryRule {
   id              String   @id @default(cuid())
-  role            String   // photographer | editor | logistics
+  role            String   // photographer | videographer | pro_crew | editor | film_editor | sales | manager | admin
   commissionType  String   // percent | fixed_per_project
   commissionValue Decimal
-  applyOn         String   // field_work | studio_work | delivery
+  applyOn         String   // field_work | studio_work
   isActive        Boolean  @default(true)
   salaryRecords   SalaryRecord[]
   createdAt       DateTime @default(now())
@@ -365,12 +404,18 @@ model SalaryRecord {
   projectId  String
   project    Project     @relation(fields: [projectId], references: [id])
   amount     Decimal
-  ruleUsedId String
-  ruleUsed   SalaryRule  @relation(fields: [ruleUsedId], references: [id])
+  ruleUsedId String?
+  ruleUsed   SalaryRule? @relation(fields: [ruleUsedId], references: [id])
   isPaid     Boolean     @default(false)
+  isSettled  Boolean     @default(false) // settled = cleared from active list
+  settledAt  DateTime?
   period     String      @default("") // "1405-04" (Jalali year-month)
   note       String?
   paidAt     DateTime?
+  // For per-attendance salary — which role and level was used
+  rolePriceId String?
+  // For manual salary entries (photo editor, bonuses, etc.)
+  isManual    Boolean     @default(false)
   createdAt  DateTime    @default(now())
 }
 
@@ -567,13 +612,20 @@ model KanbanCard {
 
 // ===================== MESSAGING =====================
 model Conversation {
-  id        String   @id @default(cuid())
-  type      String   @default("direct")
-  title     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  messages  Message[]
-  participants ConversationParticipant[]
+  id              String   @id @default(cuid())
+  type            String   @default("direct") // direct | group
+  title           String?
+  avatarUrl       String?
+  createdBy        String?
+  lastMessageAt   DateTime?
+  lastMessagePreview String?
+  lastMessageSenderName String?
+  pinnedMessageId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  messages        Message[]
+  participants    ConversationParticipant[]
+  @@index([lastMessageAt])
 }
 
 model ConversationParticipant {
@@ -582,8 +634,14 @@ model ConversationParticipant {
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   userId          String
   userName        String
+  role            String   @default("member") // owner | admin | member
   joinedAt        DateTime @default(now())
+  leftAt          DateTime?
+  lastReadAt      DateTime?
+  muted           Boolean  @default(false)
+  pinned          Boolean  @default(false)
   @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {
@@ -596,9 +654,19 @@ model Message {
   mentions        String   @default("[]")
   attachments     String   @default("[]")
   replyToId       String?
+  replyTo         Message? @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[] @relation("MessageReply")
+  forwardedFromId String?
+  forwardedFromName String?
   editedAt        DateTime?
+  deletedAt       DateTime?
+  deletedFor      String   @default("[]") // JSON array of userIds who deleted for themselves
+  pinnedAt        DateTime?
+  readBy          String   @default("[]") // JSON array of {userId, readAt}
   createdAt       DateTime @default(now())
   reactions       MessageReaction[]
+  @@index([conversationId, createdAt])
+  @@index([senderId])
 }
 
 model MessageReaction {
@@ -610,6 +678,7 @@ model MessageReaction {
   emoji     String
   createdAt DateTime @default(now())
   @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 // ===================== CUSTOM FIELDS =====================

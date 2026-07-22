@@ -210,3 +210,4 @@ export async function DELETE(
   await db.qrTemplate.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

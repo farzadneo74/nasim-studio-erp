@@ -199,3 +199,56 @@
 .rmdp-arrow-container:hover { background: var(--accent) !important; }
 .rmdp-arrow { border-color: var(--muted-foreground) !important; }
 .rmdp-day.rmdp-disabled { color: var(--muted-foreground) !important; opacity: 0.4; }
+
+/* Year/Month selector dropdown — dark mode safe */
+.rmdp-year-picker,
+.rmdp-month-picker {
+  background: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+.rmdp-year-picker .rmdp-year,
+.rmdp-month-picker .rmdp-month {
+  color: var(--popover-foreground) !important;
+  border-radius: 0.25rem !important;
+}
+.rmdp-year-picker .rmdp-year:hover,
+.rmdp-month-picker .rmdp-month:hover {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+.rmdp-year-picker .rmdp-year.rmdp-selected,
+.rmdp-month-picker .rmdp-month.rmdp-selected {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+/* Header values (year/month buttons) — ensure readable in dark */
+.rmdp-header-values button {
+  color: var(--popover-foreground) !important;
+}
+.rmdp-header-values button:hover {
+  background: var(--accent) !important;
+  border-radius: 0.25rem !important;
+}
+/* Calendar header area */
+.rmdp-header {
+  background: transparent !important;
+}
+/* Arrow containers */
+.rmdp-arrow-container {
+  background: transparent !important;
+}
+/* Ensure the dropdown selector text is visible */
+.rmdp-select {
+  color: var(--popover-foreground) !important;
+  background: var(--popover) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.25rem !important;
+}
+.rmdp-select option {
+  color: var(--foreground) !important;
+  background: var(--popover) !important;
+}
+

@@ -64,7 +64,6 @@ export async function GET() {
       OR: [
         { fieldTeam: { some: { id: user.id } } },
         { studioTeam: { some: { id: user.id } } },
-        { deliveryTeam: { some: { id: user.id } } },
       ],
     },
     orderBy: { startDatetime: "asc" },
@@ -78,7 +77,6 @@ export async function GET() {
       servicePackage: { select: { id: true, title: true, category: true } },
       fieldTeam: { where: { id: user.id }, select: { id: true } },
       studioTeam: { where: { id: user.id }, select: { id: true } },
-      deliveryTeam: { where: { id: user.id }, select: { id: true } },
     },
   })
 
@@ -86,8 +84,7 @@ export async function GET() {
     const myTeamTypes: string[] = []
     if (p.fieldTeam.length) myTeamTypes.push("field")
     if (p.studioTeam.length) myTeamTypes.push("studio")
-    if (p.deliveryTeam.length) myTeamTypes.push("delivery")
-    return {
+        return {
       id: p.id,
       contractNumber: p.contract.contractNumber,
       customerId: p.contract.customer.id,
@@ -137,3 +134,4 @@ export async function GET() {
     projects,
   })
 }
+

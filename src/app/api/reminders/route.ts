@@ -220,7 +220,11 @@ async function resolveLinkNames(
     projectIds.size
       ? db.project.findMany({
           where: { id: { in: [...projectIds] } },
-          select: { id: true, servicePackage: { select: { title: true } } },
+          select: {
+            id: true,
+            servicePackage: { select: { title: true } },
+            contract: { select: { customer: { select: { name: true } } } },
+          },
         })
       : Promise.resolve([]),
     userIds.size
@@ -230,7 +234,11 @@ async function resolveLinkNames(
   return {
     customers: Object.fromEntries(customers.map((c) => [c.id, c.name])),
     projects: Object.fromEntries(
-      projects.map((p) => [p.id, p.servicePackage?.title ?? "پروژه"])
+      projects.map((p) => {
+        const customerName = p.contract?.customer?.name
+        const pkgTitle = p.servicePackage?.title ?? "پروژه"
+        return [p.id, customerName ? `${customerName} — ${pkgTitle}` : pkgTitle]
+      })
     ),
     users: Object.fromEntries(
       users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()])
@@ -421,3 +429,4 @@ export async function POST(req: NextRequest) {
     { status: 201 }
   )
 }
+

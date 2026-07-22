@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil } from "lucide-react"
+import { Plus, Pencil, Calendar } from "lucide-react"
 import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLES, ROLE_LABELS, ROLE_PERMISSIONS } from "@/lib/constants"
+import { ROLES, ROLE_LABELS, ROLE_BADGE_COLORS, hasPermission, STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, CATEGORY_COLORS, type ProjectStatus, type PackageCategory } from "@/lib/constants"
+import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import { PageHeader, EmptyState, StatCard, SectionCard } from "./_shared"
@@ -17,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -57,15 +59,7 @@ interface User {
   address: string | null
 }
 
-const ROLE_BADGE: Record<Role, string> = {
-  admin: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-  manager: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  sales: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  photographer: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  editor: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-  qc: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
-  logistics: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-}
+const ROLE_BADGE = ROLE_BADGE_COLORS
 
 function initials(u: { firstName: string; lastName: string }) {
   return `${u.firstName.charAt(0)}${u.lastName.charAt(0)}`.toUpperCase()
@@ -73,8 +67,8 @@ function initials(u: { firstName: string; lastName: string }) {
 
 export function SettingsUsersView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = ROLE_PERMISSIONS[role]?.users
-  const canView = role === "admin" || role === "manager"
+  const canManage = hasPermission(role, "employees_manage")
+  const canView = hasPermission(role, "employees")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -86,6 +80,7 @@ export function SettingsUsersView() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<User | null>(null)
+  const [bookingUser, setBookingUser] = React.useState<User | null>(null)
   const [createForm, setCreateForm] = React.useState<{
     firstName: string
     lastName: string
@@ -240,7 +235,7 @@ export function SettingsUsersView() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {ROLES.map((r) => (
           <StatCard
             key={r}
@@ -333,24 +328,35 @@ export function SettingsUsersView() {
                     </TableCell>
                     {canManage && (
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditing(u)
-                            setEditForm({
-                              role: u.role as Role,
-                              email: u.email || "",
-                              bankName: u.bankName || "",
-                              iban: u.iban || "",
-                              cardNumber: u.cardNumber || "",
-                              isAvailable: u.isAvailable,
-                            })
-                          }}
-                          aria-label="ویرایش کاربر"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setBookingUser(u)}
+                            aria-label="تقویم رزرو"
+                            title="تقویم رزرو"
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditing(u)
+                              setEditForm({
+                                role: u.role as Role,
+                                email: u.email || "",
+                                bankName: u.bankName || "",
+                                iban: u.iban || "",
+                                cardNumber: u.cardNumber || "",
+                                isAvailable: u.isAvailable,
+                              })
+                            }}
+                            aria-label="ویرایش کاربر"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -574,16 +580,188 @@ export function SettingsUsersView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Booking calendar dialog */}
+      <BookingCalendarDialog
+        user={bookingUser}
+        open={!!bookingUser}
+        onOpenChange={(v) => !v && setBookingUser(null)}
+      />
     </div>
   )
 }
 
 const ROLE_ACCENT: Record<Role, string> = {
   admin: "#ef4444",
-  manager: "#10b981",
-  sales: "#0ea5e9",
-  photographer: "#f59e0b",
-  editor: "#a855f7",
-  qc: "#ec4899",
-  logistics: "#64748b",
+  manager: "#f59e0b",
+  sales: "#10b981",
+  photographer: "#0ea5e9",
+  videographer: "#8b5cf6",
+  pro_crew: "#d946ef",
+  editor: "#14b8a6",
+  film_editor: "#06b6d4",
 }
+
+// ============================================================
+// Booking Calendar Dialog — shows all projects assigned to a user
+// ============================================================
+function BookingCalendarDialog({
+  user,
+  open,
+  onOpenChange,
+}: {
+  user: User | null
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
+  const api = useApi()
+  const { openProject } = useWorkspace()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["user-projects", user?.id],
+    queryFn: () => api.get<{ items: UserProject[] }>(`/api/users/${user?.id}/projects`),
+    enabled: !!user && open,
+  })
+
+  const projects = data?.items ?? []
+
+  // Group by date (Jalali date string)
+  const grouped = React.useMemo(() => {
+    const map = new Map<string, UserProject[]>()
+    for (const p of projects) {
+      if (!p.startDatetime) continue
+      const d = new Date(p.startDatetime)
+      const key = d.toISOString().split("T")[0]
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(p)
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [projects])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>تقویم رزرو — {user ? `${user.firstName} ${user.lastName}` : ""}</DialogTitle>
+          <DialogDescription>
+            پروژه‌هایی که این کاربر در تیم آن‌ها قرار دارد. روی هر پروژه کلیک کنید تا جزئیات باز شود.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <EmptyState
+            icon="📅"
+            title="هیچ رزروی وجود ندارد"
+            description="این کاربر هنوز در تیم هیچ پروژه‌ای قرار نگرفته است."
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border bg-muted/30 p-2 text-center">
+                <div className="text-lg font-bold">{projects.length}</div>
+                <div className="text-[10px] text-muted-foreground">کل پروژه‌ها</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-2 text-center">
+                <div className="text-lg font-bold">{grouped.length}</div>
+                <div className="text-[10px] text-muted-foreground">روزهای رزرو</div>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-2 text-center">
+                <div className="text-lg font-bold text-amber-600">
+                  {projects.filter((p) => p.status !== "delivered" && p.status !== "ready").length}
+                </div>
+                <div className="text-[10px] text-muted-foreground">در حال انجام</div>
+              </div>
+            </div>
+
+            {/* Project list grouped by date */}
+            {grouped.map(([dateKey, items]) => (
+              <div key={dateKey}>
+                <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                  {new Date(dateKey).toLocaleDateString("fa-IR", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </div>
+                <div className="space-y-2">
+                  {items.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        openProject(p.id)
+                        onOpenChange(false)
+                      }}
+                      className="flex w-full items-center gap-3 rounded-lg border bg-card p-3 text-right transition hover:bg-muted/40"
+                    >
+                      <div
+                        className="flex size-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white"
+                        style={{ background: STATUS_COLORS[p.status as ProjectStatus] ?? "#64748b" }}
+                      >
+                        {new Date(p.startDatetime).toLocaleTimeString("fa-IR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">
+                          {p.packageTitle}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="truncate">{p.customerName}</span>
+                          <span dir="ltr">{p.contractNumber}</span>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px]"
+                          style={{
+                            background: (CATEGORY_COLORS[p.category as PackageCategory] ?? "#64748b") + "22",
+                            color: CATEGORY_COLORS[p.category as PackageCategory] ?? "#64748b",
+                          }}
+                        >
+                          {CATEGORY_LABELS[p.category as PackageCategory] ?? p.category}
+                        </Badge>
+                        <span
+                          className="text-[9px] font-medium"
+                          style={{ color: STATUS_COLORS[p.status as ProjectStatus] ?? "#64748b" }}
+                        >
+                          {STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>بستن</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+interface UserProject {
+  id: string
+  status: string
+  startDatetime: string | null
+  endDatetime: string | null
+  contractNumber: string
+  customerName: string
+  packageTitle: string
+  category: string
+}
+

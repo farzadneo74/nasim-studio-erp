@@ -171,6 +171,7 @@ export async function GET(req: NextRequest) {
       customerType: c.customerType,
       profileImage: c.profileImage,
       extraPhones: parseExtraPhones(c.extraPhones),
+      instagramId: c.instagramId,
       birthDate: iso(c.birthDate),
       engagementDate: iso(c.engagementDate),
       weddingDate: iso(c.weddingDate),
@@ -374,6 +375,11 @@ export async function POST(req: NextRequest) {
       ? body.address.trim()
       : null
 
+  const instagramId =
+    typeof body.instagramId === "string" && body.instagramId.trim().length > 0
+      ? body.instagramId.trim().replace(/^@/, "")
+      : null
+
   const created = await db.customer.create({
     data: {
       name,
@@ -381,6 +387,7 @@ export async function POST(req: NextRequest) {
       customerType,
       profileImage,
       extraPhones: extraPhonesJson,
+      instagramId,
       birthDate,
       engagementDate,
       weddingDate,
@@ -402,6 +409,7 @@ export async function POST(req: NextRequest) {
     familyMeta: created.familyMeta,
     profileImage: created.profileImage,
     extraPhones: parseExtraPhones(created.extraPhones),
+    instagramId: created.instagramId,
     birthDate: iso(created.birthDate),
     engagementDate: iso(created.engagementDate),
     weddingDate: iso(created.weddingDate),
@@ -410,3 +418,4 @@ export async function POST(req: NextRequest) {
     tags: created.tags.map((t) => ({ id: t.id, name: t.name, color: t.color })),
   }, { status: 201 })
 }
+

@@ -54,3 +54,4 @@ export function getEffectivePrice(p: PricingInput): number {
       return calc
   }
 }
+

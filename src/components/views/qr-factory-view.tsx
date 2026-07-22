@@ -27,7 +27,7 @@ import JSZip from "jszip"
 import { useWorkspace } from "@/stores/workspace"
 import { useApi } from "@/lib/api/client"
 import { useStudioName } from "@/lib/api/use-studio-name"
-import { ROLE_PERMISSIONS, type Role } from "@/lib/constants"
+import { hasPermission, type Role } from "@/lib/constants"
 import { cn } from "@/lib/utils"
 import { formatDate, toPersianDigits } from "@/lib/format"
 
@@ -723,14 +723,17 @@ function CustomerCombobox({
   const [results, setResults] = React.useState<CustomerOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<CustomerOption | null>(null)
+  const resolvedRef = React.useRef<string | null>(null)
 
   // Hydrate the selected name when value changes from outside
   React.useEffect(() => {
     if (!value) {
+      resolvedRef.current = null
       setKnown(null)
       return
     }
-    if (known?.id === value) return
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     let cancelled = false
     fetch(`/api/customers?limit=50&search=`, {
       headers: { "x-demo-role": role },
@@ -746,7 +749,7 @@ function CustomerCombobox({
     return () => {
       cancelled = true
     }
-  }, [value, known, role])
+  }, [value, role])
 
   // Debounced search-as-you-type
   React.useEffect(() => {
@@ -846,14 +849,17 @@ function OwnerFilterCombobox({
   const [results, setResults] = React.useState<CustomerOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<CustomerOption | null>(null)
+  const resolvedRef = React.useRef<string | null>(null)
 
   // Hydrate the selected owner's name when value changes from outside
   React.useEffect(() => {
     if (!value) {
+      resolvedRef.current = null
       setKnown(null)
       return
     }
-    if (known?.id === value) return
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     let cancelled = false
     fetch(`/api/customers?limit=50&search=`, {
       headers: { "x-demo-role": role },
@@ -868,7 +874,7 @@ function OwnerFilterCombobox({
     return () => {
       cancelled = true
     }
-  }, [value, known, role])
+  }, [value, role])
 
   // Debounced search-as-you-type — fetch with ?search=X&limit=20
   React.useEffect(() => {
@@ -974,14 +980,17 @@ function CustomerPickerField({
   const [results, setResults] = React.useState<CustomerOption[]>([])
   const [loading, setLoading] = React.useState(false)
   const [known, setKnown] = React.useState<CustomerOption | null>(null)
+  const resolvedRef = React.useRef<string | null>(null)
 
   // Hydrate the selected customer's name when value changes from outside
   React.useEffect(() => {
     if (!value) {
+      resolvedRef.current = null
       setKnown(null)
       return
     }
-    if (known?.id === value) return
+    if (resolvedRef.current === value) return
+    resolvedRef.current = value
     let cancelled = false
     fetch(`/api/customers?limit=50&search=`, {
       headers: { "x-demo-role": role },
@@ -996,7 +1005,7 @@ function CustomerPickerField({
     return () => {
       cancelled = true
     }
-  }, [value, known, role])
+  }, [value, role])
 
   // Debounced search-as-you-type — fetch with ?search=X&limit=20
   React.useEffect(() => {
@@ -2553,7 +2562,7 @@ export function QrFactoryView() {
   const mutate = useMutate()
   const { fa: studioName } = useStudioName()
 
-  const canAccess = ROLE_PERMISSIONS[role].qr
+  const canAccess = hasPermission(role, "qr_factory")
   const canExpire = role === "admin" || role === "manager"
 
   const [statusFilter, setStatusFilter] = React.useState<"all" | "available" | "used" | "expired">("all")
@@ -2691,9 +2700,9 @@ export function QrFactoryView() {
           title="کدهای صادر شده"
           description={`${toPersianDigits(data?.total ?? 0)} مجموع${statusFilter !== "all" || ownerFilter ? " · فیلتر شده" : ""}`}
           actions={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <Select value={defaultTemplateId} onValueChange={setDefaultTemplateId}>
-                <SelectTrigger size="sm" className="h-8 w-[240px]">
+                <SelectTrigger size="sm" className="h-8 w-full sm:w-[240px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2714,7 +2723,7 @@ export function QrFactoryView() {
               <OwnerFilterCombobox value={ownerFilter} onChange={setOwnerFilter} />
 
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-                <SelectTrigger size="sm" className="h-8 w-[140px]">
+                <SelectTrigger size="sm" className="h-8 w-full sm:w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2831,3 +2840,4 @@ export function QrFactoryView() {
     </div>
   )
 }
+

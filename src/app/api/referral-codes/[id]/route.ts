@@ -85,3 +85,4 @@ export async function PATCH(req: Request, { params }: Ctx) {
     statusLabel: updated.isExpired ? "expired" : isUsedUp ? "used" : "available",
   })
 }
+

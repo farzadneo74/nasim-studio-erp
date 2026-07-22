@@ -8,3 +8,4 @@ export async function POST(req: Request) {
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 429 })
   return NextResponse.json({ ok: true, demoCode: result.demoCode, message: "کد تایید ارسال شد" })
 }
+

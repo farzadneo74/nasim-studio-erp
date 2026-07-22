@@ -60,3 +60,4 @@ export function findHolidayByDate(
 export function findHoliday(holidays: Holiday[], jm: number, jd: number): Holiday | undefined {
   return holidays.find((h) => h.jalaliYear === 0 && h.jm === jm && h.jd === jd)
 }
+

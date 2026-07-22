@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, X, AlertCircle, Info } from "lucide-react"
+import { Plus, Pencil, Trash2, X, AlertCircle, Info, Copy } from "lucide-react"
 import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
@@ -15,7 +15,7 @@ import {
   CATEGORY_LABELS,
   QUALITY_LABELS,
   PRICING_STRATEGY_LABELS,
-  ROLE_PERMISSIONS,
+  hasPermission,
   type PackageCategory,
   type PackageQuality,
   type PricingStrategy,
@@ -47,6 +47,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import {
   Dialog,
   DialogContent,
@@ -75,8 +76,8 @@ interface Pkg {
   currentPrice: number
   pricingStrategy: string
   defaultDescription: string | null
-  defaultTasks: string[]
-  defaultEquipment: string[]
+  defaultTasks: Array<string | { name: string; price: number }>
+  defaultEquipment: Array<string | { name: string; price: number }>
   isActive: boolean
 }
 
@@ -111,6 +112,9 @@ const STRATEGY_DESCRIPTIONS: Record<PricingStrategy, string> = {
   delayed: "تغییر قیمت بعد از وضعیت «آماده تحویل» و گذشت ۳۰ روز اعمال می‌شود",
 }
 
+interface TaskItem { name: string; price: number }
+interface EquipmentItem { name: string; price: number }
+
 interface FormState {
   title: string
   quality: PackageQuality
@@ -118,8 +122,8 @@ interface FormState {
   pricingStrategy: PricingStrategy
   priceToman: number
   defaultDescription: string
-  defaultTasks: string[]
-  defaultEquipment: string[]
+  defaultTasks: TaskItem[]
+  defaultEquipment: EquipmentItem[]
   isActive: boolean
 }
 
@@ -137,7 +141,7 @@ const EMPTY_FORM: FormState = {
 
 export function SettingsPackagesView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = ROLE_PERMISSIONS[role]?.packages
+  const canManage = hasPermission(role, "packages_manage")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -151,6 +155,39 @@ export function SettingsPackagesView() {
   const [form, setForm] = React.useState<FormState>(EMPTY_FORM)
   const [deleteTarget, setDeleteTarget] = React.useState<Pkg | null>(null)
 
+  // Filters
+  const [filterQuality, setFilterQuality] = React.useState<string>("all")
+  const [filterCategory, setFilterCategory] = React.useState<string>("all")
+  const [filterStrategy, setFilterStrategy] = React.useState<string>("all")
+
+  // Column visibility
+  type ColKey = "title" | "category" | "strategy" | "price" | "active" | "actions"
+  const [columns, setColumns] = React.useState<Record<ColKey, boolean>>({
+    title: true,
+    category: true,
+    strategy: true,
+    price: true,
+    active: true,
+    actions: true,
+  })
+  const [colPopoverOpen, setColPopoverOpen] = React.useState(false)
+
+  // Apply filters
+  const filteredData = React.useMemo(() => {
+    if (!data) return []
+    return data.filter((p) => {
+      const q = normalizeQuality(p.quality)
+      const c = normalizeCategory(p.category)
+      const s = normalizeStrategy(p.pricingStrategy)
+      if (filterQuality !== "all" && q !== filterQuality) return false
+      if (filterCategory !== "all" && c !== filterCategory) return false
+      if (filterStrategy !== "all" && s !== filterStrategy) return false
+      return true
+    })
+  }, [data, filterQuality, filterCategory, filterStrategy])
+
+  const hasFilters = filterQuality !== "all" || filterCategory !== "all" || filterStrategy !== "all"
+
   const saveMut = useMutation({
     mutationFn: async () => {
       const priceRials = tomanToRials(form.priceToman)
@@ -162,8 +199,8 @@ export function SettingsPackagesView() {
         basePrice: priceRials,
         currentPrice: priceRials,
         defaultDescription: form.defaultDescription.trim() || undefined,
-        defaultTasks: form.defaultTasks.filter((t) => t.trim().length > 0),
-        defaultEquipment: form.defaultEquipment.filter((t) => t.trim().length > 0),
+        defaultTasks: form.defaultTasks.filter((t) => t.name.trim().length > 0),
+        defaultEquipment: form.defaultEquipment.filter((t) => t.name.trim().length > 0),
         isActive: form.isActive,
       }
       if (!payload.title) throw new Error("عنوان الزامی است")
@@ -204,6 +241,32 @@ export function SettingsPackagesView() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+
+  const duplicateMut = useMutation({
+    mutationFn: async (id: string) => {
+      const pkg = data?.find((p) => p.id === id)
+      if (!pkg) throw new Error("پکیج یافت نشد")
+      const priceRials = Number(pkg.currentPrice)
+      return mutateFn("/api/packages", "POST", {
+        title: pkg.title + " (کپی)",
+        quality: normalizeQuality(pkg.quality),
+        category: normalizeCategory(pkg.category),
+        pricingStrategy: normalizeStrategy(pkg.pricingStrategy),
+        basePrice: priceRials,
+        currentPrice: priceRials,
+        defaultDescription: pkg.defaultDescription || undefined,
+        defaultTasks: (pkg.defaultTasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
+        defaultEquipment: (pkg.defaultEquipment || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
+        isActive: true,
+      }, role)
+    },
+    onSuccess: () => {
+      toast.success("کپی پکیج ایجاد شد")
+      qc.invalidateQueries({ queryKey: ["packages"] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   function editPkg(p: Pkg) {
     setEditing(p)
     // Prices stored in DB as Rials; TomanInput works in Toman (÷10).
@@ -215,8 +278,8 @@ export function SettingsPackagesView() {
       pricingStrategy: normalizeStrategy(p.pricingStrategy),
       priceToman: toman,
       defaultDescription: p.defaultDescription || "",
-      defaultTasks: p.defaultTasks?.length ? p.defaultTasks : [],
-      defaultEquipment: p.defaultEquipment?.length ? p.defaultEquipment : [],
+      defaultTasks: (p.defaultTasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
+      defaultEquipment: (p.defaultEquipment || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
       isActive: p.isActive,
     })
     setDialogOpen(true)
@@ -256,10 +319,45 @@ export function SettingsPackagesView() {
         title="کاتالوگ خدمات"
         description="استراتژی «متغیر» قیمت را فوراً اعمال می‌کند؛ «مهلت‌دار» بعد از ۳۰ روز از آماده تحویل."
       >
+        {/* Filter toolbar — mobile responsive */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Select value={filterQuality} onValueChange={setFilterQuality}>
+            <SelectTrigger className="h-9 w-full sm:w-[130px]"><SelectValue placeholder="کیفیت" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه کیفیت‌ها</SelectItem>
+              <SelectItem value="fullhd">FullHD</SelectItem>
+              <SelectItem value="4k">4K</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="h-9 w-full sm:w-[130px]"><SelectValue placeholder="دسته‌بندی" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه دسته‌ها</SelectItem>
+              <SelectItem value="photo">عکس</SelectItem>
+              <SelectItem value="video">فیلم</SelectItem>
+              <SelectItem value="mix">مختلط</SelectItem>
+              <SelectItem value="other">سایر</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterStrategy} onValueChange={setFilterStrategy}>
+            <SelectTrigger className="h-9 w-full sm:w-[140px]"><SelectValue placeholder="استراتژی" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه استراتژی‌ها</SelectItem>
+              <SelectItem value="variable">متغیر</SelectItem>
+              <SelectItem value="delayed">مهلت‌دار</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasFilters && (
+            <Button variant="ghost" size="sm" className="shrink-0 gap-1 text-xs" onClick={() => { setFilterQuality("all"); setFilterCategory("all"); setFilterStrategy("all") }}>
+              <X className="size-3" /> پاک کردن
+            </Button>
+          )}
+        </div>
+
         {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-xl" />
             ))}
           </div>
         ) : !data || data.length === 0 ? (
@@ -268,101 +366,75 @@ export function SettingsPackagesView() {
             title="هنوز پکیجی وجود ندارد"
             description="برای شروع رزرو پروژه‌ها، اولین پکیج خدمات خود را ایجاد کنید."
           />
+        ) : filteredData.length === 0 ? (
+          <EmptyState icon="🔍" title="پکیجی با این فیلتر یافت نشد" description="فیلترها را تغییر دهید یا پاک کنید." />
         ) : (
-          <div className="overflow-x-auto">
-            <Table dir="rtl">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[240px] text-right">عنوان</TableHead>
-                  <TableHead className="text-right">دسته‌بندی</TableHead>
-                  <TableHead className="text-right">استراتژی</TableHead>
-                  <TableHead className="text-right">قیمت پکیج</TableHead>
-                  <TableHead className="text-center">فعال</TableHead>
-                  <TableHead className="text-center">عملیات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((p) => {
-                  const quality = normalizeQuality(p.quality)
-                  const category = normalizeCategory(p.category)
-                  const strategy = normalizeStrategy(p.pricingStrategy)
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-right align-middle">
-                        <div className="flex flex-wrap items-center justify-start gap-2">
-                          <span className="font-medium">{p.title}</span>
-                          <Badge
-                            variant="outline"
-                            className={cn("border-transparent", QUALITY_BADGE[quality])}
-                          >
-                            {QUALITY_LABELS[quality]}
-                          </Badge>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredData.map((p) => {
+              const quality = normalizeQuality(p.quality)
+              const category = normalizeCategory(p.category)
+              const strategy = normalizeStrategy(p.pricingStrategy)
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    "group flex flex-col rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md",
+                    !p.isActive && "opacity-60"
+                  )}
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold">{p.title}</div>
+                      {p.defaultDescription && (
+                        <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">
+                          {p.defaultDescription}
                         </div>
-                        {p.defaultDescription && (
-                          <div className="line-clamp-1 max-w-md text-xs text-muted-foreground mt-1">
-                            {p.defaultDescription}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right align-middle">
-                        <Badge
-                          variant="outline"
-                          className="border-transparent"
-                          style={{
-                            backgroundColor: CATEGORY_COLORS[category] + "22",
-                            color: CATEGORY_COLORS[category],
-                          }}
-                        >
-                          {CATEGORY_LABELS[category]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right align-middle">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
-                            STRATEGY_BADGE[strategy]
-                          )}
-                        >
-                          {PRICING_STRATEGY_LABELS[strategy]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right align-middle tabular-nums font-medium whitespace-nowrap">
-                        {formatRials(p.currentPrice)} تومان
-                      </TableCell>
-                      <TableCell className="text-center align-middle">
-                        <div className="flex justify-center">
-                          <Checkbox
-                            checked={p.isActive}
-                            onCheckedChange={() => toggleActiveMut.mutate(p)}
-                            aria-label="تغییر وضعیت فعال"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center align-middle">
-                        <div className="flex justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => editPkg(p)}
-                            aria-label="ویرایش پکیج"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteTarget(p)}
-                            aria-label="حذف پکیج"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                      )}
+                    </div>
+                    <Checkbox
+                      checked={p.isActive}
+                      onCheckedChange={() => toggleActiveMut.mutate(p)}
+                      aria-label="تغییر وضعیت فعال"
+                      className="shrink-0"
+                    />
+                  </div>
+                  <div className="mb-3 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className={cn("border-transparent text-[9px]", QUALITY_BADGE[quality])}>
+                      {QUALITY_LABELS[quality]}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-transparent text-[9px]"
+                      style={{ backgroundColor: CATEGORY_COLORS[category] + "22", color: CATEGORY_COLORS[category] }}
+                    >
+                      {CATEGORY_LABELS[category]}
+                    </Badge>
+                    <Badge variant="outline" className={cn("border-transparent text-[9px]", STRATEGY_BADGE[strategy])}>
+                      {PRICING_STRATEGY_LABELS[strategy]}
+                    </Badge>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t pt-2">
+                    <div>
+                      <div className="text-[10px] text-muted-foreground">قیمت</div>
+                      <div className="text-base font-bold tabular-nums text-emerald-600">
+                        {formatRials(p.currentPrice)} <span className="text-[10px] font-normal">تومان</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editPkg(p)} aria-label="ویرایش">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => duplicateMut.mutate(p.id)} aria-label="کپی" title="ساخت کپی">
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-600" onClick={() => setDeleteTarget(p)} aria-label="حذف">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </SectionCard>
@@ -566,16 +638,16 @@ function PackageDialog({
             />
           </div>
 
-          {/* 7. تسک‌های پکیج */}
+          {/* 7. تسک‌های پکیج با قیمت */}
           <div className="sm:col-span-2">
             <div className="mb-2 flex items-center justify-between">
-              <Label>تسک‌های پکیج</Label>
+              <Label>تسک‌های پکیج <span className="text-[10px] text-muted-foreground">(قیمت‌ها راهنمایی است و به قیمت پکیج تأثیری ندارد)</span></Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  setForm((f) => ({ ...f, defaultTasks: [...f.defaultTasks, ""] }))
+                  setForm((f) => ({ ...f, defaultTasks: [...f.defaultTasks, { name: "", price: 0 }] }))
                 }
               >
                 <Plus className="ml-1 h-3.5 w-3.5" />
@@ -585,23 +657,40 @@ function PackageDialog({
             <div className="space-y-2">
               {form.defaultTasks.length === 0 && (
                 <div className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                  هیچ تسکی وجود ندارد. این تسک‌ها هنگام ایجاد پروژه از این پکیج، به‌صورت خودکار در کانبان پروژه پر می‌شوند.
+                  هیچ تسکی وجود ندارد.
                 </div>
               )}
               {form.defaultTasks.map((t, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <Input
-                    value={t}
+                    value={t.name}
                     onChange={(e) => {
                       const v = e.target.value
                       setForm((f) => {
                         const next = [...f.defaultTasks]
-                        next[idx] = v
+                        next[idx] = { ...next[idx], name: v }
                         return { ...f, defaultTasks: next }
                       })
                     }}
                     placeholder={`تسک ${idx + 1}`}
+                    className="flex-1"
                   />
+                  <Input
+                    type="number"
+                    dir="ltr"
+                    value={t.price || ""}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) || 0
+                      setForm((f) => {
+                        const next = [...f.defaultTasks]
+                        next[idx] = { ...next[idx], price: v }
+                        return { ...f, defaultTasks: next }
+                      })
+                    }}
+                    placeholder="قیمت (تومان)"
+                    className="w-32 text-left text-xs"
+                  />
+                  <span className="shrink-0 text-[10px] text-muted-foreground">ت</span>
                   <Button
                     type="button"
                     variant="ghost"
@@ -621,16 +710,16 @@ function PackageDialog({
             </div>
           </div>
 
-          {/* 8. تجهیزات */}
+          {/* 8. تجهیزات با قیمت */}
           <div className="sm:col-span-2">
             <div className="mb-2 flex items-center justify-between">
-              <Label>تجهیزات</Label>
+              <Label>تجهیزات <span className="text-[10px] text-muted-foreground">(قیمت‌ها راهنمایی است)</span></Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  setForm((f) => ({ ...f, defaultEquipment: [...f.defaultEquipment, ""] }))
+                  setForm((f) => ({ ...f, defaultEquipment: [...f.defaultEquipment, { name: "", price: 0 }] }))
                 }
               >
                 <Plus className="ml-1 h-3.5 w-3.5" />
@@ -640,23 +729,40 @@ function PackageDialog({
             <div className="space-y-2">
               {form.defaultEquipment.length === 0 && (
                 <div className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                  هیچ تجهیزی وجود ندارد. این لیست به‌عنوان چک‌لیست تجهیزات پیشنهادی برای پروژه‌های جدید استفاده می‌شود.
+                  هیچ تجهیزی وجود ندارد.
                 </div>
               )}
               {form.defaultEquipment.map((t, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <Input
-                    value={t}
+                    value={t.name}
                     onChange={(e) => {
                       const v = e.target.value
                       setForm((f) => {
                         const next = [...f.defaultEquipment]
-                        next[idx] = v
+                        next[idx] = { ...next[idx], name: v }
                         return { ...f, defaultEquipment: next }
                       })
                     }}
-                    placeholder={`مثلاً دوربین Canon R6، سه‌پایه، لنس ۵۰mm…`}
+                    placeholder={`مثلاً دوربین Canon R6`}
+                    className="flex-1"
                   />
+                  <Input
+                    type="number"
+                    dir="ltr"
+                    value={t.price || ""}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) || 0
+                      setForm((f) => {
+                        const next = [...f.defaultEquipment]
+                        next[idx] = { ...next[idx], price: v }
+                        return { ...f, defaultEquipment: next }
+                      })
+                    }}
+                    placeholder="قیمت (تومان)"
+                    className="w-32 text-left text-xs"
+                  />
+                  <span className="shrink-0 text-[10px] text-muted-foreground">ت</span>
                   <Button
                     type="button"
                     variant="ghost"
@@ -712,3 +818,4 @@ function PackageDialog({
     </Dialog>
   )
 }
+

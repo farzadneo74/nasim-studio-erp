@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
-import { ROLE_PERMISSIONS, PHOTO_LOCATION_LABELS } from "@/lib/constants"
+import { hasPermission, PHOTO_LOCATION_LABELS } from "@/lib/constants"
 import { formatRials, tomanToRials } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +61,8 @@ interface PrintPhotoPrice {
   paperType: string
   laminateType: string
   photoLocation: PhotoLocation
+  isFormal: boolean
+  printOrder: string // "none" | "first" | "second"
   price: number // Rials
   isActive: boolean
   createdAt: string
@@ -77,24 +79,22 @@ const PHOTO_LOCATION_BADGE: Record<PhotoLocation, string> = {
   customer: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 }
 
-// Common laminate options (Persian). The Select also exposes "بدون لمینت" + "سفارشی…".
+// Laminate options — limited to glossy, matte, none only
 const LAMINATE_PRESETS: { value: string; label: string }[] = [
   { value: "none", label: "بدون لمینت" },
-  { value: "مات", label: "مات" },
-  { value: "براق", label: "براق" },
-  { value: "مخمل", label: "مخمل" },
-  { value: "سوپربراق", label: "سوپربراق" },
+  { value: "glossy", label: "براق" },
+  { value: "matte", label: "مات" },
 ]
-const LAMINATE_CUSTOM = "__custom__"
 
 const LAMINATE_NONE_LABEL = "بدون لمینت"
 
 interface FormState {
   size: string
   paperType: string
-  laminateSelect: string // one of LAMINATE_PRESETS values or LAMINATE_CUSTOM
-  laminateCustom: string // free text when LAMINATE_CUSTOM
+  laminateType: string // "none" | "glossy" | "matte"
   photoLocation: PhotoLocation
+  isFormal: boolean
+  printOrder: string // "none" | "first" | "second"
   price: number // Toman (input units)
   isActive: boolean
 }
@@ -102,9 +102,10 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   size: "",
   paperType: "",
-  laminateSelect: "none",
-  laminateCustom: "",
+  laminateType: "none",
   photoLocation: "studio",
+  isFormal: false,
+  printOrder: "none",
   price: 0,
   isActive: true,
 }
@@ -128,7 +129,7 @@ function rialsToTomanNumber(rials: number): number {
 
 export function SettingsPrintPhotoPricesView() {
   const role = useWorkspace((s) => s.role)
-  const canManage = role === "admin" || role === "manager"
+  const canManage = hasPermission(role, "print_photo_prices")
   const api = useApi()
   const qc = useQueryClient()
 
@@ -153,8 +154,10 @@ export function SettingsPrintPhotoPricesView() {
       const payload = {
         size,
         paperType,
-        laminateType: resolveLaminate(form),
+        laminateType: form.laminateType,
         photoLocation: form.photoLocation,
+        isFormal: form.isFormal,
+        printOrder: form.printOrder,
         price: tomanToRials(form.price), // Toman → Rials
         isActive: form.isActive,
       }
@@ -293,8 +296,10 @@ export function SettingsPrintPhotoPricesView() {
                 <TableRow>
                   <TableHead>اندازه</TableHead>
                   <TableHead>جنس کاغذ</TableHead>
-                  <TableHead>جنس لمینت</TableHead>
+                  <TableHead>لمینت</TableHead>
                   <TableHead>محل عکاسی</TableHead>
+                  <TableHead>سرمجلسی</TableHead>
+                  <TableHead>چاپ</TableHead>
                   <TableHead className="text-right">قیمت (تومان)</TableHead>
                   <TableHead className="text-center">فعال</TableHead>
                   {canManage && <TableHead className="text-right">عملیات</TableHead>}
@@ -308,21 +313,27 @@ export function SettingsPrintPhotoPricesView() {
                     </TableCell>
                     <TableCell className="text-sm">{r.paperType}</TableCell>
                     <TableCell className="text-sm">
-                      {r.laminateType === "none" ? (
-                        <span className="text-muted-foreground">{LAMINATE_NONE_LABEL}</span>
-                      ) : (
-                        r.laminateType
-                      )}
+                      {LAMINATE_PRESETS.find((p) => p.value === r.laminateType)?.label || r.laminateType || "بدون لمینت"}
                     </TableCell>
                     <TableCell>
                       <span
                         className={cn(
                           "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
-                          PHOTO_LOCATION_BADGE[r.photoLocation]
+                          PHOTO_LOCATION_BADGE[r.photoLocation as PhotoLocation]
                         )}
                       >
-                        {PHOTO_LOCATION_LABELS[r.photoLocation]}
+                        {PHOTO_LOCATION_LABELS[r.photoLocation as PhotoLocation] || r.photoLocation}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {r.isFormal ? (
+                        <Badge variant="outline" className="border-transparent bg-amber-100 text-amber-700 text-[9px] dark:bg-amber-950 dark:text-amber-300">بله</Badge>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">خیر</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center text-xs">
+                      {r.printOrder === "first" ? "اول" : r.printOrder === "second" ? "دوم" : "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
                       {formatRials(r.price)} تومان
@@ -433,8 +444,8 @@ export function SettingsPrintPhotoPricesView() {
             <div className="sm:col-span-2">
               <Label>جنس لمینت</Label>
               <Select
-                value={form.laminateSelect}
-                onValueChange={(v) => setForm((f) => ({ ...f, laminateSelect: v }))}
+                value={form.laminateType}
+                onValueChange={(v) => setForm((f) => ({ ...f, laminateType: v }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -445,23 +456,14 @@ export function SettingsPrintPhotoPricesView() {
                       {p.label}
                     </SelectItem>
                   ))}
-                  <SelectItem value={LAMINATE_CUSTOM}>سفارشی…</SelectItem>
+
                 </SelectContent>
               </Select>
-              {form.laminateSelect === LAMINATE_CUSTOM && (
-                <Input
-                  className="mt-2"
-                  value={form.laminateCustom}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, laminateCustom: e.target.value }))
-                  }
-                  placeholder="نوع لمینت دلخواه را وارد کنید"
-                />
-              )}
+              
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {laminateDisplay(resolveLaminate(form)) === LAMINATE_NONE_LABEL
+                {laminateDisplay(form.laminateType) === LAMINATE_NONE_LABEL
                   ? "بدون لمینت انتخاب شده است."
-                  : `لمینت انتخابی: ${laminateDisplay(resolveLaminate(form))}`}
+                  : `لمینت انتخابی: ${laminateDisplay(form.laminateType)}`}
               </p>
             </div>
 
@@ -531,3 +533,4 @@ export function SettingsPrintPhotoPricesView() {
     </div>
   )
 }
+

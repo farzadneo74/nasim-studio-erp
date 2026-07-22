@@ -76,3 +76,4 @@ export async function DELETE(
   await db.city.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

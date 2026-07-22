@@ -7,6 +7,7 @@ import {
   Plus,
   Search,
   MoreHorizontal,
+  MoreVertical,
   Pencil,
   Trash2,
   Eye,
@@ -37,6 +38,13 @@ import {
   Building2,
   Filter,
   Maximize2,
+  Clapperboard,
+  CreditCard,
+  StickyNote,
+  Award,
+  History,
+  UserPlus,
+  AlertCircle,
 } from "lucide-react"
 
 import { useWorkspace } from "@/stores/workspace"
@@ -48,6 +56,7 @@ import {
   formatDateTime,
   timeAgo,
   tomanToRials,
+  toPersianDigits,
 } from "@/lib/format"
 import {
   CAN_MANAGE_CUSTOMERS,
@@ -200,6 +209,7 @@ interface CustomerDetail {
   customerType: string
   profileImage?: string | null
   extraPhones?: ExtraPhone[]
+  instagramId?: string | null
   birthDate?: string | null
   engagementDate?: string | null
   weddingDate?: string | null
@@ -216,6 +226,8 @@ interface CustomerDetail {
   createdAt: string
   familyMeta?: string
   totalRevenue?: number
+  totalPaidAll?: number
+  totalPaidUsd?: number
   creditBalance?: number
   credit?: number
   debt?: number
@@ -248,15 +260,15 @@ interface CustomerProjectsResponse {
 interface FamilyMember {
   name: string
   birth: string
+  gender?: "boy" | "girl" | ""
 }
 interface FamilyMeta {
-  spouse: { name: string; birth: string } | null
+  spouse: { name: string; birth: string; phone?: string; instagramId?: string } | null
   children: FamilyMember[]
 }
 
-// Phone label options for extraPhones
+// Phone label options for extraPhones (همسر حذف شده چون در بخش همسر فیلد جداگانه دارد)
 const PHONE_LABELS: string[] = [
-  "همسر",
   "برادر",
   "خواهر",
   "پدر",
@@ -362,16 +374,16 @@ function parseFamilyMeta(raw?: string | null): FamilyMeta {
   if (!raw) return { spouse: null, children: [] }
   try {
     const parsed = JSON.parse(raw) as {
-      spouse?: { name?: string; birth?: string } | null
-      children?: { name?: string; birth?: string }[] | null
+      spouse?: { name?: string; birth?: string; phone?: string; instagramId?: string } | null
+      children?: { name?: string; birth?: string; gender?: string }[] | null
     }
     const sp = parsed.spouse
     const spouse =
-      sp && (sp.name || sp.birth)
-        ? { name: sp.name || "", birth: sp.birth || "" }
+      sp && (sp.name || sp.birth || sp.phone || sp.instagramId)
+        ? { name: sp.name || "", birth: sp.birth || "", phone: sp.phone || "", instagramId: sp.instagramId || "" }
         : null
     const children: FamilyMember[] = Array.isArray(parsed.children)
-      ? parsed.children.map((c) => ({ name: c.name || "", birth: c.birth || "" }))
+      ? parsed.children.map((c) => ({ name: c.name || "", birth: c.birth || "", gender: (c.gender as "boy" | "girl" | "") || "" }))
       : []
     return { spouse, children }
   } catch {
@@ -834,43 +846,41 @@ function ExtraPhonesEditor({
         rows.map((row, idx) => (
           <div
             key={idx}
-            className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[140px_1fr_auto]"
+            className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]"
           >
-            <Select
-              value={row.label || "دیگر"}
-              onValueChange={(v) => {
-                const next = [...rows]
-                next[idx] = { ...row, label: v }
-                onChange(next)
-              }}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PHONE_LABELS.map((l) => (
-                  <SelectItem key={l} value={l}>
-                    {l}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              dir="ltr"
-              value={row.phone}
-              onChange={(e) => {
-                const next = [...rows]
-                next[idx] = { ...row, phone: e.target.value }
-                onChange(next)
-              }}
-              placeholder="09120000000"
-              className="h-9 text-left"
-            />
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">نام</Label>
+              <Input
+                dir="rtl"
+                value={row.label || ""}
+                onChange={(e) => {
+                  const next = [...rows]
+                  next[idx] = { ...row, label: e.target.value }
+                  onChange(next)
+                }}
+                placeholder="مثلاً برادر، خواهر..."
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">شماره</Label>
+              <Input
+                dir="ltr"
+                value={row.phone}
+                onChange={(e) => {
+                  const next = [...rows]
+                  next[idx] = { ...row, phone: e.target.value }
+                  onChange(next)
+                }}
+                placeholder="09120000000"
+                className="h-9 text-left"
+              />
+            </div>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 text-muted-foreground hover:text-rose-600"
+              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-rose-600"
               onClick={() => onChange(rows.filter((_, i) => i !== idx))}
               aria-label="حذف شماره"
             >
@@ -883,7 +893,7 @@ function ExtraPhonesEditor({
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => onChange([...rows, { label: "همسر", phone: "" }])}
+        onClick={() => onChange([...rows, { label: "", phone: "" }])}
       >
         <Plus className="mr-1.5 size-3.5" /> افزودن شماره
       </Button>
@@ -920,7 +930,7 @@ function FamilyMetaEditor({
         />
       </div>
       {hasSpouse && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">نام همسر</Label>
             <Input
@@ -931,11 +941,57 @@ function FamilyMetaEditor({
                   spouse: {
                     name: e.target.value,
                     birth: value.spouse?.birth ?? "",
+                    phone: value.spouse?.phone ?? "",
+                    instagramId: value.spouse?.instagramId ?? "",
                   },
                 })
               }
               placeholder="نام و نام خانوادگی"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">شماره تماس همسر</Label>
+            <Input
+              dir="ltr"
+              value={value.spouse?.phone ?? ""}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  spouse: {
+                    name: value.spouse?.name ?? "",
+                    birth: value.spouse?.birth ?? "",
+                    phone: e.target.value,
+                    instagramId: value.spouse?.instagramId ?? "",
+                  },
+                })
+              }
+              placeholder="09120000000"
+              className="text-left"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">آیدی اینستاگرام همسر</Label>
+            <div className="relative">
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+              <Input
+                dir="ltr"
+                value={value.spouse?.instagramId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^a-zA-Z0-9._]/g, "")
+                  onChange({
+                    ...value,
+                    spouse: {
+                      name: value.spouse?.name ?? "",
+                      birth: value.spouse?.birth ?? "",
+                      phone: value.spouse?.phone ?? "",
+                      instagramId: v,
+                    },
+                  })
+                }}
+                placeholder="instagram_id"
+                className="pr-6 text-left"
+              />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">تاریخ تولد همسر</Label>
@@ -947,6 +1003,8 @@ function FamilyMetaEditor({
                   spouse: {
                     name: value.spouse?.name ?? "",
                     birth: iso ?? "",
+                    phone: value.spouse?.phone ?? "",
+                    instagramId: value.spouse?.instagramId ?? "",
                   },
                 })
               }
@@ -987,7 +1045,7 @@ function FamilyMetaEditor({
           {value.children.map((child, idx) => (
             <div
               key={idx}
-              className="grid grid-cols-1 items-end gap-2 rounded-lg border bg-muted/20 p-2 sm:grid-cols-[1fr_1fr_auto]"
+              className="grid grid-cols-1 items-end gap-2 rounded-lg border bg-muted/20 p-2 sm:grid-cols-[1fr_auto_1fr_auto]"
             >
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">نام</Label>
@@ -1001,6 +1059,25 @@ function FamilyMetaEditor({
                   placeholder="نام فرزند"
                   className="h-8"
                 />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">جنسیت</Label>
+                <Select
+                  value={child.gender || ""}
+                  onValueChange={(v) => {
+                    const next = [...value.children]
+                    next[idx] = { ...child, gender: v as "boy" | "girl" }
+                    onChange({ ...value, children: next })
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[100px]">
+                    <SelectValue placeholder="انتخاب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="boy">پسر</SelectItem>
+                    <SelectItem value="girl">دختر</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">تاریخ تولد</Label>
@@ -1242,9 +1319,11 @@ function useCities() {
 function CityCombobox({
   value,
   onChange,
+  onManageCities,
 }: {
   value: string | null
   onChange: (v: string | null) => void
+  onManageCities?: () => void
 }) {
   const api = useApi()
   const queryClient = useQueryClient()
@@ -1387,28 +1466,258 @@ function CityCombobox({
             </Command>
           </PopoverContent>
         </Popover>
-        {canManage && (
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// Cities manager button (for city section header)
+// ============================================================
+function CitiesManagerButton() {
+  const role = useWorkspace((s) => s.role)
+  const canManage = CAN_MANAGE_CUSTOMERS.includes(role)
+  const [managerOpen, setManagerOpen] = React.useState(false)
+  if (!canManage) return null
+  return (
+    <Popover open={managerOpen} onOpenChange={setManagerOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+          title="مدیریت شهرها"
+          aria-label="مدیریت شهرها"
+        >
+          <MoreVertical className="size-3.5" />
+          مدیریت شهرها
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <CitiesManager />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ============================================================
+// Cities manager — inline (rendered inside the CityCombobox popover)
+// ============================================================
+function CitiesManager() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const { data: citiesData } = useCities()
+  const cities = React.useMemo(() => normalizeCities(citiesData), [citiesData])
+
+  const [newName, setNewName] = React.useState("")
+  const [newProvince, setNewProvince] = React.useState("")
+  const [creating, setCreating] = React.useState(false)
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [editName, setEditName] = React.useState("")
+  const [editProvince, setEditProvince] = React.useState("")
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
+
+  const canManagePreset = role === "admin" || role === "manager"
+
+  const create = async () => {
+    if (!newName.trim()) return
+    setCreating(true)
+    try {
+      await api.post("/api/cities", { name: newName.trim(), province: newProvince.trim() || null })
+      toast.success("شهر افزوده شد")
+      setNewName("")
+      setNewProvince("")
+      queryClient.invalidateQueries({ queryKey: ["cities"] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "افزودن شهر ناموفق بود")
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const saveEdit = async (id: string) => {
+    if (!editName.trim()) return
+    try {
+      await api.patch(`/api/cities/${id}`, {
+        name: editName.trim(),
+        province: editProvince.trim() || null,
+      })
+      toast.success("شهر به‌روزرسانی شد")
+      setEditingId(null)
+      queryClient.invalidateQueries({ queryKey: ["cities"] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "به‌روزرسانی شهر ناموفق بود")
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingId) return
+    try {
+      await api.del(`/api/cities/${deletingId}`)
+      toast.success("شهر حذف شد")
+      setDeletingId(null)
+      queryClient.invalidateQueries({ queryKey: ["cities"] })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "حذف شهر ناموفق بود")
+    }
+  }
+
+  return (
+    <div className="p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <MapPin className="size-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">مدیریت شهرها</span>
+      </div>
+
+      {canManagePreset && (
+        <div className="mb-3 space-y-2 rounded-lg border bg-muted/30 p-2">
+          <div className="grid grid-cols-1 gap-1.5">
+            <Input
+              placeholder="نام شهر"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              dir="rtl"
+              className="h-8 text-sm"
+            />
+            <Input
+              placeholder="استان (اختیاری)"
+              value={newProvince}
+              onChange={(e) => setNewProvince(e.target.value)}
+              dir="rtl"
+              className="h-8 text-sm"
+            />
+          </div>
           <Button
-            type="button"
-            variant="ghost"
             size="sm"
-            onClick={() => setManagerOpen(true)}
-            title="مدیریت شهرها"
-            className="shrink-0 gap-1.5 text-muted-foreground"
+            onClick={create}
+            disabled={creating || !newName.trim()}
+            className="h-8 w-full text-xs"
           >
-            <Settings2 className="size-3.5" /> مدیریت شهرها
+            {creating ? (
+              <Loader2 className="mr-1.5 size-3 animate-spin" />
+            ) : (
+              <Plus className="mr-1.5 size-3" />
+            )}
+            افزودن
           </Button>
+        </div>
+      )}
+
+      <div className="max-h-60 space-y-1 overflow-y-auto pr-1">
+        {cities.length === 0 ? (
+          <p className="rounded-lg border border-dashed py-4 text-center text-xs text-muted-foreground">
+            هنوز شهری ثبت نشده
+          </p>
+        ) : (
+          cities.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center justify-between rounded-md border bg-card px-2.5 py-1.5"
+            >
+              {editingId === c.id ? (
+                <div className="flex w-full flex-1 flex-wrap items-center gap-1.5">
+                  <Input
+                    className="h-7 flex-1 text-xs"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    dir="rtl"
+                  />
+                  <Input
+                    className="h-7 flex-1 text-xs"
+                    placeholder="استان"
+                    value={editProvince}
+                    onChange={(e) => setEditProvince(e.target.value)}
+                    dir="rtl"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-emerald-600"
+                    onClick={() => saveEdit(c.id)}
+                    title="ذخیره"
+                  >
+                    <Check className="size-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    onClick={() => setEditingId(null)}
+                    title="انصراف"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 truncate">
+                    <MapPin className="size-3 text-muted-foreground" />
+                    <span className="truncate text-xs font-medium">{c.name}</span>
+                    {c.province && (
+                      <span className="text-[10px] text-muted-foreground">· {c.province}</span>
+                    )}
+                  </div>
+                  {canManagePreset && (
+                    <div className="flex items-center gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-6"
+                        onClick={() => {
+                          setEditingId(c.id)
+                          setEditName(c.name)
+                          setEditProvince(c.province ?? "")
+                        }}
+                        title="ویرایش"
+                      >
+                        <Pencil className="size-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-6 text-rose-600 hover:text-rose-700"
+                        onClick={() => setDeletingId(c.id)}
+                        title="حذف"
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))
         )}
       </div>
-      {managerOpen && (
-        <CitiesManagerDialog
-          open={managerOpen}
-          onOpenChange={setManagerOpen}
-          cities={cities}
-          api={api}
-          queryClient={queryClient}
-        />
-      )}
+
+      <AlertDialog
+        open={!!deletingId}
+        onOpenChange={(o) => !o && setDeletingId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف شهر؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              این شهر از فهرست پیش‌فرض‌ها حذف می‌شود. مشتریانی که قبلاً این شهر را
+              داشته‌اند تحت تأثیر قرار نمی‌گیرند.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                confirmDelete()
+              }}
+              className="bg-rose-600 hover:bg-rose-700"
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -1707,6 +2016,7 @@ function CustomerFormDialog({
 
   const [name, setName] = React.useState("")
   const [phone, setPhone] = React.useState("")
+  const [instagramId, setInstagramId] = React.useState("")
   const [customerType, setCustomerType] = React.useState<"individual" | "company">("individual")
   const [referrerId, setReferrerId] = React.useState<string | null>(null)
   const [tagIds, setTagIds] = React.useState<string[]>([])
@@ -1736,6 +2046,7 @@ function CustomerFormDialog({
         hydratedKey.current = existing.id
         setName(existing.name)
         setPhone(existing.phone)
+        setInstagramId(existing.instagramId ?? "")
         setCustomerType(
           existing.customerType === "company" ? "company" : "individual"
         )
@@ -1755,6 +2066,7 @@ function CustomerFormDialog({
         hydratedKey.current = "__new__"
         setName("")
         setPhone("")
+        setInstagramId("")
         setCustomerType("individual")
         setReferrerId(null)
         setTagIds([])
@@ -1810,6 +2122,7 @@ function CustomerFormDialog({
       const payload: Record<string, unknown> = {
         name: name.trim(),
         phone: phone.trim(),
+        instagramId: instagramId.trim() || null,
         customerType,
         referrerId: referrerId || null,
         tagIds,
@@ -1927,6 +2240,25 @@ function CustomerFormDialog({
                 />
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="cust-instagram">آیدی اینستاگرام</Label>
+                <div className="relative">
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">@</span>
+                  <Input
+                    id="cust-instagram"
+                    dir="ltr"
+                    value={instagramId}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^a-zA-Z0-9._]/g, "")
+                      setInstagramId(v)
+                    }}
+                    placeholder="instagram_id"
+                    className="pr-6 text-left"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label>نوع مشتری</Label>
                 <Select
                   value={customerType}
@@ -1953,6 +2285,9 @@ function CustomerFormDialog({
               <div className="flex items-center gap-2">
                 <MapPin className="size-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">شهر و نشانی</span>
+                <div className="mr-auto">
+                  <CitiesManagerButton />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">شهر</Label>
@@ -2435,6 +2770,109 @@ function CustomerProjectsSection({ customerId }: { customerId: string }) {
 // ============================================================
 // Customer profile sheet
 // ============================================================
+// ============================================================
+// Activity Timeline — aggregates all customer interactions
+// ============================================================
+interface ActivityItem {
+  id: string
+  type: "project_created" | "project_status" | "payment" | "note" | "credit" | "contract"
+  title: string
+  description: string
+  date: string
+  amount?: string | null
+}
+
+const ACTIVITY_CONFIG: Record<ActivityItem["type"], { icon: React.ElementType; color: string; label: string }> = {
+  project_created: { icon: Clapperboard, color: "#a855f7", label: "پروژه" },
+  project_status: { icon: CalendarDays, color: "#0ea5e9", label: "زمان‌بندی" },
+  payment: { icon: CreditCard, color: "#10b981", label: "پرداخت" },
+  note: { icon: StickyNote, color: "#f59e0b", label: "یادداشت" },
+  credit: { icon: Award, color: "#8b5cf6", label: "اعتبار" },
+  contract: { icon: FileText, color: "#64748b", label: "قرارداد" },
+}
+
+function ActivityTimeline({ customerId }: { customerId: string }) {
+  const api = useApi()
+  const { data, isLoading } = useQuery<{ items: ActivityItem[]; total: number }>({
+    queryKey: ["customer-activity", customerId],
+    queryFn: () => api.get(`/api/customers/${customerId}/activity`),
+    enabled: !!customerId,
+  })
+
+  const items = data?.items ?? []
+
+  return (
+    <SectionCard
+      title="خط زمانی تعاملات"
+      description="آخرین فعالیت‌های این مشتری"
+      actions={
+        data?.total != null && data.total > 0 ? (
+          <span className="text-[11px] text-muted-foreground">{toPersianDigits(data.total)} مورد</span>
+        ) : undefined
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <History className="mb-2 size-7 text-muted-foreground/40" />
+          <p className="text-xs text-muted-foreground">هنوز تعاملی ثبت نشده</p>
+        </div>
+      ) : (
+        <div className="relative max-h-80 overflow-y-auto pl-1">
+          {items.map((item, idx) => {
+            const config = ACTIVITY_CONFIG[item.type]
+            const Icon = config.icon
+            const isLast = idx === items.length - 1
+            return (
+              <div key={item.id} className="relative flex gap-3 pb-3 last:pb-0">
+                {/* Vertical connector */}
+                {!isLast && (
+                  <div className="absolute right-[15px] top-8 h-[calc(100%-0.5rem)] w-0.5 bg-border/60" />
+                )}
+                {/* Icon dot */}
+                <div
+                  className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: config.color + "18", color: config.color }}
+                >
+                  <Icon className="size-3.5" />
+                </div>
+                {/* Content */}
+                <div className="min-w-0 flex-1 pb-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-xs font-semibold">{item.title}</span>
+                        <Badge
+                          variant="outline"
+                          className="h-3.5 shrink-0 px-1 text-[8px]"
+                          style={{ color: config.color, borderColor: config.color + "30" }}
+                        >
+                          {config.label}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-left text-[10px] text-muted-foreground/70" dir="ltr">
+                      {timeAgo(item.date)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 function CustomerProfileSheet({
   customerId,
   onClose,
@@ -2552,9 +2990,22 @@ function CustomerProfileSheet({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {canManage && customer && (
-                  <Button variant="outline" size="sm" onClick={() => onEdit(customer.id)}>
-                    <Pencil className="mr-1.5 size-3.5" /> ویرایش
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        onClose()
+                        setPage("projects")
+                      }}
+                      title="ایجاد پروژه برای این مشتری"
+                    >
+                      <Plus className="mr-1.5 size-3.5" /> پروژه جدید
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => onEdit(customer.id)}>
+                      <Pencil className="mr-1.5 size-3.5" /> ویرایش
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -2792,9 +3243,18 @@ function CustomerProfileSheet({
                 {canSeeFinance && (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                     <StatCard
-                      label="درآمد کل"
-                      value={formatRialsShort(customer.totalRevenue ?? 0)}
-                      sub={formatRials(customer.totalRevenue ?? 0) + " تومان"}
+                      label="جمع پرداخت‌ها"
+                      value={formatRialsShort(customer.totalPaidAll ?? 0)}
+                      sub={
+                        <>
+                          {formatRials(customer.totalPaidAll ?? 0) + " تومان"}
+                          {(customer.totalPaidUsd ?? 0) > 0 && (
+                            <span className="mr-1 text-[10px] text-emerald-600">
+                              ≈ {toPersianDigits(customer.totalPaidUsd ?? 0)} دلار
+                            </span>
+                          )}
+                        </>
+                      }
                       icon={<TrendingUp className="size-4" />}
                       accent="#10b981"
                     />
@@ -2889,33 +3349,8 @@ function CustomerProfileSheet({
                   </SectionCard>
                 )}
 
-                {/* Contracts / projects summary */}
-                <SectionCard
-                  title="قراردادها و پروژه‌ها"
-                  actions={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage("projects")}
-                    >
-                      مشاهده پروژه‌ها
-                    </Button>
-                  }
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg border bg-muted/30 p-3">
-                      <div className="text-xs text-muted-foreground">قراردادها</div>
-                      <div className="mt-1 text-2xl font-semibold">{customer.contractsCount}</div>
-                    </div>
-                    <div className="rounded-lg border bg-muted/30 p-3">
-                      <div className="text-xs text-muted-foreground">پروژه‌ها</div>
-                      <div className="mt-1 text-2xl font-semibold">{customer.projectsCount}</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    آخرین تعامل: {customer.lastInteraction ? timeAgo(customer.lastInteraction) : "—"}
-                  </div>
-                </SectionCard>
+                {/* Activity Timeline */}
+                <ActivityTimeline customerId={customer.id} />
               </div>
             )}
           </div>
@@ -3016,9 +3451,9 @@ function ColumnVisibilityPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" title="نمایش ستون‌ها" className="gap-1.5">
+        <Button variant="outline" title="نمایش ستون‌ها" className="shrink-0 gap-1.5 whitespace-nowrap">
           <Settings2 className="size-3.5 text-muted-foreground" />
-          <span className="hidden sm:inline">ستون‌ها</span>
+          <span className="text-xs">ستون‌ها</span>
           <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
             {visibleCount}
           </Badge>
@@ -3099,11 +3534,11 @@ function MoneyRangePopover({
       <PopoverTrigger asChild>
         <Button
           variant={hasFilter ? "default" : "outline"}
-          className="gap-1.5"
+          className="shrink-0 gap-1.5 whitespace-nowrap"
           title={label}
         >
           {icon}
-          <span className="hidden text-xs lg:inline">{label}</span>
+          <span className="text-xs">{label}</span>
           {hasFilter && (
             <span className="mr-1 inline-flex h-1.5 w-1.5 rounded-full bg-primary-foreground" />
           )}
@@ -3300,6 +3735,118 @@ function CustomerRow({
 // ============================================================
 // Main view
 // ============================================================
+// ============================================================
+// Customer Stats Bar — compact summary at top of customers list
+// ============================================================
+interface CustomerStats {
+  totalCustomers: number
+  totalDebt: number
+  totalCredit: number
+  newThisMonth: number
+  individualCount: number
+  companyCount: number
+}
+
+function CustomerStatsBar() {
+  const api = useApi()
+  const apiRef = React.useRef(api)
+  React.useEffect(() => { apiRef.current = api }, [api])
+  const { data, isLoading } = useQuery<CustomerStats>({
+    queryKey: ["customer-stats"],
+    queryFn: () => apiRef.current.get("/api/customers/stats"),
+  })
+
+  if (isLoading || !data) {
+    return (
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  const stats = [
+    {
+      label: "کل مشتریان",
+      value: toPersianDigits(data.totalCustomers),
+      sub: `${toPersianDigits(data.individualCount)} حقیقی · ${toPersianDigits(data.companyCount)} حقوقی`,
+      icon: Users,
+      accent: "#0ea5e9",
+    },
+    {
+      label: "بدهی کل",
+      value: `${formatRialsShort(data.totalDebt)}`,
+      sub: "مانده قابل دریافت",
+      icon: AlertCircle,
+      accent: "#ef4444",
+    },
+    {
+      label: "اعتبار کل",
+      value: `${formatRialsShort(data.totalCredit)}`,
+      sub: "اعتبار مشتریان",
+      icon: Wallet,
+      accent: "#10b981",
+    },
+    {
+      label: "جدید این ماه",
+      value: toPersianDigits(data.newThisMonth),
+      sub: "مشتری جدید",
+      icon: UserPlus,
+      accent: "#a855f7",
+    },
+  ]
+
+  return (
+    <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {stats.map((s, i) => {
+        const Icon = s.icon
+        return (
+          <div
+            key={i}
+            className="group relative overflow-hidden rounded-xl border bg-card p-3 shadow-sm transition-all hover:shadow-md"
+            style={{ borderTopColor: s.accent, borderTopWidth: 2 }}
+          >
+            {/* Gradient blob */}
+            <div
+              className="pointer-events-none absolute -left-6 -top-6 size-16 rounded-full opacity-10 blur-2xl transition-opacity group-hover:opacity-20"
+              style={{ background: s.accent }}
+            />
+            <div className="relative flex items-center gap-2.5">
+              <div
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg shadow-sm transition-transform group-hover:scale-110"
+                style={{
+                  background: `linear-gradient(135deg, ${s.accent}28, ${s.accent}10)`,
+                  color: s.accent,
+                  border: `1px solid ${s.accent}20`,
+                }}
+              >
+                <Icon className="size-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-medium text-muted-foreground">{s.label}</div>
+                <div className="truncate text-sm font-bold text-foreground">
+                  {(s.label.includes("بدهی") || s.label.includes("اعتبار")) ? (
+                    <>
+                      <span>{s.value.split(" ")[0]}</span>
+                      <span className="mr-1 text-[9px] font-normal text-muted-foreground">
+                        {s.value.split(" ").slice(1).join(" ")} تومان
+                      </span>
+                    </>
+                  ) : (
+                    s.value
+                  )}
+                </div>
+                <div className="truncate text-[9px] text-muted-foreground">{s.sub}</div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function CustomersView() {
   const api = useApi()
   const role = useWorkspace((s) => s.role)
@@ -3513,6 +4060,9 @@ export function CustomersView() {
           )
         }
       />
+
+      {/* Quick Stats Bar */}
+      <CustomerStatsBar />
 
       {/* Toolbar */}
       <div className="mb-4 space-y-3">
@@ -3912,3 +4462,4 @@ export function CustomersView() {
     </div>
   )
 }
+

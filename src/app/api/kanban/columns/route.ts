@@ -51,3 +51,4 @@ export async function POST(req: NextRequest) {
   const col = await db.kanbanColumn.create({ data: { userId, title, color: body.color || "#64748b", order: count } })
   return NextResponse.json({ id: col.id, title: col.title, color: col.color, order: col.order, cards: [] }, { status: 201 })
 }
+

@@ -1,25 +1,8 @@
 // Domain constants & types (enums are stored as String in SQLite)
-
-export const ROLES = [
-  "admin",
-  "manager",
-  "sales",
-  "photographer",
-  "editor",
-  "qc",
-  "logistics",
-] as const
-export type Role = (typeof ROLES)[number]
-
-export const ROLE_LABELS: Record<Role, string> = {
-  admin: "مدیر سیستم",
-  manager: "مدیر",
-  sales: "فروش",
-  photographer: "عکاس",
-  editor: "ادیتور",
-  qc: "کنترل کیفیت",
-  logistics: "تدارکات",
-}
+// NOTE: ROLES, Role, ROLE_LABELS are defined further down in the
+// "New Role & Permission System" section. The 8-role system is the
+// canonical one — the old 7-role system (admin/manager/sales/photographer/
+// editor/qc/logistics) has been fully retired.
 
 export const CUSTOMER_TYPES = ["individual", "company"] as const
 export type CustomerType = (typeof CUSTOMER_TYPES)[number]
@@ -234,61 +217,356 @@ export type LeaveStatus = (typeof LEAVE_STATUSES)[number]
 export const CREDIT_TX_TYPES = ["reward_referral", "manual_adjustment", "used"] as const
 export type CreditTxType = (typeof CREDIT_TX_TYPES)[number]
 
-// ---- Permissions ----
-export const CAN_ACCESS_FULL_FINANCE: Role[] = ["admin", "manager"]
-export const CAN_SEE_BALANCE: Role[] = ["admin", "manager", "sales"]
-export const CAN_MANAGE_CUSTOMERS: Role[] = ["admin", "manager", "sales"]
-export const CAN_MANAGE_PACKAGES: Role[] = ["admin"]
-export const CAN_MANAGE_TAGS: Role[] = ["admin"]
-export const CAN_MANAGE_SALARY_RULES: Role[] = ["admin"]
-export const CAN_MANAGE_USERS: Role[] = ["admin"]
-export const CAN_MANAGE_SYSTEM: Role[] = ["admin"]
+// ===================== NEW ROLE & PERMISSION SYSTEM =====================
+// 8 canonical roles with a granular, extensible permission system.
+// Each role has a default permission set defined in DEFAULT_ROLE_PERMISSIONS.
+// Per-user overrides are stored in the User.permissions JSON column
+// (added in the schema migration). Studio managers can also override
+// role-level defaults via the RolePermission table.
+//
+// To add a NEW role:
+//   1. Add the role key to ROLES
+//   2. Add a Persian label to ROLE_LABELS
+//   3. Add an entry to DEFAULT_ROLE_PERMISSIONS
+//   4. Optionally add to STAGE_ASSIGNEE_ROLES
+//
+// To add a NEW permission:
+//   1. Add the key to PERMISSION_KEYS
+//   2. Add a Persian label to PERMISSION_LABELS
+//   3. Grant it to whichever roles should have it by default in DEFAULT_ROLE_PERMISSIONS
+//   4. Use hasPermission(role, "new_perm") in UI/API to check
+
+export const ROLES = [
+  "admin",        // مدیر کل — full access
+  "manager",      // مدیر — most access except system config
+  "sales",        // فروش — customers + projects (no financial details)
+  "photographer", // عکاس — own projects only
+  "videographer", // تصویربردار — own projects only
+  "pro_crew",     // کادر حرفه‌ای — own projects only (multi-role field crew)
+  "editor",       // ادیتور — own projects only
+  "film_editor",  // تدوین‌کار — own projects only
+] as const
+export type Role = (typeof ROLES)[number]
+
+export const ROLE_LABELS: Record<Role, string> = {
+  admin: "مدیر کل",
+  manager: "مدیر",
+  sales: "فروش",
+  photographer: "عکاس",
+  videographer: "تصویربردار",
+  pro_crew: "کادر حرفه‌ای",
+  editor: "ادیتور",
+  film_editor: "تدوین‌کار",
+}
+
+// Group roles by their team for display in the UI
+export const ROLE_TEAMS: Record<Role, "management" | "sales" | "field" | "edit"> = {
+  admin: "management",
+  manager: "management",
+  sales: "sales",
+  photographer: "field",
+  videographer: "field",
+  pro_crew: "field",
+  editor: "edit",
+  film_editor: "edit",
+}
+
+export const ROLE_TEAM_LABELS: Record<"management" | "sales" | "field" | "edit", string> = {
+  management: "مدیریت",
+  sales: "فروش",
+  field: "تیم میدانی",
+  edit: "تیم ادیت",
+}
+
+// Color badge per role for visual identification
+export const ROLE_BADGE_COLORS: Record<Role, string> = {
+  admin: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+  manager: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  sales: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  photographer: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+  videographer: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  pro_crew: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950 dark:text-fuchsia-300",
+  editor: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+  film_editor: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
+}
+
+// Legacy role migration: map old role names to the new system
+export const LEGACY_ROLE_MIGRATION: Record<string, Role> = {
+  qc: "editor",        // qc → editor (both do quality checks)
+  logistics: "pro_crew", // logistics → pro_crew (general field crew)
+}
+
+/** Migrate any legacy role string to the new 8-role system. */
+export function migrateRole(role: string): Role {
+  if ((ROLES as readonly string[]).includes(role)) return role as Role
+  return LEGACY_ROLE_MIGRATION[role] ?? "pro_crew"
+}
+
+// ---- Extensible Permission System ----
+// Each permission is a feature/module that can be granted to a role.
+// To add a new permission: add it to PermissionKey, DEFAULT_ROLE_PERMISSIONS, and use it in the UI/API.
+export const PERMISSION_KEYS = [
+  "dashboard",
+  "calendar",
+  "reports",
+  "customers",
+  "customers_create",
+  "customers_edit",
+  "projects",
+  "projects_create",
+  "projects_edit",
+  "projects_workflow",
+  "projects_financials",
+  "my_tasks",
+  "messages",
+  "finances",
+  "finances_full",
+  "qr_factory",
+  "scanner",
+  "packages",
+  "packages_manage",
+  "tags",
+  "print_photo_prices",
+  "employees",
+  "employees_manage",
+  "salary_rules",
+  "sms_templates",
+  "custom_fields",
+  "system",
+  "storage",
+] as const
+export type PermissionKey = (typeof PERMISSION_KEYS)[number]
+
+export const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  dashboard: "داشبورد",
+  calendar: "تقویم",
+  reports: "گزارش‌ها",
+  customers: "مشاهده مشتریان",
+  customers_create: "ایجاد مشتری",
+  customers_edit: "ویرایش مشتری",
+  projects: "مشاهده پروژه‌ها",
+  projects_create: "ایجاد پروژه",
+  projects_edit: "ویرایش پروژه",
+  projects_workflow: "گردش کار پروژه",
+  projects_financials: "مالی پروژه",
+  my_tasks: "کارهای من",
+  messages: "پیام‌رسان",
+  finances: "بخش مالی",
+  finances_full: "مالی کامل (هزینه‌ها)",
+  qr_factory: "کارخانه QR",
+  scanner: "اسکنر",
+  packages: "مشاهده پکیج‌ها",
+  packages_manage: "مدیریت پکیج‌ها",
+  tags: "تگ‌ها",
+  print_photo_prices: "قیمت عکس چاپی",
+  employees: "مشاهده کارمندان",
+  employees_manage: "مدیریت کارمندان",
+  salary_rules: "قوانین حقوق",
+  sms_templates: "قالب پیامک",
+  custom_fields: "فیلدهای سفارشی",
+  system: "تنظیمات سیستم",
+  storage: "فضای ذخیره‌سازی",
+}
+
+// Default permissions per role — can be overridden per-user in the future
+export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Set<PermissionKey>> = {
+  admin: new Set(PERMISSION_KEYS as readonly string[] as PermissionKey[]),
+  manager: new Set([
+    "dashboard", "calendar", "reports", "customers", "customers_create", "customers_edit",
+    "projects", "projects_create", "projects_edit", "projects_workflow", "projects_financials",
+    "my_tasks", "messages", "finances", "finances_full", "qr_factory", "scanner",
+    "packages", "packages_manage", "tags", "print_photo_prices",
+    "employees", "employees_manage", "salary_rules", "sms_templates", "custom_fields",
+    "storage",
+  ] as PermissionKey[]),
+  sales: new Set([
+    "dashboard", "calendar", "customers", "customers_create", "customers_edit",
+    "projects", "projects_create", "projects_financials", "my_tasks", "messages",
+    "qr_factory", "scanner", "packages",
+  ] as PermissionKey[]),
+  photographer: new Set([
+    "dashboard", "calendar", "my_tasks", "messages", "projects",
+  ] as PermissionKey[]),
+  videographer: new Set([
+    "dashboard", "calendar", "my_tasks", "messages", "projects",
+  ] as PermissionKey[]),
+  pro_crew: new Set([
+    "dashboard", "calendar", "my_tasks", "messages", "projects",
+  ] as PermissionKey[]),
+  editor: new Set([
+    "dashboard", "calendar", "my_tasks", "messages", "projects",
+  ] as PermissionKey[]),
+  film_editor: new Set([
+    "dashboard", "calendar", "my_tasks", "messages", "projects",
+  ] as PermissionKey[]),
+}
+
+// Check if a role has a permission (defaults only — does NOT consult per-user overrides).
+// Use `hasUserPermission()` from auth-helpers for the full per-user check.
+export function hasPermission(role: string, perm: PermissionKey): boolean {
+  const r = migrateRole(role) as Role
+  if (!(r in DEFAULT_ROLE_PERMISSIONS)) return false
+  return DEFAULT_ROLE_PERMISSIONS[r].has(perm)
+}
+
+// ---- Per-user permission overrides ----
+// Stored in User.permissions JSON column as:
+//   { "overrides": { "customers_create": false, "finances_full": true, ... } }
+// A `false` value REVOKES a permission the role would otherwise have.
+// A `true` value GRANTS a permission the role wouldn't have by default.
+// (Managers can only GRANT permissions they themselves hold — enforced in API.)
+export type UserPermissionOverrides = Partial<Record<PermissionKey, boolean>>
+
+export interface UserPermissionsPayload {
+  overrides?: UserPermissionOverrides
+}
+
+export function parseUserPermissions(raw: string | null | undefined): UserPermissionsPayload {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed !== "object" || parsed === null) return {}
+    return parsed as UserPermissionsPayload
+  } catch {
+    return {}
+  }
+}
+
+/** Effective permission for a specific user, accounting for role defaults + overrides. */
+export function hasUserPermission(
+  role: string,
+  perm: PermissionKey,
+  userPermissionsJson?: string | null
+): boolean {
+  const r = migrateRole(role) as Role
+  const defaults = DEFAULT_ROLE_PERMISSIONS[r] ?? new Set<PermissionKey>()
+  const payload = parseUserPermissions(userPermissionsJson)
+  const override = payload.overrides?.[perm]
+  if (override === true) return true
+  if (override === false) return false
+  return defaults.has(perm)
+}
+
+// ---- Backward-compatibility shim: ROLE_PERMISSIONS[role].xxx ----
+// Many existing call sites use the old `ROLE_PERMISSIONS[role]?.xxx` object shape.
+// This shim maps the old property names onto the new permission keys so those
+// call sites continue to work without requiring a sweeping refactor. New code
+// should use `hasPermission()` / `hasUserPermission()` directly.
+type LegacyPermissionShape = {
+  dashboard?: boolean
+  calendar?: boolean
+  reports?: boolean
+  customers?: boolean
+  customersCreate?: boolean
+  customersEdit?: boolean
+  projects?: boolean
+  projectsCreate?: boolean
+  projectsEdit?: boolean
+  projectsWorkflow?: boolean
+  projectsFinancials?: boolean
+  myTasks?: boolean
+  messages?: boolean
+  finances?: boolean
+  financesFull?: boolean
+  qr?: boolean
+  qrFactory?: boolean
+  scanner?: boolean
+  packages?: boolean
+  packagesManage?: boolean
+  tags?: boolean
+  printPhotoPrices?: boolean
+  employees?: boolean
+  employeesManage?: boolean
+  users?: boolean
+  salaryRules?: boolean
+  smsTemplates?: boolean
+  customFields?: boolean
+  system?: boolean
+  storage?: boolean
+}
+
+const LEGACY_TO_NEW: Record<keyof LegacyPermissionShape, PermissionKey> = {
+  dashboard: "dashboard",
+  calendar: "calendar",
+  reports: "reports",
+  customers: "customers",
+  customersCreate: "customers_create",
+  customersEdit: "customers_edit",
+  projects: "projects",
+  projectsCreate: "projects_create",
+  projectsEdit: "projects_edit",
+  projectsWorkflow: "projects_workflow",
+  projectsFinancials: "projects_financials",
+  myTasks: "my_tasks",
+  messages: "messages",
+  finances: "finances",
+  financesFull: "finances_full",
+  qr: "qr_factory",
+  qrFactory: "qr_factory",
+  scanner: "scanner",
+  packages: "packages",
+  packagesManage: "packages_manage",
+  tags: "tags",
+  printPhotoPrices: "print_photo_prices",
+  employees: "employees",
+  employeesManage: "employees_manage",
+  users: "employees_manage",
+  salaryRules: "salary_rules",
+  smsTemplates: "sms_templates",
+  customFields: "custom_fields",
+  system: "system",
+  storage: "storage",
+}
+
+export const ROLE_PERMISSIONS: Record<string, LegacyPermissionShape> = ROLES.reduce(
+  (acc, r) => {
+    const shape: LegacyPermissionShape = {}
+    for (const [legacyKey, permKey] of Object.entries(LEGACY_TO_NEW) as [
+      keyof LegacyPermissionShape,
+      PermissionKey,
+    ][]) {
+      ;(shape as Record<string, boolean>)[legacyKey] = hasPermission(r, permKey)
+    }
+    acc[r] = shape
+    return acc
+  },
+  {} as Record<string, LegacyPermissionShape>
+)
+
+// Legacy compatibility — derived from new permission system
+export const CAN_ACCESS_FULL_FINANCE: Role[] = ROLES.filter((r) => hasPermission(r, "finances_full"))
+export const CAN_SEE_BALANCE: Role[] = ROLES.filter((r) => hasPermission(r, "projects_financials"))
+export const CAN_MANAGE_CUSTOMERS: Role[] = ROLES.filter((r) => hasPermission(r, "customers_edit"))
+export const CAN_MANAGE_PACKAGES: Role[] = ROLES.filter((r) => hasPermission(r, "packages_manage"))
+export const CAN_MANAGE_TAGS: Role[] = ROLES.filter((r) => hasPermission(r, "tags"))
+export const CAN_MANAGE_SALARY_RULES: Role[] = ROLES.filter((r) => hasPermission(r, "salary_rules"))
+export const CAN_MANAGE_USERS: Role[] = ROLES.filter((r) => hasPermission(r, "employees_manage"))
+export const CAN_MANAGE_SYSTEM: Role[] = ROLES.filter((r) => hasPermission(r, "system"))
+
+// Technical roles = anyone who works on projects in the field or edit room.
+// (Used for project scoping: technical roles only see projects they're assigned to.)
+export const TECHNICAL_ROLES: Role[] = [
+  "photographer", "videographer", "pro_crew", "editor", "film_editor",
+]
+export function isTechnicalRole(role: string): boolean {
+  return (TECHNICAL_ROLES as readonly string[]).includes(migrateRole(role))
+}
+export function isManagementRole(role: string): boolean {
+  const r = migrateRole(role)
+  return r === "admin" || r === "manager"
+}
 
 export function canTransition(
   current: ProjectStatus,
   next: ProjectStatus,
   role: Role
 ): boolean {
-  if (role === "admin" || role === "manager" || role === "sales") return true
-  if (role === "photographer") {
-    return (
-      (current === "scheduled" && next === "running") ||
-      (current === "running" && next === "managing")
-    )
-  }
-  if (role === "editor") {
-    return (
-      (current === "managing" && next === "editing") ||
-      (current === "editing" && next === "qc") ||
-      (current === "qc" && next === "editing")
-    )
-  }
-  if (role === "qc") {
-    return (
-      (current === "qc" && next === "render") ||
-      (current === "qc" && next === "editing")
-    )
-  }
-  if (role === "logistics") {
-    return (
-      (current === "render" && next === "ready") ||
-      (current === "ready" && next === "delivered")
-    )
-  }
+  if (hasPermission(role, "projects_workflow")) return true
+  // For assignees: they can complete their assigned stage (current → next)
+  const nextStage = NEXT_STAGE[current]
+  if (next === nextStage) return true
+  if (current === "qc" && next === "editing") return true // rework
   return false
-}
-
-export const ROLE_PERMISSIONS: Record<
-  Role,
-  { finance: boolean; balance: boolean; customers: boolean; packages: boolean; tags: boolean; salaryRules: boolean; users: boolean; system: boolean; qr: boolean; scanner: boolean }
-> = {
-  admin: { finance: true, balance: true, customers: true, packages: true, tags: true, salaryRules: true, users: true, system: true, qr: true, scanner: true },
-  manager: { finance: true, balance: true, customers: true, packages: false, tags: true, salaryRules: false, users: false, system: false, qr: true, scanner: true },
-  sales: { finance: false, balance: true, customers: true, packages: false, tags: false, salaryRules: false, users: false, system: false, qr: true, scanner: true },
-  photographer: { finance: false, balance: false, customers: false, packages: false, tags: false, salaryRules: false, users: false, system: false, qr: false, scanner: false },
-  editor: { finance: false, balance: false, customers: false, packages: false, tags: false, salaryRules: false, users: false, system: false, qr: false, scanner: false },
-  qc: { finance: false, balance: false, customers: false, packages: false, tags: false, salaryRules: false, users: false, system: false, qr: false, scanner: false },
-  logistics: { finance: false, balance: false, customers: false, packages: false, tags: false, salaryRules: false, users: false, system: false, qr: false, scanner: false },
 }
 
 // ===================== DUAL-TRACK WORKFLOW =====================
@@ -316,11 +594,11 @@ export const MANUAL_STAGES: ProjectStatus[] = [
 // Which roles can be assigned to each stage (for the assignee picker).
 export const STAGE_ASSIGNEE_ROLES: Record<string, Role[]> = {
   managing: ["manager", "admin", "sales"],
-  editing: ["editor", "admin", "manager"],
-  qc: ["qc", "admin", "manager"],
-  render: ["logistics", "editor", "admin", "manager"],
-  ready: ["manager", "admin", "sales", "logistics"],
-  delivered: ["logistics", "manager", "admin"],
+  editing: ["editor", "film_editor", "admin", "manager"],
+  qc: ["editor", "film_editor", "admin", "manager"],
+  render: ["film_editor", "editor", "admin", "manager"],
+  ready: ["manager", "admin", "sales"],
+  delivered: ["manager", "admin", "sales"],
 }
 
 // The next stage in the flow (linear progression).
@@ -359,7 +637,7 @@ export function canTransitionTrack(
   next: ProjectStatus,
   role: Role
 ): boolean {
-  if (role === "admin" || role === "manager") return true
+  if (hasPermission(role, "projects_workflow")) return true
   // For assignees: they can complete their assigned stage (current → next)
   // and qc can send back to editing.
   const nextStage = NEXT_STAGE[current]
@@ -367,3 +645,4 @@ export function canTransitionTrack(
   if (current === "qc" && next === "editing") return true // rework
   return false
 }
+

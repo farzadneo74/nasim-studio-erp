@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
 import { getEffectivePrice } from "@/lib/pricing"
-import { CAN_ACCESS_FULL_FINANCE, CAN_SEE_BALANCE } from "@/lib/constants"
+import { CAN_ACCESS_FULL_FINANCE, CAN_SEE_BALANCE, isTechnicalRole } from "@/lib/constants"
 
 // GET /api/projects/by-customer
 // Returns customers who have at least one project, with aggregated stats.
@@ -14,7 +14,7 @@ export async function GET() {
   const seeFinance = CAN_ACCESS_FULL_FINANCE.includes(role)
   const seeBalance = CAN_SEE_BALANCE.includes(role)
 
-  const isTechnical = ["photographer", "editor", "qc", "logistics"].includes(role)
+  const isTechnical = isTechnicalRole(role)
 
   const projects = await db.project.findMany({
     include: {
@@ -22,7 +22,6 @@ export async function GET() {
       contract: { include: { customer: { include: { tags: true } } } },
       fieldTeam: true,
       studioTeam: true,
-      deliveryTeam: true,
       payments: true,
     },
   })
@@ -38,8 +37,7 @@ export async function GET() {
     ? projects.filter((p) =>
         technicalUserId
           ? p.fieldTeam.some((u) => u.id === technicalUserId) ||
-            p.studioTeam.some((u) => u.id === technicalUserId) ||
-            p.deliveryTeam.some((u) => u.id === technicalUserId)
+            p.studioTeam.some((u) => u.id === technicalUserId)
           : false
       )
     : projects
@@ -139,3 +137,4 @@ export async function GET() {
 
   return NextResponse.json({ items, seeFinance, seeBalance, role })
 }
+

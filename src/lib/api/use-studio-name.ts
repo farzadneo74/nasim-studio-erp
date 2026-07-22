@@ -15,3 +15,4 @@ export function useStudioName() {
   })
   return { fa: data?.fa ?? DEFAULT_FA, en: data?.en ?? DEFAULT_EN }
 }
+

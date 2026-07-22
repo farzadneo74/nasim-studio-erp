@@ -46,6 +46,11 @@ import {
   Download,
   AlertTriangle,
   ChevronDown,
+  Cake,
+  Heart,
+  Sparkles,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useApi } from "@/lib/api/client"
@@ -118,6 +123,16 @@ interface DashboardData {
     team: { id: string; name: string }[]
   }[]
   upcoming: { id: string; title: string; package: string; category: string; start: string; end: string }[]
+  upcomingOccasions: {
+    customerId: string
+    name: string
+    phone: string | null
+    profileImage: string | null
+    type: "birthday" | "engagement" | "wedding"
+    date: string
+    daysUntil: number
+    years: number | null
+  }[]
   notifications: { id: string; title: string; message: string; read: boolean; createdAt: string }[]
   seeFinance: boolean
   seeBalance: boolean
@@ -143,101 +158,109 @@ function StatusFlowWidget({ statusDist }: { statusDist: { status: string; count:
         </Badge>
       }
     >
-      {/* Desktop (lg+): horizontal flow with arrow connectors (RTL: right→left).
-          Mobile: vertical stack with down-arrow connectors. */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        {/* Flow chips */}
-        <div className="flex-1">
-          <div className="flex flex-col gap-1 lg:flex-row lg:items-stretch lg:gap-0">
-            {STATUS_FLOW.map((st, i) => {
-              const color = STATUS_COLORS[st]
-              const label = STATUS_LABELS[st]
-              const count = countFor(st)
-              const isLast = i === STATUS_FLOW.length - 1
-              return (
-                <React.Fragment key={st}>
-                  <button
-                    type="button"
+      {/* Pie chart first (bigger), then flow chips below */}
+      {total > 0 && (
+        <div className="w-full">
+          <ResponsiveContainer width="100%" height={360}>
+            <PieChart>
+              <Pie
+                data={STATUS_FLOW.map((st) => ({
+                  name: STATUS_LABELS[st],
+                  value: countFor(st),
+                  color: STATUS_COLORS[st],
+                  status: st,
+                })).filter((d) => d.value > 0)}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={130}
+                innerRadius={70}
+                paddingAngle={2}
+              >
+                {STATUS_FLOW.map((st) => (
+                  <Cell
+                    key={st}
+                    fill={STATUS_COLORS[st]}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={3}
+                    style={{ cursor: "pointer" }}
                     onClick={() => goToProjectsWithStatus(st as ProjectStatus)}
-                    className="group relative flex flex-1 items-center gap-2.5 rounded-xl border px-3 py-2.5 text-right transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-w-0"
-                    style={{
-                      background: color + "14",
-                      borderColor: color + "55",
-                    }}
-                    title={`فیلتر پروژه‌های «${label}»`}
-                    aria-label={`فیلتر پروژه‌های ${label}: ${count} پروژه`}
-                  >
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(v: number, n: string) => [`${toPersianDigits(v)} پروژه`, n]}
+                contentStyle={{ fontSize: "12px", borderRadius: "8px", direction: "rtl" }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="text-center text-[11px] text-muted-foreground">
+            توزیع {toPersianDigits(total)} پروژه فعال — روی هر بخش کلیک کنید
+          </div>
+        </div>
+      )}
+
+      {/* Flow chips — below the chart. Mobile: centered text. */}
+      <div className="mt-4">
+        <div className="flex flex-col gap-1 lg:flex-row lg:items-stretch lg:gap-0">
+          {STATUS_FLOW.map((st, i) => {
+            const color = STATUS_COLORS[st]
+            const label = STATUS_LABELS[st]
+            const count = countFor(st)
+            const isLast = i === STATUS_FLOW.length - 1
+            return (
+              <React.Fragment key={st}>
+                <button
+                  type="button"
+                  onClick={() => goToProjectsWithStatus(st as ProjectStatus)}
+                  className="group relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl border px-3 py-2.5 text-center transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:min-w-0"
+                  style={{
+                    background: color + "14",
+                    borderColor: color + "55",
+                  }}
+                  title={`فیلتر پروژه‌های «${label}»`}
+                  aria-label={`فیلتر پروژه‌های ${label}: ${count} پروژه`}
+                >
+                  <div className="flex items-center gap-2">
                     <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-background transition-transform group-hover:scale-125"
                       style={{ background: color }}
                       aria-hidden
                     />
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className="block truncate text-[11px] font-medium leading-tight"
-                        style={{ color }}
-                      >
-                        {label}
-                      </span>
-                      <span className="block text-base font-bold leading-tight tabular-nums text-foreground">
-                        {toPersianDigits(count)}
-                      </span>
+                    <span
+                      className="block truncate text-[11px] font-medium leading-tight"
+                      style={{ color }}
+                    >
+                      {label}
                     </span>
-                  </button>
-                  {!isLast && (
-                    <div className="flex items-center justify-center py-0.5 text-muted-foreground/50 lg:px-0.5 lg:py-0">
-                      <ChevronDown className="h-4 w-4 lg:hidden" aria-hidden />
-                      <ChevronLeft className="hidden h-4 w-4 lg:block" aria-hidden />
+                  </div>
+                  <span className="block text-lg font-bold leading-tight tabular-nums text-foreground">
+                    {toPersianDigits(count)}
+                  </span>
+                  {/* Mini progress bar showing percentage of total */}
+                  {total > 0 && (
+                    <div className="h-1 w-full overflow-hidden rounded-full bg-muted/50">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${(count / total) * 100}%`,
+                          background: color,
+                        }}
+                      />
                     </div>
                   )}
-                </React.Fragment>
-              )
-            })}
-          </div>
+                </button>
+                {!isLast && (
+                  <div className="flex items-center justify-center py-0.5 text-muted-foreground/50 lg:px-0.5 lg:py-0">
+                    <ChevronDown className="h-4 w-4 lg:hidden" aria-hidden />
+                    <ChevronLeft className="hidden h-4 w-4 lg:block" aria-hidden />
+                  </div>
+                )}
+              </React.Fragment>
+            )
+          })}
         </div>
-
-        {/* Pie chart — visual distribution of project statuses */}
-        {total > 0 && (
-          <div className="w-full shrink-0 lg:w-[260px]">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={STATUS_FLOW.map((st) => ({
-                    name: STATUS_LABELS[st],
-                    value: countFor(st),
-                    color: STATUS_COLORS[st],
-                    status: st,
-                  })).filter((d) => d.value > 0)}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={65}
-                  innerRadius={30}
-                  paddingAngle={2}
-                >
-                  {STATUS_FLOW.map((st) => (
-                    <Cell
-                      key={st}
-                      fill={STATUS_COLORS[st]}
-                      stroke="hsl(var(--background))"
-                      strokeWidth={2}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => goToProjectsWithStatus(st as ProjectStatus)}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: number, n: string) => [`${toPersianDigits(v)} پروژه`, n]}
-                  contentStyle={{ fontSize: "11px", borderRadius: "8px", direction: "rtl" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="text-center text-[10px] text-muted-foreground">
-              توزیع {toPersianDigits(total)} پروژه فعال
-            </div>
-          </div>
-        )}
       </div>
       <p className="mt-3 text-[10px] text-muted-foreground">
         مسیر تولید: زمان‌بندی ← اجرا ← مدیریت ← ادیت ← کنترل کیفیت ← چاپ/رندر ← آماده تحویل ← تحویل. روی هر مرحله کلیک کنید تا پروژه‌های همان وضعیت در صفحه پروژه‌ها نمایش داده شوند.
@@ -248,7 +271,7 @@ function StatusFlowWidget({ statusDist }: { statusDist: { status: string; count:
 
 export function DashboardView() {
   const api = useApi()
-  const { openProject, setPage } = useWorkspace()
+  const { openProject, openCustomer, setPage } = useWorkspace()
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => api.get<DashboardData>("/api/dashboard"),
@@ -353,6 +376,71 @@ export function DashboardView() {
           title="درآمد در مقابل هزینه"
           description="۶ ماه گذشته"
         >
+          {/* Summary header with totals & trend */}
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+            {(() => {
+              const trend = data.revenueTrend!
+              const totalRev = trend.reduce((s, x) => s + (x.revenue || 0), 0)
+              const totalExp = trend.reduce((s, x) => s + (x.expense || 0), 0)
+              const netProfit = totalRev - totalExp
+              // Compare last month vs previous month
+              const last = trend[trend.length - 1]
+              const prev = trend[trend.length - 2]
+              const revChange = last && prev ? prev.revenue > 0 ? Math.round(((last.revenue - prev.revenue) / prev.revenue) * 100) : 0 : 0
+              const expChange = last && prev ? prev.expense > 0 ? Math.round(((last.expense - prev.expense) / prev.expense) * 100) : 0 : 0
+              return (
+                <>
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2.5 sm:p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <span className="size-2 rounded-full bg-emerald-500" />
+                      درآمد کل
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-emerald-600 dark:text-emerald-400 sm:text-base">
+                      {formatRialsShort(totalRev)} <span className="text-[10px] font-normal">تومان</span>
+                    </div>
+                    {revChange !== 0 && (
+                      <div className={cn("mt-0.5 text-[10px] font-medium", revChange > 0 ? "text-emerald-600" : "text-rose-600")}>
+                        {revChange > 0 ? "▲" : "▼"} {toPersianDigits(Math.abs(revChange))}٪ vs ماه قبل
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-2.5 sm:p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <span className="size-2 rounded-full bg-rose-500" />
+                      هزینه کل
+                    </div>
+                    <div className="mt-1 text-sm font-bold text-rose-600 dark:text-rose-400 sm:text-base">
+                      {formatRialsShort(totalExp)} <span className="text-[10px] font-normal">تومان</span>
+                    </div>
+                    {expChange !== 0 && (
+                      <div className={cn("mt-0.5 text-[10px] font-medium", expChange < 0 ? "text-emerald-600" : "text-rose-600")}>
+                        {expChange > 0 ? "▲" : "▼"} {toPersianDigits(Math.abs(expChange))}٪ vs ماه قبل
+                      </div>
+                    )}
+                  </div>
+                  <div className={cn(
+                    "rounded-xl border p-2.5 sm:p-3",
+                    netProfit >= 0 ? "border-sky-500/20 bg-sky-500/5" : "border-amber-500/20 bg-amber-500/5"
+                  )}>
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                      <span className={cn("size-2 rounded-full", netProfit >= 0 ? "bg-sky-500" : "bg-amber-500")} />
+                      سود خالص
+                    </div>
+                    <div className={cn(
+                      "mt-1 text-sm font-bold sm:text-base",
+                      netProfit >= 0 ? "text-sky-600 dark:text-sky-400" : "text-amber-600 dark:text-amber-400"
+                    )}>
+                      {formatRialsShort(Math.abs(netProfit))} <span className="text-[10px] font-normal">تومان</span>
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+                      {netProfit >= 0 ? "سودآور" : "زیان"}
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={data.revenueTrend}>
               <defs>
@@ -489,6 +577,63 @@ export function DashboardView() {
           </SectionCard>
         </div>
       </div>
+
+      {/* مناسبت‌های پیش‌رو — تولدها و سالگردها */}
+      {data.upcomingOccasions && data.upcomingOccasions.length > 0 && (
+        <SectionCard
+          title="مناسبت‌های پیش‌رو"
+          description="تولدها و سالگردهای نزدیک"
+          actions={
+            <button onClick={() => setPage("customers")} className="text-xs text-muted-foreground hover:text-foreground">
+              همه مشتریان ←
+            </button>
+          }
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {data.upcomingOccasions.map((occ) => {
+              const isBirthday = occ.type === "birthday"
+              const isWedding = occ.type === "wedding"
+              const accent = isBirthday ? "#ec4899" : isWedding ? "#f43f5e" : "#8b5cf6"
+              const Icon = isBirthday ? Cake : isWedding ? Heart : Sparkles
+              const typeLabel = isBirthday ? "تولد" : isWedding ? "سالگرد ازدواج" : "سالگرد نامزدی"
+              return (
+                <button
+                  key={`${occ.customerId}-${occ.type}`}
+                  onClick={() => openCustomer(occ.customerId)}
+                  className="group flex items-center gap-3 rounded-xl border bg-card p-3 text-right shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform group-hover:scale-110"
+                    style={{
+                      background: `linear-gradient(135deg, ${accent}28, ${accent}10)`,
+                      color: accent,
+                      border: `1px solid ${accent}20`,
+                    }}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{occ.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {typeLabel}
+                      {occ.years != null && ` · ${toPersianDigits(occ.years)} سالگی`}
+                    </div>
+                    <div className="mt-0.5 text-[11px] font-medium" style={{ color: accent }}>
+                      {occ.daysUntil === 0
+                        ? "امروز 🎉"
+                        : occ.daysUntil === 1
+                          ? "فردا"
+                          : occ.daysUntil > 0
+                            ? `${toPersianDigits(occ.daysUntil)} روز دیگر`
+                            : `${toPersianDigits(Math.abs(occ.daysUntil))} روز پیش`}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </SectionCard>
+      )}
     </div>
   )
 }
@@ -615,99 +760,154 @@ function uploadAttachment(
 }
 
 // ----------------------- Audio player with speed control -----------------------
+// ============================================================
+// Professional Audio Player — seek bar, skip, speed, dark/light
+// ============================================================
 function AudioPlayer({ att }: { att: Attachment }) {
   const audioRef = React.useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = React.useState(false)
   const [current, setCurrent] = React.useState(0)
   const [duration, setDuration] = React.useState(0)
   const [rate, setRate] = React.useState(1)
+  const [volume, setVolume] = React.useState(1)
+  const [isDragging, setIsDragging] = React.useState(false)
+  const progressBarRef = React.useRef<HTMLDivElement | null>(null)
 
   React.useEffect(() => {
     const a = audioRef.current
     if (!a) return
-    const onTime = () => setCurrent(a.currentTime)
+    const onTime = () => { if (!isDragging) setCurrent(a.currentTime) }
     const onDur = () => setDuration(a.duration || 0)
-    const onEnd = () => setPlaying(false)
+    const onEnd = () => { setPlaying(false); setCurrent(0) }
     a.addEventListener("timeupdate", onTime)
     a.addEventListener("loadedmetadata", onDur)
+    a.addEventListener("durationchange", onDur)
     a.addEventListener("ended", onEnd)
     return () => {
       a.removeEventListener("timeupdate", onTime)
       a.removeEventListener("loadedmetadata", onDur)
+      a.removeEventListener("durationchange", onDur)
       a.removeEventListener("ended", onEnd)
     }
-  }, [])
+  }, [isDragging])
 
   React.useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = rate
   }, [rate])
 
+  React.useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
+
   const toggle = () => {
     const a = audioRef.current
     if (!a) return
-    if (playing) {
-      a.pause()
-      setPlaying(false)
-    } else {
-      a.play().then(() => setPlaying(true)).catch(() => {})
-    }
+    if (playing) { a.pause(); setPlaying(false) }
+    else { a.play().then(() => setPlaying(true)).catch(() => {}) }
   }
 
-  const seek = (v: number) => {
+  const skip = (delta: number) => {
     const a = audioRef.current
-    if (!a || !duration) return
-    a.currentTime = (v / 100) * duration
+    if (!a) return
+    a.currentTime = Math.max(0, Math.min(duration, a.currentTime + delta))
+    setCurrent(a.currentTime)
+  }
+
+  const handleProgressClick = (e: React.MouseEvent | React.TouchEvent) => {
+    const bar = progressBarRef.current
+    const a = audioRef.current
+    if (!bar || !a || !duration) return
+    const rect = bar.getBoundingClientRect()
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+    const pct = (clientX - rect.left) / rect.width
+    a.currentTime = Math.max(0, Math.min(duration, pct * duration))
     setCurrent(a.currentTime)
   }
 
   const pct = duration > 0 ? (current / duration) * 100 : 0
   const fmt = (s: number) => {
-    if (!Number.isFinite(s)) return "۰:۰۰"
-    const m = Math.floor(s / 60)
+    if (!Number.isFinite(s) || s < 0) return "۰:۰۰"
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
     const sec = Math.floor(s % 60)
+    if (h > 0) return `${toPersianDigits(h)}:${toPersianDigits(String(m).padStart(2, "0"))}:${toPersianDigits(String(sec).padStart(2, "0"))}`
     return `${toPersianDigits(m)}:${toPersianDigits(String(sec).padStart(2, "0"))}`
   }
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-2.5">
-      <div className="mb-2 flex items-center gap-2">
-        <Music className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-xs">{att.name}</span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      {/* Header */}
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 text-violet-600 dark:text-violet-400">
+          <Music className="h-4 w-4" />
+        </div>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">{att.name}</span>
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground" dir="ltr">
           {fmt(current)} / {fmt(duration)}
         </span>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          className="h-8 w-8 shrink-0"
+
+      {/* Controls */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        {/* Skip backward */}
+        <button
+          onClick={() => skip(-10)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          aria-label="۱۰ ثانیه عقب"
+          title="۱۰ ثانیه عقب"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          <span className="absolute text-[7px] font-bold">۱۰</span>
+        </button>
+
+        {/* Play/Pause */}
+        <button
           onClick={toggle}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition hover:scale-105 active:scale-95"
           aria-label={playing ? "توقف" : "پخش"}
         >
-          {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-        </Button>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={0.1}
-          value={pct}
-          onChange={(e) => seek(Number(e.target.value))}
-          className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+          {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-0.5" />}
+        </button>
+
+        {/* Skip forward */}
+        <button
+          onClick={() => skip(10)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          aria-label="۱۰ ثانیه جلو"
+          title="۱۰ ثانیه جلو"
+        >
+          <RotateCw className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Progress bar — clickable + draggable */}
+        <div
+          ref={progressBarRef}
+          className="group relative h-1.5 flex-1 cursor-pointer rounded-full bg-muted"
+          onClick={handleProgressClick}
           dir="ltr"
-          aria-label="پیشرفت پخش"
-        />
+        >
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all"
+            style={{ width: `${pct}%` }}
+          />
+          <div
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm transition-opacity group-hover:opacity-100"
+            style={{ left: `${pct}%`, opacity: isDragging ? 1 : 0 }}
+          />
+        </div>
+
+        {/* Speed */}
         <Select value={String(rate)} onValueChange={(v) => setRate(Number(v))}>
-          <SelectTrigger className="h-8 w-[68px] shrink-0 text-[11px]" dir="ltr">
+          <SelectTrigger className="h-7 w-[60px] shrink-0 border-0 bg-muted text-[10px]" dir="ltr">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="0.5">0.5×</SelectItem>
-            <SelectItem value="1">1×</SelectItem>
-            <SelectItem value="1.5">1.5×</SelectItem>
-            <SelectItem value="2">2×</SelectItem>
+            <SelectItem value="0.5">۰.۵×</SelectItem>
+            <SelectItem value="0.75">۰.۷۵×</SelectItem>
+            <SelectItem value="1">۱×</SelectItem>
+            <SelectItem value="1.25">۱.۲۵×</SelectItem>
+            <SelectItem value="1.5">۱.۵×</SelectItem>
+            <SelectItem value="2">۲×</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -716,14 +916,63 @@ function AudioPlayer({ att }: { att: Attachment }) {
   )
 }
 
-// ----------------------- Video player with speed control + fullscreen -----------------------
+// ============================================================
+// Professional Video Player — seek bar, skip, speed, fullscreen, dark/light
+// ============================================================
 function VideoPlayer({ att }: { att: Attachment }) {
   const videoRef = React.useRef<HTMLVideoElement | null>(null)
+  const [playing, setPlaying] = React.useState(false)
+  const [current, setCurrent] = React.useState(0)
+  const [duration, setDuration] = React.useState(0)
   const [rate, setRate] = React.useState(1)
+  const [volume, setVolume] = React.useState(1)
+  const [showControls, setShowControls] = React.useState(true)
+  const progressBarRef = React.useRef<HTMLDivElement | null>(null)
+  const hideTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const onTime = () => setCurrent(v.currentTime)
+    const onDur = () => setDuration(v.duration || 0)
+    const onEnd = () => { setPlaying(false); setCurrent(0) }
+    v.addEventListener("timeupdate", onTime)
+    v.addEventListener("loadedmetadata", onDur)
+    v.addEventListener("ended", onEnd)
+    return () => {
+      v.removeEventListener("timeupdate", onTime)
+      v.removeEventListener("loadedmetadata", onDur)
+      v.removeEventListener("ended", onEnd)
+    }
+  }, [])
 
   React.useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = rate
   }, [rate])
+
+  const toggle = () => {
+    const v = videoRef.current
+    if (!v) return
+    if (playing) { v.pause(); setPlaying(false) }
+    else { v.play().then(() => setPlaying(true)).catch(() => {}) }
+  }
+
+  const skip = (delta: number) => {
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = Math.max(0, Math.min(duration, v.currentTime + delta))
+    setCurrent(v.currentTime)
+  }
+
+  const handleProgressClick = (e: React.MouseEvent) => {
+    const bar = progressBarRef.current
+    const v = videoRef.current
+    if (!bar || !v || !duration) return
+    const rect = bar.getBoundingClientRect()
+    const pct = (e.clientX - rect.left) / rect.width
+    v.currentTime = Math.max(0, Math.min(duration, pct * duration))
+    setCurrent(v.currentTime)
+  }
 
   const fullscreen = () => {
     const v = videoRef.current
@@ -731,42 +980,101 @@ function VideoPlayer({ att }: { att: Attachment }) {
     if (v.requestFullscreen) v.requestFullscreen().catch(() => {})
   }
 
+  const handleMouseMove = () => {
+    setShowControls(true)
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    hideTimerRef.current = setTimeout(() => { if (playing) setShowControls(false) }, 3000)
+  }
+
+  const pct = duration > 0 ? (current / duration) * 100 : 0
+  const fmt = (s: number) => {
+    if (!Number.isFinite(s) || s < 0) return "۰:۰۰"
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${toPersianDigits(m)}:${toPersianDigits(String(sec).padStart(2, "0"))}`
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg border bg-black">
+    <div
+      className="group relative overflow-hidden rounded-xl border bg-black"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => playing && setShowControls(false)}
+    >
       <video
         ref={videoRef}
         src={att.url}
-        controls
         playsInline
-        className="max-h-72 w-full"
+        onClick={toggle}
+        className="max-h-80 w-full cursor-pointer"
       />
-      <div className="flex items-center justify-between gap-2 bg-black/80 px-2 py-1.5">
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-white/90">
-          <Video className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{att.name}</span>
+
+      {/* Center play button overlay when paused */}
+      {!playing && (
+        <button
+          onClick={toggle}
+          className="absolute inset-0 flex items-center justify-center bg-black/30 transition"
+          aria-label="پخش"
+        >
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-lg">
+            <Play className="h-6 w-6 translate-x-0.5 text-black" />
+          </div>
+        </button>
+      )}
+
+      {/* Bottom controls bar */}
+      <div
+        className={cn(
+          "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-3 pb-2 pt-8 transition-opacity",
+          showControls ? "opacity-100" : "opacity-0"
+        )}
+      >
+        {/* Progress bar */}
+        <div
+          ref={progressBarRef}
+          className="group/seek relative mb-2 h-1 cursor-pointer rounded-full bg-white/30"
+          onClick={handleProgressClick}
+          dir="ltr"
+        >
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-white"
+            style={{ width: `${pct}%` }}
+          />
+          <div
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-sm"
+            style={{ left: `${pct}%` }}
+          />
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Select value={String(rate)} onValueChange={(v) => setRate(Number(v))}>
-            <SelectTrigger className="h-7 w-[64px] border-white/20 bg-transparent text-[11px] text-white hover:bg-white/10" dir="ltr">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0.5">0.5×</SelectItem>
-              <SelectItem value="1">1×</SelectItem>
-              <SelectItem value="1.5">1.5×</SelectItem>
-              <SelectItem value="2">2×</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-white hover:bg-white/10"
-            onClick={fullscreen}
-            aria-label="تمام صفحه"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-          </Button>
+
+        {/* Controls row */}
+        <div className="flex items-center gap-2 text-white">
+          <button onClick={toggle} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/20" aria-label={playing ? "توقف" : "پخش"}>
+            {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+          <button onClick={() => skip(-10)} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/20" aria-label="۱۰ ثانیه عقب">
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => skip(10)} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/20" aria-label="۱۰ ثانیه جلو">
+            <RotateCw className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-[10px] tabular-nums" dir="ltr">
+            {fmt(current)} / {fmt(duration)}
+          </span>
+          <div className="mr-auto flex items-center gap-1">
+            <Select value={String(rate)} onValueChange={(v) => setRate(Number(v))}>
+              <SelectTrigger className="h-7 w-[60px] border-0 bg-white/10 text-[10px] text-white hover:bg-white/20" dir="ltr">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0.5">۰.۵×</SelectItem>
+                <SelectItem value="1">۱×</SelectItem>
+                <SelectItem value="1.5">۱.۵×</SelectItem>
+                <SelectItem value="2">۲×</SelectItem>
+              </SelectContent>
+            </Select>
+            <button onClick={fullscreen} className="flex h-7 w-7 items-center justify-center rounded hover:bg-white/20" aria-label="تمام صفحه">
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1154,87 +1462,22 @@ function NoteCard({
   const done = note.items.filter((i) => i.done).length
   const attCount = note.attachments?.length ?? 0
 
-  // iOS-style swipe-to-delete confirmation state.
-  const [confirming, setConfirming] = React.useState(false)
-  const wrapperRef = React.useRef<HTMLDivElement | null>(null)
-
-  // Escape key + outside-click cancel the confirming state.
-  React.useEffect(() => {
-    if (!confirming) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setConfirming(false)
-    }
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node | null
-      if (!target) return
-      if (wrapperRef.current && !wrapperRef.current.contains(target)) {
-        setConfirming(false)
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    // Defer so the click that opened the panel doesn't immediately close it.
-    const t = window.setTimeout(() => {
-      window.addEventListener("pointerdown", onPointer)
-    }, 0)
-    return () => {
-      window.removeEventListener("keydown", onKey)
-      window.removeEventListener("pointerdown", onPointer)
-      window.clearTimeout(t)
-    }
-  }, [confirming])
+  // Delete confirmation dialog state (replaces the old swipe-to-delete effect).
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
 
   return (
-    <div
-      ref={wrapperRef}
-      className="relative overflow-hidden rounded-xl"
-      onClick={() => {
-        // Click on the wrapper (outside the panel button) cancels confirming.
-        if (confirming) setConfirming(false)
-      }}
-    >
-      {/* Red delete panel — revealed when the card content slides left (RTL). */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete()
-        }}
-        disabled={deleting}
-        aria-label="حذف یادداشت"
-        title="حذف"
-        tabIndex={confirming ? 0 : -1}
-        className="absolute inset-y-0 right-0 z-0 flex w-20 items-center justify-center bg-rose-600 text-white transition-colors hover:bg-rose-700 disabled:opacity-70"
-      >
-        <span className="flex flex-col items-center gap-1">
-          <Trash2 className="h-4 w-4" />
-          <span className="text-[11px] font-semibold">حذف</span>
-        </span>
-      </button>
-
-      {/* Main card content — slides left when confirming. */}
+    <>
       <div
-        className={cn(
-          // Semantic tokens so the card adapts to light/dark theme.
-          "group relative z-10 min-w-0 cursor-pointer overflow-hidden rounded-xl border bg-card p-3 text-card-foreground shadow-sm transition duration-200 hover:shadow-md",
-          note.pinned && "ring-1 ring-amber-400/40",
-          confirming ? "-translate-x-20" : "translate-x-0"
-        )}
-        onClick={(e) => {
-          if (confirming) {
-            e.stopPropagation()
-            setConfirming(false)
-          } else {
-            onOpen()
-          }
-        }}
+        className="group relative min-w-0 cursor-pointer overflow-hidden rounded-xl border bg-card p-3 text-card-foreground shadow-sm transition hover:shadow-md"
+        onClick={() => onOpen()}
       >
-        {/* Subtle left border accent in the note's color tag (NOT a hard bg) */}
+        {/* Subtle left border accent in the note's color tag */}
         <span
           className="absolute inset-y-0 right-0 w-1.5"
           style={{ background: c.hex }}
           aria-hidden
         />
-        {/* Top row: color dot + pin */}
+        {/* Top row: color dot + actions */}
         <div className="mb-1.5 flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-1.5">
             <span
@@ -1266,14 +1509,11 @@ function NoteCard({
               {note.pinned ? <Pin className="h-3.5 w-3.5 fill-amber-500 text-amber-600" /> : <PinOff className="h-3.5 w-3.5" />}
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setConfirming(true)
-              }}
+              onClick={() => setDeleteDialogOpen(true)}
               disabled={deleting}
               className="rounded p-1 text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-600"
-              title="حذف"
-              aria-label="آماده‌سازی حذف"
+              title="حذف یادداشت"
+              aria-label="حذف یادداشت"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -1325,7 +1565,34 @@ function NoteCard({
           {timeAgo(note.updatedAt)}
         </div>
       </div>
-    </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>حذف یادداشت</DialogTitle>
+            <DialogDescription>
+              آیا از حذف این یادداشت مطمئن هستید؟ این عمل قابل بازگشت نیست.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>
+              لغو
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => {
+                onDelete()
+                setDeleteDialogOpen(false)
+              }}
+            >
+              {deleting ? "در حال حذف..." : "حذف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -1735,3 +2002,4 @@ function DashboardSkeleton() {
     </div>
   )
 }
+

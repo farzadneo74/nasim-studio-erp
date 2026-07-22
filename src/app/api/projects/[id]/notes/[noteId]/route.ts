@@ -74,3 +74,4 @@ export async function DELETE(_req: Request, { params }: Ctx) {
   await db.projectNote.delete({ where: { id: noteId } })
   return NextResponse.json({ ok: true })
 }
+

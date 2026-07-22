@@ -113,6 +113,7 @@ export function RemindersWidget({ limit = 6 }: { limit?: number }) {
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editTarget, setEditTarget] = React.useState<ReminderItem | null>(null)
   const [reRemindTarget, setReRemindTarget] = React.useState<ReminderItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<ReminderItem | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ["reminders"],
@@ -259,21 +260,24 @@ export function RemindersWidget({ limit = 6 }: { limit?: number }) {
                     <div className="flex items-start justify-between gap-2">
                       <div
                         className={cn(
-                          "min-w-0 break-words text-sm font-medium",
+                          "min-w-0 flex-1 break-words text-sm font-medium",
                           r.done && "text-muted-foreground line-through",
                           isOverdue && !r.done && "text-rose-600 dark:text-rose-400"
                         )}
+                        onClick={() => openEdit(r)}
+                        role="button"
+                        tabIndex={0}
                       >
                         {isOverdue && !r.done && (
                           <span className="ml-1 inline-block h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full bg-rose-500 align-middle" aria-hidden />
                         )}
                         {r.title}
                       </div>
-                      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex shrink-0 items-center gap-0.5">
                         <button
                           type="button"
                           aria-label="ویرایش یادآور"
-                          className="rounded p-1 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                          className="rounded p-1 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
                           onClick={() => openEdit(r)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -281,8 +285,8 @@ export function RemindersWidget({ limit = 6 }: { limit?: number }) {
                         <button
                           type="button"
                           aria-label="حذف یادآور"
-                          className="rounded p-1 text-muted-foreground/60 hover:bg-rose-500/10 hover:text-rose-600"
-                          onClick={() => deleteMutation.mutate(r.id)}
+                          className="rounded p-1 text-muted-foreground/70 hover:bg-rose-500/10 hover:text-rose-600"
+                          onClick={() => setDeleteTarget(r)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -401,6 +405,31 @@ export function RemindersWidget({ limit = 6 }: { limit?: number }) {
         onOpenChange={(v) => !v && setReRemindTarget(null)}
         onConfirm={(dueAt) => reRemindTarget && reRemindMutation.mutate({ id: reRemindTarget.id, dueAt })}
       />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>حذف یادآور</DialogTitle>
+            <DialogDescription>
+              آیا از حذف یادآور «{deleteTarget?.title}» مطمئن هستید؟ این عمل قابل بازگشت نیست.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>لغو</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (deleteTarget) deleteMutation.mutate(deleteTarget.id)
+                setDeleteTarget(null)
+              }}
+            >
+              {deleteMutation.isPending ? "در حال حذف..." : "حذف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -603,7 +632,7 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
             <p className="text-sm text-muted-foreground">اعلانی برای نمایش وجود ندارد</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-80">
+          <div className="max-h-80 overflow-y-auto overflow-x-hidden pl-1">
             <div className="divide-y">
               {notifications.map((n) => {
                 const accent = NOTIFICATION_ACCENT[n.type] ?? NOTIFICATION_ACCENT.info
@@ -613,7 +642,7 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
                   <div
                     key={n.id}
                     className={cn(
-                      "group relative flex min-w-0 gap-2 overflow-hidden p-2.5 transition-colors",
+                      "group relative flex min-w-0 gap-2 overflow-hidden rounded-lg p-2.5 transition-colors",
                       !n.read && !isActionable && "bg-muted/40",
                       n.read && "opacity-70",
                       isActionable ? "cursor-default" : "cursor-pointer hover:bg-muted/60"
@@ -633,7 +662,7 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
                     >
                       {NOTIFICATION_ICON[n.type] ?? NOTIFICATION_ICON.info}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 overflow-hidden">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 break-words text-xs font-semibold">{n.title}</div>
                         <div className="shrink-0 text-[10px] text-muted-foreground/70">
@@ -658,11 +687,11 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
                       )}
 
                       {isPayment && isActionable && (
-                        <div className="mt-1.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="default"
-                            className="h-6 gap-1 px-2 text-[10px]"
+                            className="h-7 gap-1 px-2.5 text-[10px]"
                             onClick={() => n.refId && confirmPaymentMutation.mutate(n.refId)}
                             disabled={confirmPaymentMutation.isPending}
                           >
@@ -672,7 +701,7 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 gap-1 px-2 text-[10px]"
+                            className="h-7 gap-1 px-2.5 text-[10px]"
                             onClick={() => rejectPayment(n)}
                           >
                             <X className="h-3 w-3" />
@@ -681,49 +710,52 @@ export function EnhancedNotificationsWidget({ limit = 6 }: { limit?: number }) {
                         </div>
                       )}
 
-                      {/* Seen button for view-only (non-actionable) notifications */}
-                      {!isActionable && !n.read && (
-                        <div className="mt-1.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {/* Action buttons: confirm/reject for actionable, view+delete for all */}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        {/* View button (for navigatable notifications) */}
+                        {isNavigatable(n.link) && !isActionable && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-6 gap-1 px-2 text-[10px] text-muted-foreground"
+                            className="h-7 gap-1 px-2.5 text-[10px] text-muted-foreground"
+                            onClick={() => handleClick(n)}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            مشاهده
+                          </Button>
+                        )}
+                        {/* Mark as read for unread non-actionable */}
+                        {!isActionable && !n.read && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 gap-1 px-2.5 text-[10px] text-muted-foreground"
                             onClick={() => markReadMutation.mutate(n.id)}
                             disabled={markReadMutation.isPending}
                           >
                             <Check className="h-3 w-3" />
                             دیده شد
                           </Button>
-                        </div>
-                      )}
-
-                      {isNavigatable(n.link) && !isActionable && (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                          <ExternalLink className="h-3 w-3" />
-                          <span>مشاهده</span>
-                        </div>
-                      )}
+                        )}
+                        {/* Delete button — always visible (not hover-only) */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 px-2.5 text-[10px] text-muted-foreground hover:text-rose-600"
+                          onClick={() => deleteMutation.mutate(n.id)}
+                          disabled={deleteMutation.isPending}
+                          aria-label="حذف اعلان"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          حذف
+                        </Button>
+                      </div>
                     </div>
-
-                    {/* Delete button — hidden for action-required (cannot delete until action done) */}
-                    {!isActionable && (
-                      <button
-                        type="button"
-                        aria-label="حذف اعلان"
-                        className="absolute left-1 top-1 hidden rounded p-1 text-muted-foreground/60 hover:bg-muted hover:text-foreground group-hover:block"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteMutation.mutate(n.id)
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
                   </div>
                 )
               })}
             </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
     </div>
@@ -754,3 +786,4 @@ type NavPage = (typeof NAVIGATABLE_PAGES)[number]
 function isNavigatable(link: string | null | undefined): link is NavPage {
   return !!link && (NAVIGATABLE_PAGES as readonly string[]).includes(link)
 }
+

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { TASK_STATUSES, type TaskStatus, type Role } from "@/lib/constants"
+import { TASK_STATUSES, type TaskStatus, type Role, isManagementRole, isTechnicalRole } from "@/lib/constants"
 import { PrismaClient } from "@prisma/client"
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -11,13 +11,12 @@ async function assertOnTeam(db: PrismaClient, role: Role, projectId: string) {
   if (!userId) return false
   const p = await db.project.findUnique({
     where: { id: projectId },
-    include: { fieldTeam: { select: { id: true } }, studioTeam: { select: { id: true } }, deliveryTeam: { select: { id: true } } },
+    include: { fieldTeam: { select: { id: true } }, studioTeam: { select: { id: true } } },
   })
   if (!p) return false
   return (
     p.fieldTeam.some((u) => u.id === userId) ||
-    p.studioTeam.some((u) => u.id === userId) ||
-    p.deliveryTeam.some((u) => u.id === userId)
+    p.studioTeam.some((u) => u.id === userId)
   )
 }
 
@@ -70,7 +69,7 @@ interface CreateBody {
 
 export async function POST(req: Request, { params }: Ctx) {
   const role = await getCurrentRole()
-  if (!["admin", "manager", "sales", "photographer", "editor", "qc", "logistics"].includes(role)) {
+  if (!isManagementRole(role) && role !== "sales" && !isTechnicalRole(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   // دریافت دیتابیس استودیوی فعال
@@ -111,3 +110,4 @@ export async function POST(req: Request, { params }: Ctx) {
     createdAt: task.createdAt,
   }, { status: 201 })
 }
+

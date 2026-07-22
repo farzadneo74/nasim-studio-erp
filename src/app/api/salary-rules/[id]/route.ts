@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { COMMISSION_TYPES, APPLY_ON } from "@/lib/constants"
+import { COMMISSION_TYPES, APPLY_ON, TECHNICAL_ROLES } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
-const SALARY_ROLES = ["photographer", "editor", "logistics"]
+// Roles that can have salary rules: technical roles + sales (commissions).
+const SALARY_ROLES = [...TECHNICAL_ROLES, "sales"]
 
 export async function PATCH(
   req: NextRequest,
@@ -117,3 +118,4 @@ export async function DELETE(
   await db.salaryRule.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

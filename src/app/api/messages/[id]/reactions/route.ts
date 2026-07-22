@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentStudioDb } from "@/lib/auth-helpers"
+import { getCurrentStudioDb, getCurrentStudioDbName } from "@/lib/auth-helpers"
 import { getCurrentUser } from "@/lib/auth"
+import { broadcastToChatWs, conversationRoom } from "@/lib/chat-ws"
 
 export const dynamic = "force-dynamic"
 
 // POST /api/messages/[id]/reactions — toggle a reaction { emoji }.
 // If the user already has that emoji on this message, remove it; otherwise add it.
-// Returns the message's reactions array.
+// Returns the message's reactions array AND broadcasts to the conversation room.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,6 +19,9 @@ export async function POST(
     }
     const db = await getCurrentStudioDb()
     if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
+    const studioDbName = await getCurrentStudioDbName()
+    if (!studioDbName)
+      return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
     const { id } = await params
 
     const msg = await db.message.findUnique({
@@ -28,7 +32,7 @@ export async function POST(
 
     // Ensure the user is a participant of the conversation.
     const participant = await db.conversationParticipant.findFirst({
-      where: { conversationId: msg.conversationId, userId: user.userId },
+      where: { conversationId: msg.conversationId, userId: user.userId, leftAt: null },
       select: { id: true },
     })
     if (!participant) {
@@ -61,17 +65,29 @@ export async function POST(
     }
 
     const reactions = await db.messageReaction.findMany({ where: { messageId: id } })
-    return NextResponse.json({
-      items: reactions.map((r) => ({
-        id: r.id,
-        userId: r.userId,
-        userName: r.userName,
-        emoji: r.emoji,
-        createdAt: r.createdAt.toISOString(),
-      })),
+    const shaped = reactions.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      userName: r.userName,
+      emoji: r.emoji,
+      createdAt: r.createdAt.toISOString(),
+    }))
+
+    // Broadcast
+    await broadcastToChatWs({
+      room: conversationRoom(studioDbName, msg.conversationId),
+      event: "message:reaction",
+      data: {
+        messageId: id,
+        conversationId: msg.conversationId,
+        reactions: shaped,
+      },
     })
+
+    return NextResponse.json({ items: shaped })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "خطای ناشناخته"
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+

@@ -312,3 +312,4 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   await db.reminder.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

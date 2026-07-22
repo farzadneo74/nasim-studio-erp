@@ -90,12 +90,14 @@ export async function GET(
     0
   )
 
-  // Compute debt across all projects (admin/manager only)
+  // Compute debt and total paid across all projects (admin/manager only)
   let debt = 0
+  let totalPaidAll = 0
   if (seeFinance) {
     for (const ct of c.contracts) {
       for (const p of ct.projects) {
-        const totalPaid = p.payments.reduce((s, x) => s + Number(x.amount), 0)
+        const totalPaid = p.payments.filter(x => x.isConfirmed).reduce((s, x) => s + Number(x.amount), 0)
+        totalPaidAll += totalPaid
         const eff = getEffectivePrice({
           pricingStrategy: p.pricingStrategy as never,
           calculatedPrice: p.calculatedPrice,
@@ -120,6 +122,7 @@ export async function GET(
     customerType: c.customerType,
     profileImage: c.profileImage,
     extraPhones: parseExtraPhones(c.extraPhones),
+    instagramId: c.instagramId,
     birthDate: iso(c.birthDate),
     engagementDate: iso(c.engagementDate),
     weddingDate: iso(c.weddingDate),
@@ -146,6 +149,11 @@ export async function GET(
   if (seeFinance) {
     base.familyMeta = c.familyMeta
     base.totalRevenue = Number(c.totalRevenue)
+    base.totalPaidAll = totalPaidAll
+    // USD equivalent: use a fixed approximate rate (can be updated via system settings)
+    // Rate: 1 USD ≈ 60000 Toman (configurable in system settings)
+    const usdRate = 60000 // Toman per USD
+    base.totalPaidUsd = usdRate > 0 ? Math.round(totalPaidAll / 10 / usdRate) : 0 // Rials -> Toman -> USD
     base.creditBalance = Number(c.creditBalance)
     base.credit = Number(c.creditBalance)
     base.debt = debt
@@ -240,6 +248,12 @@ export async function PATCH(
       .filter((x) => x && typeof x === "object" && typeof x.phone === "string" && x.phone.trim().length > 0)
       .map((x) => ({ label: String(x.label ?? "").trim(), phone: String(x.phone).trim() }))
     data.extraPhones = JSON.stringify(cleaned)
+  }
+
+  if ("instagramId" in body) {
+    const v = body.instagramId
+    if (v === null || v === "") data.instagramId = null
+    else if (typeof v === "string") data.instagramId = v.trim().replace(/^@/, "")
   }
 
   if ("birthDate" in body) data.birthDate = parseOptionalDate(body.birthDate)
@@ -359,3 +373,4 @@ export async function DELETE(
   await db.customer.delete({ where: { id } })
   return NextResponse.json({ ok: true })
 }
+

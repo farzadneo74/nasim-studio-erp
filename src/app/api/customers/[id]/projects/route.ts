@@ -63,7 +63,6 @@ export async function GET(
         contract: true,
         fieldTeam: true,
         studioTeam: true,
-        deliveryTeam: true,
         payments: {
           orderBy: { datePaid: "desc" },
           include: {
@@ -84,7 +83,6 @@ export async function GET(
         contract: true,
         fieldTeam: true,
         studioTeam: true,
-        deliveryTeam: true,
         payments: { orderBy: { datePaid: "desc" } },
         notes: { include: { author: true }, orderBy: { createdAt: "desc" } },
       },
@@ -166,7 +164,7 @@ export async function GET(
       totalPaid: seeBalance ? confirmedPaid : null,
       balance: seeBalance ? Math.max(0, eff - confirmedPaid) : null,
       isDelivered: p.status === "delivered",
-      team: [...p.fieldTeam, ...p.studioTeam, ...p.deliveryTeam].map((u) => ({
+      team: [...p.fieldTeam, ...p.studioTeam, ].map((u) => ({
         id: u.id,
         name: u.firstName + " " + u.lastName,
         role: u.role,
@@ -236,3 +234,4 @@ export async function GET(
     canManage: CAN_MANAGE_CUSTOMERS.includes(role),
   })
 }
+

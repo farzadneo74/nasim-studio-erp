@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { ROLE_PERMISSIONS } from "@/lib/constants"
+import { hasPermission } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
@@ -12,7 +12,7 @@ function iso(d: Date | null): string | null {
 // Returns {valid:true, code, owner, relatedProject?} or {valid:false, reason:"not_found"|"expired"|"used_up"}
 export async function GET(req: NextRequest) {
   const role = await getCurrentRole()
-  if (!ROLE_PERMISSIONS[role].scanner) {
+  if (!hasPermission(role, "scanner")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
   // دریافت دیتابیس استودیوی فعال
@@ -107,3 +107,4 @@ export async function GET(req: NextRequest) {
       : null,
   })
 }
+

@@ -134,3 +134,4 @@ export async function getCurrentRole(): Promise<string> {
   const user = await getCurrentUser()
   return user?.role ?? "admin"
 }
+

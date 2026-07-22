@@ -227,8 +227,14 @@ function RescheduleForm({
   onSubmit: (dueAt: string) => void
   submitting: boolean
 }) {
-  const [date, setDate] = React.useState<string | null>(null)
-  const [time, setTime] = React.useState<string>("")
+  // Use lazy initial state to set defaults once — avoids the useEffect
+  // that previously caused "Maximum update depth exceeded" warnings.
+  const [date, setDate] = React.useState<string | null>(() => new Date().toISOString())
+  const [time, setTime] = React.useState<string>(() => {
+    const now = new Date()
+    now.setHours(now.getHours() + 1, 0, 0, 0)
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+  })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -238,22 +244,6 @@ function RescheduleForm({
     }
     onSubmit(combineDateTime(date, time))
   }
-
-  // Default the date to "today" and time to "now + 1 hour" so the user can
-  // quickly reschedule without picking a past time again.
-  React.useEffect(() => {
-    if (!date) {
-      const now = new Date()
-      setDate(now.toISOString())
-    }
-    if (!time) {
-      const now = new Date()
-      now.setHours(now.getHours() + 1, 0, 0, 0)
-      const hh = String(now.getHours()).padStart(2, "0")
-      const mm = String(now.getMinutes()).padStart(2, "0")
-      setTime(`${hh}:${mm}`)
-    }
-  }, [date, time])
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 space-y-2 rounded-md border bg-card p-3">
@@ -290,3 +280,4 @@ function RescheduleForm({
     </form>
   )
 }
+

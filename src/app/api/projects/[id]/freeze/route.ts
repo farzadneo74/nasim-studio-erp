@@ -28,3 +28,4 @@ export async function PATCH(req: Request, { params }: Ctx) {
     isPriceFrozen: updated.isPriceFrozen,
   })
 }
+

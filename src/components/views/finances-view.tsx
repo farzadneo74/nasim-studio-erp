@@ -128,6 +128,8 @@ interface DashboardData {
     totalExpenses: number | null
     netProfit: number | null
     unpaidSalaries: number | null
+    todaysIncome: number | null
+    pendingSettlement: number | null
   }
 }
 
@@ -292,41 +294,55 @@ function FinancesInner() {
         description="پرداخت‌ها، هزینه‌ها، حقوق‌ها و دفتر اعتبار"
       />
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* KPI cards — expanded 6-card grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {dashLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))
         ) : (
           <>
             <StatCard
-              label="درآمد کل"
-              value={`${formatRialsShort(kpis?.totalRevenue ?? 0)} تومان`}
-              sub="پرداخت‌های تأییدشده"
+              label="درآمد امروز"
+              value={`${formatRialsShort(kpis?.todaysIncome ?? 0)}`}
+              sub="پرداخت‌های امروز"
               icon={<Wallet className="h-4 w-4" />}
               accent="#10b981"
             />
             <StatCard
+              label="درآمد کل"
+              value={`${formatRialsShort(kpis?.totalRevenue ?? 0)}`}
+              sub="تأییدشده"
+              icon={<TrendingUp className="h-4 w-4" />}
+              accent="#22c55e"
+            />
+            <StatCard
               label="هزینه کل"
-              value={`${formatRialsShort(kpis?.totalExpenses ?? 0)} تومان`}
-              sub="همه دسته‌بندی‌ها"
+              value={`${formatRialsShort(kpis?.totalExpenses ?? 0)}`}
+              sub="همه دسته‌ها"
               icon={<TrendingDown className="h-4 w-4" />}
               accent="#ef4444"
             />
             <StatCard
               label="سود خالص"
-              value={`${formatRialsShort(kpis?.netProfit ?? 0)} تومان`}
-              sub="درآمد − هزینه‌ها"
+              value={`${formatRialsShort(kpis?.netProfit ?? 0)}`}
+              sub="درآمد − هزینه"
               icon={<TrendingUp className="h-4 w-4" />}
               accent={(kpis?.netProfit ?? 0) >= 0 ? "#0ea5e9" : "#f43f5e"}
             />
             <StatCard
+              label="مانده تسویه"
+              value={`${formatRialsShort(kpis?.pendingSettlement ?? 0)}`}
+              sub="پروژه‌های فعال"
+              icon={<Clock className="h-4 w-4" />}
+              accent="#f59e0b"
+            />
+            <StatCard
               label="حقوق پرداخت‌نشده"
-              value={`${formatRialsShort(kpis?.unpaidSalaries ?? 0)} تومان`}
+              value={`${formatRialsShort(kpis?.unpaidSalaries ?? 0)}`}
               sub="در انتظار پرداخت"
               icon={<AlertCircle className="h-4 w-4" />}
-              accent="#f59e0b"
+              accent="#a855f7"
             />
           </>
         )}
@@ -2623,3 +2639,4 @@ function periodLabel(period: string): string {
   if (mo < 1 || mo > 12) return period
   return `${JALALI_MONTHS[mo - 1]} ${toPersianDigits(y)}`
 }
+

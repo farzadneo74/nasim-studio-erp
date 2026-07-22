@@ -9,3 +9,4 @@ export async function POST(req: Request) {
   await setPassword(user.userId, password)
   return NextResponse.json({ ok: true })
 }
+
