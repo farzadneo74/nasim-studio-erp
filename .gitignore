@@ -45,3 +45,8 @@ dist/
 # ZIP files
 download/
 *.zip
+# Database files
+db/
+*.db
+*.db-journal
+prisma/db/
