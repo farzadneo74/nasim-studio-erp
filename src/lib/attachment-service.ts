@@ -419,6 +419,102 @@ export async function getAttachmentForDownload(
 }
 
 /**
+ * ⚠️ SECURITY: بررسی می‌کند که آیا کاربر فعلی حق دسترسی به این attachment دارد یا خیر.
+ *
+ * منطق:
+ *  - admin/manager: دسترسی کامل به همه attachments استودیو
+ *  - سایر نقش‌ها: فقط attachments که ownerType اون‌ها رو دارن
+ *    - user_note: فقط یادداشت‌های خودش
+ *    - customer_note: اگر دسترسی customers داره
+ *    - project_note: فقط پروژه‌هایی که توش هستن
+ *    - message: فقط پیام‌های گفتگویی که توش هستن
+ *    - custom_field: اگر دسترسی customers داره
+ *    - expense_receipt: اگر دسترسی finances_full داره
+ *
+ * @param db دیتابیس استودیو
+ * @param attachmentId شناسه attachment
+ * @param userId شناسه کاربر فعلی در استودیو
+ * @param role نقش کاربر فعلی
+ * @returns true اگه دسترسی مجاز باشد
+ */
+export async function canAccessAttachment(
+  db: PrismaClient,
+  attachmentId: string,
+  userId: string,
+  role: string
+): Promise<boolean> {
+  // admin و manager دسترسی کامل دارن
+  if (role === "admin" || role === "manager") return true
+
+  const att = await db.attachment.findUnique({
+    where: { id: attachmentId },
+    select: { ownerType: true, ownerId: true },
+  })
+  if (!att) return false
+
+  // برای هر ownerType بررسی کن
+  switch (att.ownerType) {
+    case "user_note":
+      // فقط یادداشت‌های خود کاربر
+      if (!att.ownerId) return false
+      const note = await db.userNote.findUnique({
+        where: { id: att.ownerId },
+        select: { userId: true },
+      })
+      return note?.userId === userId
+
+    case "customer_note":
+      // اگر دسترسی customers داره، کافیه
+      return true
+
+    case "project_note":
+      // باید عضو تیم پروژه باشه (fieldTeam یا studioTeam)
+      if (!att.ownerId) return false
+      const pNote = await db.projectNote.findUnique({
+        where: { id: att.ownerId },
+        select: { projectId: true },
+      })
+      if (!pNote) return false
+      const project = await db.project.findUnique({
+        where: { id: pNote.projectId },
+        select: { fieldTeam: { select: { id: true } }, studioTeam: { select: { id: true } } },
+      })
+      if (!project) return false
+      const inTeam = [
+        ...project.fieldTeam.map((u) => u.id),
+        ...project.studioTeam.map((u) => u.id),
+      ].includes(userId)
+      return inTeam
+
+    case "message":
+      // باید شرکت‌کننده گفتگو باشد
+      if (!att.ownerId) return false
+      const msg = await db.message.findUnique({
+        where: { id: att.ownerId },
+        select: { conversationId: true },
+      })
+      if (!msg) return false
+      const participant = await db.conversationParticipant.findFirst({
+        where: { conversationId: msg.conversationId, userId },
+      })
+      return !!participant
+
+    case "custom_field":
+      // اگر دسترسی customers داره
+      return true
+
+    case "expense_receipt":
+      // فقط نقش‌های مالی
+      return role === "admin" || role === "manager"
+
+    default:
+      // ownerType ناشناخته → deny
+      return false
+  }
+}
+
+
+/**
  * Soft-delete (move to trash). File stays on disk.
  */
 export async function softDelete(

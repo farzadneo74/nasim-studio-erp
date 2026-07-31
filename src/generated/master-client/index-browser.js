@@ -125,8 +125,25 @@ exports.Prisma.StudioScalarFieldEnum = {
   dbName: 'dbName',
   isActive: 'isActive',
   plan: 'plan',
+  subscriptionStart: 'subscriptionStart',
+  subscriptionEnd: 'subscriptionEnd',
+  maxEmployees: 'maxEmployees',
+  maxProjects: 'maxProjects',
+  maxCustomers: 'maxCustomers',
+  maxStorageBytes: 'maxStorageBytes',
   storageQuotaBytes: 'storageQuotaBytes',
   storageUsedBytes: 'storageUsedBytes',
+  studioPhone: 'studioPhone',
+  ownerName: 'ownerName',
+  ownerPhone: 'ownerPhone',
+  city: 'city',
+  address: 'address',
+  notes: 'notes',
+  kavenegarApikey: 'kavenegarApikey',
+  kavenegarSender: 'kavenegarSender',
+  kavenegarLocalId: 'kavenegarLocalId',
+  kavenegarStatus: 'kavenegarStatus',
+  smsCreditRial: 'smsCreditRial',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -136,6 +153,7 @@ exports.Prisma.MasterUserScalarFieldEnum = {
   phone: 'phone',
   passwordHash: 'passwordHash',
   name: 'name',
+  isSuperAdmin: 'isSuperAdmin',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -170,6 +188,39 @@ exports.Prisma.SessionScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.SmsTransactionScalarFieldEnum = {
+  id: 'id',
+  studioId: 'studioId',
+  type: 'type',
+  amountRial: 'amountRial',
+  receptor: 'receptor',
+  messageSnippet: 'messageSnippet',
+  description: 'description',
+  kavenegarMessageId: 'kavenegarMessageId',
+  status: 'status',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.SubscriptionEventScalarFieldEnum = {
+  id: 'id',
+  studioId: 'studioId',
+  eventType: 'eventType',
+  fromPlan: 'fromPlan',
+  toPlan: 'toPlan',
+  amountPaidToman: 'amountPaidToman',
+  durationDays: 'durationDays',
+  startAt: 'startAt',
+  endAt: 'endAt',
+  note: 'note',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.PlatformSettingScalarFieldEnum = {
+  key: 'key',
+  value: 'value',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -186,7 +237,10 @@ exports.Prisma.ModelName = {
   MasterUser: 'MasterUser',
   StudioMembership: 'StudioMembership',
   OtpCode: 'OtpCode',
-  Session: 'Session'
+  Session: 'Session',
+  SmsTransaction: 'SmsTransaction',
+  SubscriptionEvent: 'SubscriptionEvent',
+  PlatformSetting: 'PlatformSetting'
 };
 
 /**

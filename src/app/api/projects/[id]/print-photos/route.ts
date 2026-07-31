@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentStudioDb, getCurrentUser } from "@/lib/auth-helpers"
+import { getCurrentStudioDb, getCurrentUser, getCurrentRole, currentUserHasPermission } from "@/lib/auth-helpers"
 import { PHOTO_LOCATION_LABELS } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
@@ -7,10 +7,20 @@ export const dynamic = "force-dynamic"
 type Ctx = { params: Promise<{ id: string }> }
 
 // GET /api/projects/[id]/print-photos — list all print photo selections for a project
+// نیاز به دسترسی: projects (مشاهده پروژه‌ها)
 export async function GET(_req: NextRequest, { params }: Ctx) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+    const role = await getCurrentRole()
+    if (!role) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+
+    // بررسی دسترسی: باید projects یا projects_financials داشته باشه
+    const canView = await currentUserHasPermission("projects")
+    if (!canView) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     const db = await getCurrentStudioDb()
     if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
     const { id } = await params
@@ -51,11 +61,21 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 // POST /api/projects/[id]/print-photos — add a print photo selection
+// نیاز به دسترسی: projects_edit (ویرایش پروژه) — نه فقط لاگین
 // Body: { printPhotoPriceId: string, quantity: number }
 export async function POST(req: NextRequest, { params }: Ctx) {
   try {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+    const role = await getCurrentRole()
+    if (!role) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+
+    // ⚠️ SECURITY: فقط کاربرانی که projects_edit دارن می‌تونن print photos اضافه کنن
+    const canEdit = await currentUserHasPermission("projects_edit")
+    if (!canEdit) {
+      return NextResponse.json({ error: "Forbidden — نیاز به دسترسی ویرایش پروژه" }, { status: 403 })
+    }
+
     const db = await getCurrentStudioDb()
     if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
     const { id } = await params

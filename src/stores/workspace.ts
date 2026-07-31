@@ -25,6 +25,7 @@ export type PageId =
   | "settings-leaves"
   | "settings-custom-fields"
   | "settings-storage"
+  | "super-admin"
 
 interface WorkspaceState {
   activePage: PageId

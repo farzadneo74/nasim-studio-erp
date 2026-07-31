@@ -221,6 +221,7 @@ interface CreateBody {
   customEquipment?: string[]
   isPriceFrozen?: boolean
   pricingStrategy?: string
+  priceAdjustment?: number // Toman (will be converted to Rials × 10) — adjustment to base price
   smsAssignments?: SmsAssignmentInput[]
   // contract
   createNewContract?: boolean

@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server"
-import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import { ROLES, type Role } from "@/lib/constants"
-import { PrismaClient } from "@prisma/client"
+import { getCurrentRole, getCurrentStudioDb, getCurrentStudioUserId } from "@/lib/auth-helpers"
+import { ROLES } from "@/lib/constants"
 
-// Demo: in the absence of real auth, we resolve the current user as the first
-// user matching the demo role. admin/manager/sales share a "system inbox" of
-// notes scoped to the admin user; technical roles get their own user's notes.
-async function resolveUserId(db: PrismaClient, role: Role): Promise<string | null> {
-  const exact = await db.user.findFirst({ where: { role }, select: { id: true } })
-  if (exact) return exact.id
-  // Fallback: first admin user.
-  const admin = await db.user.findFirst({ where: { role: "admin" }, select: { id: true } })
-  return admin?.id ?? null
-}
+// ⚠️ SECURITY: قبلاً از findFirst({role}) استفاده می‌شد که وقتی دو کاربر نقش یکسان داشتن،
+// اشتباه پیدا می‌کرد. حالا از getCurrentStudioUserId استفاده می‌کنیم که با phone matching
+// کاربر واقعی رو پیدا می‌کنه.
 
 interface NoteItem {
   text: string
@@ -89,7 +81,7 @@ export async function GET() {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await resolveUserId(db, role)
+  const userId = await getCurrentStudioUserId()
   if (!userId) return NextResponse.json({ items: [] })
 
   const rows = await db.userNote.findMany({
@@ -131,7 +123,7 @@ export async function POST(req: Request) {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await resolveUserId(db, role)
+  const userId = await getCurrentStudioUserId()
   if (!userId) {
     return NextResponse.json({ error: "No user available" }, { status: 400 })
   }

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import type { Role } from "@/lib/constants"
-import { PrismaClient } from "@prisma/client"
+import { getCurrentRole, getCurrentStudioDb, getCurrentStudioUserId } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
 
@@ -9,11 +7,9 @@ const VALID_LINK_TYPES = ["project", "customer", "user", "task", "multi", "none"
 // Links ticked via the UI auto-delete after this many days (lazy on GET).
 const LINK_AUTO_DELETE_MS = 3 * 24 * 60 * 60 * 1000
 
-async function getCurrentUserId(db: PrismaClient, role: Role): Promise<string | null> {
-  // Demo: resolve the "current user" as the first user matching the active role.
-  const u = await db.user.findFirst({ where: { role }, select: { id: true } })
-  return u?.id ?? null
-}
+// ⚠️ SECURITY: قبلاً از findFirst({role}) استفاده می‌شد که وقتی دو کاربر نقش یکسان داشتن،
+// اشتباه پیدا می‌کرد. حالا از getCurrentStudioUserId استفاده می‌کنیم که با phone matching
+// کاربر واقعی رو پیدا می‌کنه.
 
 interface MultiLink {
   customerId?: string | null
@@ -263,7 +259,7 @@ export async function GET(req: NextRequest) {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await getCurrentUserId(db, role)
+  const userId = await getCurrentStudioUserId()
   if (!userId) return NextResponse.json({ items: [] })
 
   // Lazy cleanup: delete done+acknowledged reminders older than 24h.
@@ -342,7 +338,7 @@ export async function POST(req: NextRequest) {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await getCurrentUserId(db, role)
+  const userId = await getCurrentStudioUserId()
   if (!userId) {
     return NextResponse.json({ error: "کاربر فعال یافت نشد" }, { status: 400 })
   }

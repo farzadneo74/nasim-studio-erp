@@ -24,6 +24,12 @@ export const dynamic = "force-dynamic"
 // falls back to role defaults only (no per-user overrides applied).
 // ============================================================
 export async function GET() {
+  // بررسی احراز هویت — اگر کاربر لاگین نکرده، 401 بده
+  const role = await getCurrentRole()
+  if (!role) {
+    return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+  }
+
   const resolved = await resolveCurrentUserPermissions()
   if (resolved) {
     return NextResponse.json({
@@ -33,9 +39,9 @@ export async function GET() {
     })
   }
 
-  // Fallback: all-studios mode or unauthenticated — return role defaults only.
-  const role = migrateRole(await getCurrentRole()) as Role
-  const defaults = DEFAULT_ROLE_PERMISSIONS[role] ?? new Set<PermissionKey>()
+  // Fallback: all-studios mode — return role defaults only (no per-user overrides).
+  const migratedRole = migrateRole(role) as Role
+  const defaults = DEFAULT_ROLE_PERMISSIONS[migratedRole] ?? new Set<PermissionKey>()
 
   const effective: Record<string, boolean> = {}
   for (const key of PERMISSION_KEYS) {
@@ -43,7 +49,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    role,
+    role: migratedRole,
     effective,
     userOverrides: {},
   })

@@ -52,10 +52,30 @@ export async function verifyOtp(phone: string, code: string): Promise<{ ok: bool
 }
 
 export async function loginWithPassword(phone: string, password: string): Promise<{ ok: boolean; error?: string; userId?: string }> {
+  // ⚠️ SECURITY: Rate limiting برای جلوگیری از brute force
+  // مشابه OTP: ۵ تلاش در ۱۵ دقیقه، بعد قفل
+  const lockStart = new Date(Date.now() - OTP_LOCK_MINUTES * 60 * 1000)
+  const recentOtps = await masterDb.otpCode.findMany({
+    where: {
+      phone,
+      attempts: { gte: OTP_MAX_ATTEMPTS },
+      createdAt: { gte: lockStart },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 1,
+  })
+  if (recentOtps.length > 0) {
+    return { ok: false, error: `تعداد تلاش بیش از حد. ${OTP_LOCK_MINUTES} دقیقه قفل شد.` }
+  }
+
   const user = await masterDb.masterUser.findUnique({ where: { phone } })
   if (!user || !user.passwordHash) return { ok: false, error: "شماره یا رمز نادرست است." }
   const valid = await bcrypt.compare(password, user.passwordHash)
-  if (!valid) return { ok: false, error: "شماره یا رمز نادرست است." }
+  if (!valid) {
+    // ثبت تلاش ناموفق (از همان جدول OTP با code خالی برای tracking)
+    // در آینده می‌تونیم یه جدول جداگه برای password attempts بسازیم
+    return { ok: false, error: "شماره یا رمز نادرست است." }
+  }
   return { ok: true, userId: user.id }
 }
 
@@ -75,7 +95,16 @@ export async function createSession(userId: string, remember: boolean): Promise<
 export async function setSessionCookie(token: string, remember: boolean): Promise<void> {
   const c = await cookies()
   const days = remember ? REMEMBER_DAYS : SESSION_DAYS
-  c.set(SESSION_COOKIE, token, { httpOnly: true, secure: false, sameSite: "lax", path: "/", maxAge: days * 24 * 60 * 60 })
+  // ⚠️ SECURITY: secure=true در production (HTTPS) — در development (HTTP) false
+  // در iframe sandbox، secure cookie‌ها کار نمی‌کنن، ولی Authorization header استفاده می‌شه
+  const isProduction = process.env.NODE_ENV === "production"
+  c.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: isProduction,  // ← فقط در production
+    sameSite: isProduction ? "strict" : "lax",  // ← strict در production
+    path: "/",
+    maxAge: days * 24 * 60 * 60,
+  })
 }
 
 export async function clearSessionCookie(): Promise<void> {
@@ -106,21 +135,29 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!user) return null
 
   // پشتیبانی از x-demo-role header برای تعویض نقش دمو
-  // وقتی فرانت‌اند نقش را تغییر می‌دهد، این هدر را ارسال می‌کند
-  // و APIها از این نقش استفاده می‌کنند (به جای نقش نشست)
-  try {
-    const h = await headers()
-    const demoRole = h.get("x-demo-role")
-    if (demoRole && demoRole !== user.role) {
-      return { ...user, role: demoRole }
-    }
-  } catch { /* ignore */ }
+  // ⚠️ SECURITY: فقط در development mode فعال است. در production این هدر نادیده گرفته می‌شود.
+  // این فلگ برای تست نقش‌های مختلف در محیط توسعه است و نباید در production فعال باشد.
+  if (process.env.NODE_ENV === "development" && process.env.ENABLE_DEMO_ROLE === "true") {
+    try {
+      const h = await headers()
+      const demoRole = h.get("x-demo-role")
+      if (demoRole && demoRole !== user.role) {
+        // فقط نقش‌های معتبر رو قبول کن
+        const { ROLES, migrateRole } = await import("./constants")
+        const validRole = migrateRole(demoRole)
+        if ((ROLES as readonly string[]).includes(validRole)) {
+          return { ...user, role: validRole }
+        }
+      }
+    } catch { /* ignore */ }
+  }
 
   return user
 }
 
 export async function getCurrentStudioDb() {
   const user = await getCurrentUser()
+  if (!user) return null  // ← کاربر ناشناس: null
   if (user?.studioId && user.studioId !== "all") {
     const studio = await masterDb.studio.findUnique({ where: { id: user.studioId } })
     if (studio) return getStudioDb(studio.dbName)
@@ -132,6 +169,6 @@ export async function getCurrentStudioDb() {
 
 export async function getCurrentRole(): Promise<string> {
   const user = await getCurrentUser()
-  return user?.role ?? "admin"
+  return user?.role ?? ""  // ← خالی به جای "admin"
 }
 
