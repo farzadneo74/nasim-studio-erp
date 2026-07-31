@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentStudioDb, getCurrentRole, getCurrentUser } from "@/lib/auth-helpers"
-import { db as defaultDb } from "@/lib/db"
+import { getCurrentStudioDb, getCurrentRole, getCurrentUser, getCurrentStudioUserId } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
 type Ctx = { params: Promise<{ id: string }> }
@@ -14,24 +13,31 @@ type Ctx = { params: Promise<{ id: string }> }
 //   - notifyUserName: target user's full name (optional, denormalized for display)
 //   - projectNoteContent: optional override for the note content; default uses card title.
 //
-// DB strategy:
-//   - The KanbanCard + ProjectNote live in the studio DB (getCurrentStudioDb()).
-//   - The Notification is written to the DEFAULT db (lib/db.ts → custom.db), matching
-//     the existing /api/notifications route and lib/notify.ts helpers so the bell
-//     dropdown (which reads from custom.db) sees the notification.
+// ⚠️ SECURITY FIX: همه‌ی نوشته‌ها (Notification, ProjectNote) حالا در دیتابیس استودیوی
+// فعلی نوشته می‌شوند، نه دیتابیس پیش‌فرض. این از نشت داده بین استودیوها جلوگیری می‌کند.
 export async function POST(req: NextRequest, { params }: Ctx) {
+  // بررسی احراز هویت
   const role = await getCurrentRole()
+  if (!role) {
+    return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
+  }
   if (!["admin", "manager", "sales"].includes(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
+
   const studioDb = await getCurrentStudioDb()
   if (!studioDb) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
+
   const user = await getCurrentUser()
-  const userId = user?.userId ?? "demo:admin"
+  // شناسه کاربر فعلی در دیتابیس استودیو (با phone matching)
+  const currentStudioUserId = await getCurrentStudioUserId()
+  if (!currentStudioUserId) {
+    return NextResponse.json({ error: "کاربر در استودیو یافت نشد" }, { status: 403 })
+  }
 
   const { id } = await params
   const card = await studioDb.kanbanCard.findUnique({ where: { id } })
-  if (!card || card.userId !== userId) {
+  if (!card || card.userId !== currentStudioUserId) {
     return NextResponse.json({ error: "کارت یافت نشد" }, { status: 404 })
   }
 
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "گیرنده اعلان الزامی است" }, { status: 400 })
   }
 
-  // Resolve the target user's name from the studio DB if we don't have it.
+  // Resolve the target user's name from the studio DB.
   let notifyUserName = typeof body.notifyUserName === "string" ? body.notifyUserName.trim() : ""
   if (!notifyUserName) {
     const u = await studioDb.user.findUnique({
@@ -69,17 +75,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       ? body.projectNoteContent.trim()
       : `✅ کارت «${cardTitle}» تکمیل شد.`
 
-  // 1) Create a Notification for the target user (targeted).
-  //    Written to the DEFAULT db so the bell dropdown (which reads from default db)
-  //    sees it — matches notify.ts convention.
+  // 1) Create a Notification for the target user — در دیتابیس استودیوی فعلی
   try {
-    // Resolve the current user's display name (the completer) from the studio DB.
+    // نام نمایشی کاربر فعلی (تکمیل‌کننده) از دیتابیس استودیو
     let completerName = user?.name || "کاربر"
-    if (role) {
-      const me = await studioDb.user.findFirst({ where: { role }, select: { firstName: true, lastName: true } })
-      if (me) completerName = `${me.firstName} ${me.lastName}`.trim() || completerName
-    }
-    await defaultDb.notification.create({
+    const me = await studioDb.user.findUnique({
+      where: { id: currentStudioUserId },
+      select: { firstName: true, lastName: true },
+    })
+    if (me) completerName = `${me.firstName} ${me.lastName}`.trim() || completerName
+
+    await studioDb.notification.create({
       data: {
         type: "info",
         title: "کارت کانبان تکمیل شد",
@@ -93,11 +99,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     /* best-effort */
   }
 
-  // 2) If the card is linked to a project, also create a ProjectNote.
-  //    ProjectNotes live in the DEFAULT db (custom.db) — same as the projects +
-  //    projects/[id]/notes APIs — so the note shows up in the project's notes tab.
-  //    Supports both legacy single-link (`linkType:"project"`) and the multi-link
-  //    JSON shape (`linkType:"multi"`, `linkId` = JSON.stringify({customerId, projectId})).
+  // 2) If the card is linked to a project, also create a ProjectNote — در دیتابیس استودیو
   let linkedProjectId: string | null = null
   if (card.linkType === "project" && card.linkId) {
     linkedProjectId = card.linkId
@@ -113,20 +115,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
   if (linkedProjectId) {
     try {
-      const me = await defaultDb.user.findFirst({ where: { role }, select: { id: true } })
-      if (me) {
-        // Make sure the project exists in the default db (avoid FK error if stale link).
-        const project = await defaultDb.project.findUnique({ where: { id: linkedProjectId }, select: { id: true } })
-        if (project) {
-          await defaultDb.projectNote.create({
-            data: {
-              projectId: linkedProjectId,
-              authorId: me.id,
-              noteType: "text",
-              content: noteContent,
-            },
-          })
-        }
+      // Make sure the project exists in the studio db.
+      const project = await studioDb.project.findUnique({ where: { id: linkedProjectId }, select: { id: true } })
+      if (project) {
+        await studioDb.projectNote.create({
+          data: {
+            projectId: linkedProjectId,
+            authorId: currentStudioUserId,
+            noteType: "text",
+            content: noteContent,
+          },
+        })
       }
     } catch {
       /* best-effort */
@@ -142,4 +141,3 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     notifiedAt: updated.notifiedAt ? updated.notifiedAt.toISOString() : null,
   })
 }
-

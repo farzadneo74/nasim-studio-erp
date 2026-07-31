@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
-import type { Role } from "@/lib/constants"
-import { PrismaClient } from "@prisma/client"
+import { getCurrentRole, getCurrentStudioDb, getCurrentStudioUserId } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
 
 const VALID_TYPES = ["info", "payment_approval", "reminder", "sms"]
 
-async function getCurrentUserId(db: PrismaClient, role: Role): Promise<string | null> {
-  const u = await db.user.findFirst({ where: { role }, select: { id: true } })
-  return u?.id ?? null
-}
-
 // GET: list notifications for the current user + broadcast (userId IS NULL).
 // Newest first.
 export async function GET() {
   const role = await getCurrentRole()
+  if (!role) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await getCurrentUserId(db, role)
+
+  // ⚠️ SECURITY: استفاده از getCurrentStudioUserId که با phone matching کاربر واقعی رو پیدا می‌کنه
+  // (قبلاً findFirst({role}) بود که وقتی دو کاربر نقش یکسان داشتن، اشتباه پیدا می‌کرد)
+  const userId = await getCurrentStudioUserId()
 
   // If no user resolved (no seeded user for this role), still return broadcasts.
   const where = userId
@@ -50,15 +47,14 @@ export async function GET() {
 }
 
 // POST: create a notification (inter-member message).
-// Any role can send to any user. The current user is resolved by role → first
-// matching User; we store their id in the message metadata via title prefix
-// is not desired, so just create the notification for the recipient.
+// Any role can send to any user. The current user is resolved via phone matching.
 export async function POST(req: NextRequest) {
   const role = await getCurrentRole()
+  if (!role) return NextResponse.json({ error: "نشست معتبر نیست" }, { status: 401 })
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const senderId = await getCurrentUserId(db, role)
+  const senderId = await getCurrentStudioUserId()
 
   let body: Record<string, unknown>
   try {

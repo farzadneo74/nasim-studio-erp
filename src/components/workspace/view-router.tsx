@@ -23,6 +23,7 @@ const REGISTRY: Record<string, React.LazyExoticComponent<React.ComponentType>> =
   "settings-system": React.lazy(() => import("@/components/views/settings-system-view").then(m => ({ default: m.SettingsSystemView }))),
   "settings-custom-fields": React.lazy(() => import("@/components/views/settings-custom-fields-view").then(m => ({ default: m.SettingsCustomFieldsView }))),
   "settings-storage": React.lazy(() => import("@/components/views/storage-management-view").then(m => ({ default: m.StorageManagementView }))),
+  "super-admin": React.lazy(() => import("@/components/views/super-admin-view").then(m => ({ default: m.SuperAdminView }))),
 }
 
 export function ViewRouter() {

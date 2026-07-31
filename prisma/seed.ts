@@ -384,29 +384,29 @@ async function main() {
     status: "scheduled" | "running" | "managing" | "editing" | "qc" | "render" | "ready" | "delivered";
     startDays: number; endDays: number; deadlineDays: number; readyDays: number | null;
     strategy: "fixed" | "variable" | "delayed";
-    paid: number; fieldTeam: string[]; studioTeam: string[]; deliveryTeam: string[];
+    paid: number; fieldTeam: string[]; studioTeam: string[];
     desc: string; tasksDone: boolean;
     photoStatus?: string; videoStatus?: string;
   }
   const projects: ProjSeed[] = [
-    { id: "pr-1",  custId: "c-1",  pkgId: "p-wed-pre",   status: "delivered", startDays: -40, endDays: -40, deadlineDays: -15, readyDays: -25, strategy: "variable", paid: 920000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "عروسی بزرگ در هتل اسپیناس. پهپاد + ۴ دوربین.", tasksDone: true },
-    { id: "pr-2",  custId: "c-4",  pkgId: "p-wed-dlx",   status: "ready",     startDays: -20, endDays: -20, deadlineDays: 5,   readyDays: -8,  strategy: "fixed",    paid: 460000000, fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "عروسی در تالار وحدت. فقط عکاسی.", tasksDone: true },
-    { id: "pr-3",  custId: "c-3",  pkgId: "p-corporate", status: "editing",   startDays: -12, endDays: -11, deadlineDays: 10,  readyDays: null, strategy: "delayed",  paid: 360000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "فیلم برند آرشام. کارخانه + دفتر مرکزی.", tasksDone: false },
-    { id: "pr-4",  custId: "c-8",  pkgId: "p-wed-pre",   status: "running",   startDays: -1,  endDays: -1,  deadlineDays: 20,  readyDays: null, strategy: "variable", paid: 400000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "عروسی تارا و فرزان، هتل پارسیان آزادی.", tasksDone: false },
-    { id: "pr-5",  custId: "c-5",  pkgId: "p-event",     status: "scheduled", startDays: 3,   endDays: 3,   deadlineDays: 18,  readyDays: null, strategy: "variable", paid: 90000000,  fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "رویداد سالگرد کافه دوران.", tasksDone: false },
-    { id: "pr-6",  custId: "c-6",  pkgId: "p-family",    status: "qc",        startDays: -3,  endDays: -3,  deadlineDays: 2,   readyDays: null, strategy: "fixed",    paid: 38000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "جلسه خانواده کیانی در استودیو.", tasksDone: false },
-    { id: "pr-7",  custId: "c-2",  pkgId: "p-portrait",  status: "delivered", startDays: -60, endDays: -60, deadlineDays: -45, readyDays: -52, strategy: "fixed",    paid: 48000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "پورتره برند شخصی نگار.", tasksDone: true },
-    { id: "pr-8",  custId: "c-9",  pkgId: "p-corporate", status: "managing",  startDays: -5,  endDays: -5,  deadlineDays: 15,  readyDays: null, strategy: "delayed",  paid: 300000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "فیلم پروموشن کلینیک ستاره.", tasksDone: false },
-    { id: "pr-9",  custId: "c-7",  pkgId: "p-portrait",  status: "scheduled", startDays: 7,   endDays: 7,   deadlineDays: 21,  readyDays: null, strategy: "fixed",    paid: 0,         fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "بازسازی پورتره سوگل.", tasksDone: false },
-    { id: "pr-10", custId: "c-10", pkgId: "p-family",    status: "scheduled", startDays: 10,  endDays: 10,  deadlineDays: 24,  readyDays: null, strategy: "fixed",    paid: 0,         fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "جلسه خانواده غزینی.", tasksDone: false },
-    { id: "pr-11", custId: "c-11", pkgId: "p-wed-cinema",status: "render",    startDays: -25, endDays: -25, deadlineDays: -5,  readyDays: null, strategy: "delayed",  paid: 1100000000,fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "فیلم سینمایی ۴K عروسی نازنین و سپهر.", tasksDone: false },
-    { id: "pr-12", custId: "c-12", pkgId: "p-conference",status: "delivered", startDays: -50, endDays: -50, deadlineDays: -30, readyDays: -32, strategy: "delayed",  paid: 310000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "کنفرانس سالانه هتل اسپیناس.", tasksDone: true },
-    { id: "pr-13", custId: "c-13", pkgId: "p-portrait",  status: "editing",   startDays: -8,  endDays: -8,  deadlineDays: 7,   readyDays: null, strategy: "fixed",    paid: 30000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "پورتره فضای باز یزد.", tasksDone: false },
-    { id: "pr-14", custId: "c-15", pkgId: "p-product",   status: "ready",     startDays: -15, endDays: -15, deadlineDays: -1,  readyDays: -3,  strategy: "fixed",    paid: 60000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "عکاسی محصول مرکز خرید کوروش.", tasksDone: true },
-    { id: "pr-15", custId: "c-16", pkgId: "p-wed-dlx",   status: "running",   startDays: -2,  endDays: -2,  deadlineDays: 18,  readyDays: null, strategy: "fixed",    paid: 200000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "عروسی فرزانه و امیر، کرمانشاه.", tasksDone: false },
-    { id: "pr-16", custId: "c-14", pkgId: "p-family",    status: "delivered", startDays: -45, endDays: -45, deadlineDays: -30, readyDays: -35, strategy: "fixed",    paid: 38000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "جلسه خانواده مهدی.", tasksDone: true },
-    { id: "pr-17", custId: "c-17", pkgId: "p-music-video",status: "scheduled",startDays: 14,  endDays: 14,  deadlineDays: 35,  readyDays: null, strategy: "variable", paid: 100000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "موزیک ویدیو سپهر موحد.", tasksDone: false },
-    { id: "pr-18", custId: "c-18", pkgId: "p-corporate", status: "qc",        startDays: -6,  endDays: -6,  deadlineDays: 9,   readyDays: null, strategy: "delayed",  paid: 600000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], deliveryTeam: ["u-logistics"], desc: "فیلم برند آژانس پرشین.", tasksDone: false },
+    { id: "pr-1",  custId: "c-1",  pkgId: "p-wed-pre",   status: "delivered", startDays: -40, endDays: -40, deadlineDays: -15, readyDays: -25, strategy: "variable", paid: 920000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], desc: "عروسی بزرگ در هتل اسپیناس. پهپاد + ۴ دوربین.", tasksDone: true },
+    { id: "pr-2",  custId: "c-4",  pkgId: "p-wed-dlx",   status: "ready",     startDays: -20, endDays: -20, deadlineDays: 5,   readyDays: -8,  strategy: "fixed",    paid: 460000000, fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "عروسی در تالار وحدت. فقط عکاسی.", tasksDone: true },
+    { id: "pr-3",  custId: "c-3",  pkgId: "p-corporate", status: "editing",   startDays: -12, endDays: -11, deadlineDays: 10,  readyDays: null, strategy: "delayed",  paid: 360000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "فیلم برند آرشام. کارخانه + دفتر مرکزی.", tasksDone: false },
+    { id: "pr-4",  custId: "c-8",  pkgId: "p-wed-pre",   status: "running",   startDays: -1,  endDays: -1,  deadlineDays: 20,  readyDays: null, strategy: "variable", paid: 400000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], desc: "عروسی تارا و فرزان، هتل پارسیان آزادی.", tasksDone: false },
+    { id: "pr-5",  custId: "c-5",  pkgId: "p-event",     status: "scheduled", startDays: 3,   endDays: 3,   deadlineDays: 18,  readyDays: null, strategy: "variable", paid: 90000000,  fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "رویداد سالگرد کافه دوران.", tasksDone: false },
+    { id: "pr-6",  custId: "c-6",  pkgId: "p-family",    status: "qc",        startDays: -3,  endDays: -3,  deadlineDays: 2,   readyDays: null, strategy: "fixed",    paid: 38000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "جلسه خانواده کیانی در استودیو.", tasksDone: false },
+    { id: "pr-7",  custId: "c-2",  pkgId: "p-portrait",  status: "delivered", startDays: -60, endDays: -60, deadlineDays: -45, readyDays: -52, strategy: "fixed",    paid: 48000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "پورتره برند شخصی نگار.", tasksDone: true },
+    { id: "pr-8",  custId: "c-9",  pkgId: "p-corporate", status: "managing",  startDays: -5,  endDays: -5,  deadlineDays: 15,  readyDays: null, strategy: "delayed",  paid: 300000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "فیلم پروموشن کلینیک ستاره.", tasksDone: false },
+    { id: "pr-9",  custId: "c-7",  pkgId: "p-portrait",  status: "scheduled", startDays: 7,   endDays: 7,   deadlineDays: 21,  readyDays: null, strategy: "fixed",    paid: 0,         fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "بازسازی پورتره سوگل.", tasksDone: false },
+    { id: "pr-10", custId: "c-10", pkgId: "p-family",    status: "scheduled", startDays: 10,  endDays: 10,  deadlineDays: 24,  readyDays: null, strategy: "fixed",    paid: 0,         fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "جلسه خانواده غزینی.", tasksDone: false },
+    { id: "pr-11", custId: "c-11", pkgId: "p-wed-cinema",status: "render",    startDays: -25, endDays: -25, deadlineDays: -5,  readyDays: null, strategy: "delayed",  paid: 1100000000,fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], desc: "فیلم سینمایی ۴K عروسی نازنین و سپهر.", tasksDone: false },
+    { id: "pr-12", custId: "c-12", pkgId: "p-conference",status: "delivered", startDays: -50, endDays: -50, deadlineDays: -30, readyDays: -32, strategy: "delayed",  paid: 310000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "کنفرانس سالانه هتل اسپیناس.", tasksDone: true },
+    { id: "pr-13", custId: "c-13", pkgId: "p-portrait",  status: "editing",   startDays: -8,  endDays: -8,  deadlineDays: 7,   readyDays: null, strategy: "fixed",    paid: 30000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "پورتره فضای باز یزد.", tasksDone: false },
+    { id: "pr-14", custId: "c-15", pkgId: "p-product",   status: "ready",     startDays: -15, endDays: -15, deadlineDays: -1,  readyDays: -3,  strategy: "fixed",    paid: 60000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "عکاسی محصول مرکز خرید کوروش.", tasksDone: true },
+    { id: "pr-15", custId: "c-16", pkgId: "p-wed-dlx",   status: "running",   startDays: -2,  endDays: -2,  deadlineDays: 18,  readyDays: null, strategy: "fixed",    paid: 200000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "عروسی فرزانه و امیر، کرمانشاه.", tasksDone: false },
+    { id: "pr-16", custId: "c-14", pkgId: "p-family",    status: "delivered", startDays: -45, endDays: -45, deadlineDays: -30, readyDays: -35, strategy: "fixed",    paid: 38000000,  fieldTeam: ["u-photo"], studioTeam: ["u-editor"], desc: "جلسه خانواده مهدی.", tasksDone: true },
+    { id: "pr-17", custId: "c-17", pkgId: "p-music-video",status: "scheduled",startDays: 14,  endDays: 14,  deadlineDays: 35,  readyDays: null, strategy: "variable", paid: 100000000, fieldTeam: ["u-photo", "u-photo2"], studioTeam: ["u-editor"], desc: "موزیک ویدیو سپهر موحد.", tasksDone: false },
+    { id: "pr-18", custId: "c-18", pkgId: "p-corporate", status: "qc",        startDays: -6,  endDays: -6,  deadlineDays: 9,   readyDays: null, strategy: "delayed",  paid: 600000000, fieldTeam: ["u-photo2"], studioTeam: ["u-editor"], desc: "فیلم برند آژانس پرشین.", tasksDone: false },
   ]
 
   for (const ps of projects) {
@@ -457,7 +457,6 @@ async function main() {
         actualEndDatetime: actualEnd,
         fieldTeam: { connect: ps.fieldTeam.map((id) => ({ id })) },
         studioTeam: { connect: ps.studioTeam.map((id) => ({ id })) },
-        deliveryTeam: { connect: ps.deliveryTeam.map((id) => ({ id })) },
       },
     })
 
@@ -479,7 +478,7 @@ async function main() {
         else if (stage === "qc") { assigneeId = "u-qc"; startedAt = days(ps.endDays + 3); completedAt = i < stageIdx ? days(ps.endDays + 4) : null }
         else if (stage === "render") { assigneeId = ps.studioTeam[0]; startedAt = days(ps.endDays + 4); completedAt = i < stageIdx ? days(ps.endDays + 5) : null }
         else if (stage === "ready") { assigneeId = "u-qc"; startedAt = readyDate; completedAt = i < stageIdx ? days(ps.readyDays! + 1) : null }
-        else if (stage === "delivered") { assigneeId = ps.deliveryTeam[0]; startedAt = actualEnd; completedAt = actualEnd }
+        else if (stage === "delivered") { assigneeId = "u-sales"; startedAt = actualEnd; completedAt = actualEnd }
         if (assigneeId) {
           await db.projectWorkflow.upsert({
             where: { projectId_track_stage: { projectId: ps.id, track: "photo", stage } },
@@ -502,7 +501,7 @@ async function main() {
         else if (stage === "qc") { assigneeId = "u-qc"; startedAt = days(ps.endDays + 3); completedAt = i < stageIdx ? days(ps.endDays + 4) : null }
         else if (stage === "render") { assigneeId = ps.studioTeam[0]; startedAt = days(ps.endDays + 4); completedAt = i < stageIdx ? days(ps.endDays + 5) : null }
         else if (stage === "ready") { assigneeId = "u-qc"; startedAt = readyDate; completedAt = i < stageIdx ? days(ps.readyDays! + 1) : null }
-        else if (stage === "delivered") { assigneeId = ps.deliveryTeam[0]; startedAt = actualEnd; completedAt = actualEnd }
+        else if (stage === "delivered") { assigneeId = "u-sales"; startedAt = actualEnd; completedAt = actualEnd }
         if (assigneeId) {
           await db.projectWorkflow.upsert({
             where: { projectId_track_stage: { projectId: ps.id, track: "video", stage } },
@@ -574,7 +573,7 @@ async function main() {
           id: `task-${ps.id}-${i + 1}`,
           projectId: ps.id,
           title,
-          assignedToId: i < 3 ? ps.fieldTeam[0] : i < tasks.length - 1 ? ps.studioTeam[0] : ps.deliveryTeam[0],
+          assignedToId: i < 3 ? ps.fieldTeam[0] : i < tasks.length - 1 ? ps.studioTeam[0] : "u-sales",
           status: done ? "done" : isCurrent ? "in_progress" : "todo",
           deadline: days(ps.deadlineDays),
           order: i,
@@ -630,7 +629,7 @@ async function main() {
       const rule = salaryRules.find((r) => r.role === "logistics" && r.applyOn === "delivery")!
       const amt = Number(rule.commissionValue)
       await db.salaryRecord.create({
-        data: { id: `sr-${ps.id}-log`, userId: ps.deliveryTeam[0], projectId: ps.id, amount: amt, ruleUsedId: rule.id, isPaid: true, period: "1403-04" },
+        data: { id: `sr-${ps.id}-log`, userId: "u-logistics", projectId: ps.id, amount: amt, ruleUsedId: rule.id, isPaid: true, period: "1403-04" },
       })
     }
 

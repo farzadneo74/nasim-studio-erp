@@ -1,4 +1,15 @@
 // Master DB — multi-tenant SaaS control plane
+//
+// این دیتابیس فقط کنترل SaaS رو نگه می‌داره:
+//  - استودیوها (tenant ها)
+//  - کاربران مرکزی (شماره موبایل + رمز)
+//  - عضویت کاربران در استودیوها
+//  - نشست‌ها (session)
+//  - کدهای OTP
+//  - تنظیمات پلتفرم (master Kavenegar API key, plans, و غیره)
+//  - اشتراک هر استودیو (plan, expiry, limits)
+//  - شارژ SMS هر استودیو + تراکنش‌ها
+//  - کاربران super-admin (فرزاد و هر کس دیگه‌ای که owner هست)
 
 generator client {
   provider = "prisma-client-js"
@@ -10,19 +21,47 @@ datasource db {
   url      = "file:../db/master.db"
 }
 
+// ===================== STUDIOS (TENANTS) =====================
 model Studio {
-  id                String             @id @default(cuid())
+  id                String    @id @default(cuid())
   name              String
   nameEn            String?
-  dbName            String             @unique
-  isActive          Boolean            @default(true)
-  plan              String             @default("trial")
-  // Storage quota management (SaaS billing)
-  storageQuotaBytes BigInt             @default(1073741824) // 1 GB default quota
-  storageUsedBytes  BigInt             @default(0) // cached total (refreshed on upload/delete)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  memberships       StudioMembership[]
+  dbName            String    @unique
+  isActive          Boolean   @default(true)
+  // اشتراک (subscription)
+  plan              String    @default("trial") // "trial" | "basic" | "pro" | "enterprise" | "suspended"
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  // محدودیت‌های اشتراک (limits) — صفر یا منفی یعنی نامحدود
+  maxEmployees      Int       @default(5)
+  maxProjects       Int       @default(0) // 0 = unlimited
+  maxCustomers      Int       @default(0) // 0 = unlimited
+  maxStorageBytes   BigInt    @default(1073741824) // 1 GB default
+  // ذخیره‌سازی مصرف شده (cached total — refresh on upload/delete)
+  storageQuotaBytes BigInt    @default(1073741824)
+  storageUsedBytes  BigInt    @default(0)
+  // شماره موبایل استودیو (برای sender در Kavenegar)
+  studioPhone       String?
+  // اطلاعات تماس استودیو (برای پنل مدیریت)
+  ownerName         String?
+  ownerPhone        String?
+  city              String?
+  address           String?
+  notes             String?
+  // تنظیمات Kavenegar این استودیو (اگه child apikey داره)
+  kavenegarApikey   String? // child apikey (encrypted in production)
+  kavenegarSender   String? // شماره فرستنده اختصاصی
+  kavenegarLocalId  String? // شناسه داخلی در Kavenegar (معمولا = studio.id)
+  kavenegarStatus   String    @default("pending") // "pending" | "active" | "suspended" | "none"
+  // شارژ SMS (به Rial)
+  smsCreditRial     Int       @default(0)
+  // تاریخ ایجاد و آپدیت
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  memberships     StudioMembership[]
+  smsTransactions SmsTransaction[]
+  subscriptions   SubscriptionEvent[]
 }
 
 model MasterUser {
@@ -30,6 +69,8 @@ model MasterUser {
   phone        String             @unique
   passwordHash String?
   name         String
+  // super-admin flag — فقط فرزاد (و هر کس دیگه‌ای که owner پلتفرم باشه) true است
+  isSuperAdmin Boolean            @default(false)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   memberships  StudioMembership[]
@@ -42,7 +83,7 @@ model StudioMembership {
   user      MasterUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   studioId  String
   studio    Studio     @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  role      String
+  role      String // admin | manager | sales | photographer | videographer | pro_crew | editor | film_editor
   isActive  Boolean    @default(true)
   createdAt DateTime   @default(now())
 
@@ -71,4 +112,63 @@ model Session {
   role      String?
   expiresAt DateTime
   createdAt DateTime   @default(now())
+}
+
+// ===================== SMS TRANSACTIONS (شمارژ و مصرف SMS) =====================
+model SmsTransaction {
+  id                 String   @id @default(cuid())
+  studioId           String
+  studio             Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  // نوع تراکنش: charge (افزایش شارژ) | send (مصرف برای ارسال) | refund (بازگشت) | adjustment (تنظیم دستی)
+  type               String // "charge" | "send" | "refund" | "adjustment"
+  // مبلغ به Rial (مثبت = افزایش شارژ، منفی = مصرف)
+  amountRial         Int
+  // برای تراکنش‌های ارسال: شماره گیرنده + متن پیام (کوتاه شده)
+  receptor           String?
+  messageSnippet     String? // 100 کاراکتر اول
+  // برای تراکنش‌های شارژ: توضیحات (مثلاً "شارژ ماهانه آبان")
+  description        String?
+  // شناسه پیام در Kavenegar (برای tracking)
+  kavenegarMessageId String?
+  // وضعیت: pending | sent | delivered | failed | refunded
+  status             String   @default("pending")
+  // تاریخ
+  createdAt          DateTime @default(now())
+
+  @@index([studioId, createdAt])
+}
+
+// ===================== SUBSCRIPTION EVENTS (تاریخچه اشتراک) =====================
+// هر بار که اشتراک استودیو تغییر می‌کنه (upgrade/downgrade/renew/suspend)، یه رکورد اینجا ثبت می‌شه
+model SubscriptionEvent {
+  id              String    @id @default(cuid())
+  studioId        String
+  studio          Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  // نوع رویداد: create | upgrade | downgrade | renew | suspend | reactivate | cancel
+  eventType       String
+  // plan قبلی و جدید
+  fromPlan        String?
+  toPlan          String
+  // مبلغ پرداختی (به Toman — برای گزارش‌های مالی)
+  amountPaidToman Int?
+  // مدت (روز)
+  durationDays    Int?
+  // تاریخ شروع و پایان اشتراک جدید
+  startAt         DateTime?
+  endAt           DateTime?
+  // توضیحات
+  note            String?
+  // تاریخ ثبت رویداد
+  createdAt       DateTime  @default(now())
+
+  @@index([studioId, createdAt])
+}
+
+// ===================== PLATFORM SETTINGS (تنظیمات پلتفرم) =====================
+// ذخیره تنظیمات سراسری پلتفرم (master Kavenegar API key, default plan, و غیره)
+// به صورت key-value (مثل SystemSetting در studio DB)
+model PlatformSetting {
+  key       String   @id
+  value     String   @default("")
+  updatedAt DateTime @updatedAt
 }

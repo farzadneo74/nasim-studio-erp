@@ -28,6 +28,7 @@ import {
   MessagesSquare,
   HardDrive,
   Image as ImageIcon,
+  ShieldCheck,
 } from "lucide-react"
 import { useWorkspace, PageId } from "@/stores/workspace"
 import { ROLE_LABELS, Role, ROLES, hasPermission } from "@/lib/constants"
@@ -44,6 +45,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useStudioName } from "@/lib/api/use-studio-name"
 import { useAuth } from "@/lib/auth-context"
+import { useIsSuperAdmin } from "@/lib/hooks/use-is-super-admin"
 
 interface NavItem {
   id: PageId
@@ -179,6 +181,7 @@ export function Sidebar({ onQuickSearch }: { onQuickSearch?: () => void }) {
   } = useWorkspace()
   const studioName = useStudioName()
   const { user, currentRole, logout, refresh } = useAuth()
+  const { data: isSuperAdmin } = useIsSuperAdmin()
 
   const effectiveRole = (currentRole ?? role) as Role
   const initials = (user?.name ?? "کاربر").slice(0, 2)
@@ -246,6 +249,23 @@ export function Sidebar({ onQuickSearch }: { onQuickSearch?: () => void }) {
 
         {/* Nav sections */}
         <nav className="flex-1 overflow-y-auto scroll-thin px-2 pb-4">
+          {isSuperAdmin && (
+            <div className="mb-1 border-b border-sidebar-border/30 pb-1">
+              <a
+                href="/admin"
+                className={cn(
+                  "group flex w-full items-center gap-2.5 rounded-md border-r-2 border-transparent px-2 py-[7px] text-[13px] font-normal transition-colors",
+                  "text-sidebar-foreground/80 hover:bg-rose-50 dark:hover:bg-rose-950/15"
+                )}
+              >
+                <ShieldCheck className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>پنل مدیر پلتفرم</span>
+                <span className="mr-auto rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                  /admin
+                </span>
+              </a>
+            </div>
+          )}
           {SECTIONS.map((section, si) => {
             const items = section.items.filter((it) => itemAllowed(it.id, effectiveRole))
             if (items.length === 0) return null

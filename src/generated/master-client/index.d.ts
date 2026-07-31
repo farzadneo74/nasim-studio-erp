@@ -38,6 +38,21 @@ export type OtpCode = $Result.DefaultSelection<Prisma.$OtpCodePayload>
  * 
  */
 export type Session = $Result.DefaultSelection<Prisma.$SessionPayload>
+/**
+ * Model SmsTransaction
+ * 
+ */
+export type SmsTransaction = $Result.DefaultSelection<Prisma.$SmsTransactionPayload>
+/**
+ * Model SubscriptionEvent
+ * 
+ */
+export type SubscriptionEvent = $Result.DefaultSelection<Prisma.$SubscriptionEventPayload>
+/**
+ * Model PlatformSetting
+ * 
+ */
+export type PlatformSetting = $Result.DefaultSelection<Prisma.$PlatformSettingPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -206,6 +221,36 @@ export class PrismaClient<
     * ```
     */
   get session(): Prisma.SessionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.smsTransaction`: Exposes CRUD operations for the **SmsTransaction** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SmsTransactions
+    * const smsTransactions = await prisma.smsTransaction.findMany()
+    * ```
+    */
+  get smsTransaction(): Prisma.SmsTransactionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.subscriptionEvent`: Exposes CRUD operations for the **SubscriptionEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SubscriptionEvents
+    * const subscriptionEvents = await prisma.subscriptionEvent.findMany()
+    * ```
+    */
+  get subscriptionEvent(): Prisma.SubscriptionEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.platformSetting`: Exposes CRUD operations for the **PlatformSetting** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PlatformSettings
+    * const platformSettings = await prisma.platformSetting.findMany()
+    * ```
+    */
+  get platformSetting(): Prisma.PlatformSettingDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -651,7 +696,10 @@ export namespace Prisma {
     MasterUser: 'MasterUser',
     StudioMembership: 'StudioMembership',
     OtpCode: 'OtpCode',
-    Session: 'Session'
+    Session: 'Session',
+    SmsTransaction: 'SmsTransaction',
+    SubscriptionEvent: 'SubscriptionEvent',
+    PlatformSetting: 'PlatformSetting'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -670,7 +718,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "studio" | "masterUser" | "studioMembership" | "otpCode" | "session"
+      modelProps: "studio" | "masterUser" | "studioMembership" | "otpCode" | "session" | "smsTransaction" | "subscriptionEvent" | "platformSetting"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1044,6 +1092,228 @@ export namespace Prisma {
           }
         }
       }
+      SmsTransaction: {
+        payload: Prisma.$SmsTransactionPayload<ExtArgs>
+        fields: Prisma.SmsTransactionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SmsTransactionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SmsTransactionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          findFirst: {
+            args: Prisma.SmsTransactionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SmsTransactionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          findMany: {
+            args: Prisma.SmsTransactionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>[]
+          }
+          create: {
+            args: Prisma.SmsTransactionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          createMany: {
+            args: Prisma.SmsTransactionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SmsTransactionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>[]
+          }
+          delete: {
+            args: Prisma.SmsTransactionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          update: {
+            args: Prisma.SmsTransactionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          deleteMany: {
+            args: Prisma.SmsTransactionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SmsTransactionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SmsTransactionUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>[]
+          }
+          upsert: {
+            args: Prisma.SmsTransactionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SmsTransactionPayload>
+          }
+          aggregate: {
+            args: Prisma.SmsTransactionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSmsTransaction>
+          }
+          groupBy: {
+            args: Prisma.SmsTransactionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SmsTransactionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SmsTransactionCountArgs<ExtArgs>
+            result: $Utils.Optional<SmsTransactionCountAggregateOutputType> | number
+          }
+        }
+      }
+      SubscriptionEvent: {
+        payload: Prisma.$SubscriptionEventPayload<ExtArgs>
+        fields: Prisma.SubscriptionEventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SubscriptionEventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SubscriptionEventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          findFirst: {
+            args: Prisma.SubscriptionEventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SubscriptionEventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          findMany: {
+            args: Prisma.SubscriptionEventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>[]
+          }
+          create: {
+            args: Prisma.SubscriptionEventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          createMany: {
+            args: Prisma.SubscriptionEventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SubscriptionEventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>[]
+          }
+          delete: {
+            args: Prisma.SubscriptionEventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          update: {
+            args: Prisma.SubscriptionEventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          deleteMany: {
+            args: Prisma.SubscriptionEventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SubscriptionEventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SubscriptionEventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>[]
+          }
+          upsert: {
+            args: Prisma.SubscriptionEventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SubscriptionEventPayload>
+          }
+          aggregate: {
+            args: Prisma.SubscriptionEventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSubscriptionEvent>
+          }
+          groupBy: {
+            args: Prisma.SubscriptionEventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SubscriptionEventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SubscriptionEventCountArgs<ExtArgs>
+            result: $Utils.Optional<SubscriptionEventCountAggregateOutputType> | number
+          }
+        }
+      }
+      PlatformSetting: {
+        payload: Prisma.$PlatformSettingPayload<ExtArgs>
+        fields: Prisma.PlatformSettingFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PlatformSettingFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PlatformSettingFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          findFirst: {
+            args: Prisma.PlatformSettingFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PlatformSettingFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          findMany: {
+            args: Prisma.PlatformSettingFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>[]
+          }
+          create: {
+            args: Prisma.PlatformSettingCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          createMany: {
+            args: Prisma.PlatformSettingCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PlatformSettingCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>[]
+          }
+          delete: {
+            args: Prisma.PlatformSettingDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          update: {
+            args: Prisma.PlatformSettingUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          deleteMany: {
+            args: Prisma.PlatformSettingDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PlatformSettingUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.PlatformSettingUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>[]
+          }
+          upsert: {
+            args: Prisma.PlatformSettingUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlatformSettingPayload>
+          }
+          aggregate: {
+            args: Prisma.PlatformSettingAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePlatformSetting>
+          }
+          groupBy: {
+            args: Prisma.PlatformSettingGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PlatformSettingGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PlatformSettingCountArgs<ExtArgs>
+            result: $Utils.Optional<PlatformSettingCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1145,6 +1415,9 @@ export namespace Prisma {
     studioMembership?: StudioMembershipOmit
     otpCode?: OtpCodeOmit
     session?: SessionOmit
+    smsTransaction?: SmsTransactionOmit
+    subscriptionEvent?: SubscriptionEventOmit
+    platformSetting?: PlatformSettingOmit
   }
 
   /* Types for Logging */
@@ -1226,10 +1499,14 @@ export namespace Prisma {
 
   export type StudioCountOutputType = {
     memberships: number
+    smsTransactions: number
+    subscriptions: number
   }
 
   export type StudioCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     memberships?: boolean | StudioCountOutputTypeCountMembershipsArgs
+    smsTransactions?: boolean | StudioCountOutputTypeCountSmsTransactionsArgs
+    subscriptions?: boolean | StudioCountOutputTypeCountSubscriptionsArgs
   }
 
   // Custom InputTypes
@@ -1248,6 +1525,20 @@ export namespace Prisma {
    */
   export type StudioCountOutputTypeCountMembershipsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: StudioMembershipWhereInput
+  }
+
+  /**
+   * StudioCountOutputType without action
+   */
+  export type StudioCountOutputTypeCountSmsTransactionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SmsTransactionWhereInput
+  }
+
+  /**
+   * StudioCountOutputType without action
+   */
+  export type StudioCountOutputTypeCountSubscriptionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SubscriptionEventWhereInput
   }
 
 
@@ -1308,13 +1599,23 @@ export namespace Prisma {
   }
 
   export type StudioAvgAggregateOutputType = {
+    maxEmployees: number | null
+    maxProjects: number | null
+    maxCustomers: number | null
+    maxStorageBytes: number | null
     storageQuotaBytes: number | null
     storageUsedBytes: number | null
+    smsCreditRial: number | null
   }
 
   export type StudioSumAggregateOutputType = {
+    maxEmployees: number | null
+    maxProjects: number | null
+    maxCustomers: number | null
+    maxStorageBytes: bigint | null
     storageQuotaBytes: bigint | null
     storageUsedBytes: bigint | null
+    smsCreditRial: number | null
   }
 
   export type StudioMinAggregateOutputType = {
@@ -1324,8 +1625,25 @@ export namespace Prisma {
     dbName: string | null
     isActive: boolean | null
     plan: string | null
+    subscriptionStart: Date | null
+    subscriptionEnd: Date | null
+    maxEmployees: number | null
+    maxProjects: number | null
+    maxCustomers: number | null
+    maxStorageBytes: bigint | null
     storageQuotaBytes: bigint | null
     storageUsedBytes: bigint | null
+    studioPhone: string | null
+    ownerName: string | null
+    ownerPhone: string | null
+    city: string | null
+    address: string | null
+    notes: string | null
+    kavenegarApikey: string | null
+    kavenegarSender: string | null
+    kavenegarLocalId: string | null
+    kavenegarStatus: string | null
+    smsCreditRial: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1337,8 +1655,25 @@ export namespace Prisma {
     dbName: string | null
     isActive: boolean | null
     plan: string | null
+    subscriptionStart: Date | null
+    subscriptionEnd: Date | null
+    maxEmployees: number | null
+    maxProjects: number | null
+    maxCustomers: number | null
+    maxStorageBytes: bigint | null
     storageQuotaBytes: bigint | null
     storageUsedBytes: bigint | null
+    studioPhone: string | null
+    ownerName: string | null
+    ownerPhone: string | null
+    city: string | null
+    address: string | null
+    notes: string | null
+    kavenegarApikey: string | null
+    kavenegarSender: string | null
+    kavenegarLocalId: string | null
+    kavenegarStatus: string | null
+    smsCreditRial: number | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1350,8 +1685,25 @@ export namespace Prisma {
     dbName: number
     isActive: number
     plan: number
+    subscriptionStart: number
+    subscriptionEnd: number
+    maxEmployees: number
+    maxProjects: number
+    maxCustomers: number
+    maxStorageBytes: number
     storageQuotaBytes: number
     storageUsedBytes: number
+    studioPhone: number
+    ownerName: number
+    ownerPhone: number
+    city: number
+    address: number
+    notes: number
+    kavenegarApikey: number
+    kavenegarSender: number
+    kavenegarLocalId: number
+    kavenegarStatus: number
+    smsCreditRial: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -1359,13 +1711,23 @@ export namespace Prisma {
 
 
   export type StudioAvgAggregateInputType = {
+    maxEmployees?: true
+    maxProjects?: true
+    maxCustomers?: true
+    maxStorageBytes?: true
     storageQuotaBytes?: true
     storageUsedBytes?: true
+    smsCreditRial?: true
   }
 
   export type StudioSumAggregateInputType = {
+    maxEmployees?: true
+    maxProjects?: true
+    maxCustomers?: true
+    maxStorageBytes?: true
     storageQuotaBytes?: true
     storageUsedBytes?: true
+    smsCreditRial?: true
   }
 
   export type StudioMinAggregateInputType = {
@@ -1375,8 +1737,25 @@ export namespace Prisma {
     dbName?: true
     isActive?: true
     plan?: true
+    subscriptionStart?: true
+    subscriptionEnd?: true
+    maxEmployees?: true
+    maxProjects?: true
+    maxCustomers?: true
+    maxStorageBytes?: true
     storageQuotaBytes?: true
     storageUsedBytes?: true
+    studioPhone?: true
+    ownerName?: true
+    ownerPhone?: true
+    city?: true
+    address?: true
+    notes?: true
+    kavenegarApikey?: true
+    kavenegarSender?: true
+    kavenegarLocalId?: true
+    kavenegarStatus?: true
+    smsCreditRial?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1388,8 +1767,25 @@ export namespace Prisma {
     dbName?: true
     isActive?: true
     plan?: true
+    subscriptionStart?: true
+    subscriptionEnd?: true
+    maxEmployees?: true
+    maxProjects?: true
+    maxCustomers?: true
+    maxStorageBytes?: true
     storageQuotaBytes?: true
     storageUsedBytes?: true
+    studioPhone?: true
+    ownerName?: true
+    ownerPhone?: true
+    city?: true
+    address?: true
+    notes?: true
+    kavenegarApikey?: true
+    kavenegarSender?: true
+    kavenegarLocalId?: true
+    kavenegarStatus?: true
+    smsCreditRial?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1401,8 +1797,25 @@ export namespace Prisma {
     dbName?: true
     isActive?: true
     plan?: true
+    subscriptionStart?: true
+    subscriptionEnd?: true
+    maxEmployees?: true
+    maxProjects?: true
+    maxCustomers?: true
+    maxStorageBytes?: true
     storageQuotaBytes?: true
     storageUsedBytes?: true
+    studioPhone?: true
+    ownerName?: true
+    ownerPhone?: true
+    city?: true
+    address?: true
+    notes?: true
+    kavenegarApikey?: true
+    kavenegarSender?: true
+    kavenegarLocalId?: true
+    kavenegarStatus?: true
+    smsCreditRial?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -1501,8 +1914,25 @@ export namespace Prisma {
     dbName: string
     isActive: boolean
     plan: string
+    subscriptionStart: Date | null
+    subscriptionEnd: Date | null
+    maxEmployees: number
+    maxProjects: number
+    maxCustomers: number
+    maxStorageBytes: bigint
     storageQuotaBytes: bigint
     storageUsedBytes: bigint
+    studioPhone: string | null
+    ownerName: string | null
+    ownerPhone: string | null
+    city: string | null
+    address: string | null
+    notes: string | null
+    kavenegarApikey: string | null
+    kavenegarSender: string | null
+    kavenegarLocalId: string | null
+    kavenegarStatus: string
+    smsCreditRial: number
     createdAt: Date
     updatedAt: Date
     _count: StudioCountAggregateOutputType | null
@@ -1533,11 +1963,30 @@ export namespace Prisma {
     dbName?: boolean
     isActive?: boolean
     plan?: boolean
+    subscriptionStart?: boolean
+    subscriptionEnd?: boolean
+    maxEmployees?: boolean
+    maxProjects?: boolean
+    maxCustomers?: boolean
+    maxStorageBytes?: boolean
     storageQuotaBytes?: boolean
     storageUsedBytes?: boolean
+    studioPhone?: boolean
+    ownerName?: boolean
+    ownerPhone?: boolean
+    city?: boolean
+    address?: boolean
+    notes?: boolean
+    kavenegarApikey?: boolean
+    kavenegarSender?: boolean
+    kavenegarLocalId?: boolean
+    kavenegarStatus?: boolean
+    smsCreditRial?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     memberships?: boolean | Studio$membershipsArgs<ExtArgs>
+    smsTransactions?: boolean | Studio$smsTransactionsArgs<ExtArgs>
+    subscriptions?: boolean | Studio$subscriptionsArgs<ExtArgs>
     _count?: boolean | StudioCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["studio"]>
 
@@ -1548,8 +1997,25 @@ export namespace Prisma {
     dbName?: boolean
     isActive?: boolean
     plan?: boolean
+    subscriptionStart?: boolean
+    subscriptionEnd?: boolean
+    maxEmployees?: boolean
+    maxProjects?: boolean
+    maxCustomers?: boolean
+    maxStorageBytes?: boolean
     storageQuotaBytes?: boolean
     storageUsedBytes?: boolean
+    studioPhone?: boolean
+    ownerName?: boolean
+    ownerPhone?: boolean
+    city?: boolean
+    address?: boolean
+    notes?: boolean
+    kavenegarApikey?: boolean
+    kavenegarSender?: boolean
+    kavenegarLocalId?: boolean
+    kavenegarStatus?: boolean
+    smsCreditRial?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["studio"]>
@@ -1561,8 +2027,25 @@ export namespace Prisma {
     dbName?: boolean
     isActive?: boolean
     plan?: boolean
+    subscriptionStart?: boolean
+    subscriptionEnd?: boolean
+    maxEmployees?: boolean
+    maxProjects?: boolean
+    maxCustomers?: boolean
+    maxStorageBytes?: boolean
     storageQuotaBytes?: boolean
     storageUsedBytes?: boolean
+    studioPhone?: boolean
+    ownerName?: boolean
+    ownerPhone?: boolean
+    city?: boolean
+    address?: boolean
+    notes?: boolean
+    kavenegarApikey?: boolean
+    kavenegarSender?: boolean
+    kavenegarLocalId?: boolean
+    kavenegarStatus?: boolean
+    smsCreditRial?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["studio"]>
@@ -1574,15 +2057,34 @@ export namespace Prisma {
     dbName?: boolean
     isActive?: boolean
     plan?: boolean
+    subscriptionStart?: boolean
+    subscriptionEnd?: boolean
+    maxEmployees?: boolean
+    maxProjects?: boolean
+    maxCustomers?: boolean
+    maxStorageBytes?: boolean
     storageQuotaBytes?: boolean
     storageUsedBytes?: boolean
+    studioPhone?: boolean
+    ownerName?: boolean
+    ownerPhone?: boolean
+    city?: boolean
+    address?: boolean
+    notes?: boolean
+    kavenegarApikey?: boolean
+    kavenegarSender?: boolean
+    kavenegarLocalId?: boolean
+    kavenegarStatus?: boolean
+    smsCreditRial?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type StudioOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "nameEn" | "dbName" | "isActive" | "plan" | "storageQuotaBytes" | "storageUsedBytes" | "createdAt" | "updatedAt", ExtArgs["result"]["studio"]>
+  export type StudioOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "nameEn" | "dbName" | "isActive" | "plan" | "subscriptionStart" | "subscriptionEnd" | "maxEmployees" | "maxProjects" | "maxCustomers" | "maxStorageBytes" | "storageQuotaBytes" | "storageUsedBytes" | "studioPhone" | "ownerName" | "ownerPhone" | "city" | "address" | "notes" | "kavenegarApikey" | "kavenegarSender" | "kavenegarLocalId" | "kavenegarStatus" | "smsCreditRial" | "createdAt" | "updatedAt", ExtArgs["result"]["studio"]>
   export type StudioInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     memberships?: boolean | Studio$membershipsArgs<ExtArgs>
+    smsTransactions?: boolean | Studio$smsTransactionsArgs<ExtArgs>
+    subscriptions?: boolean | Studio$subscriptionsArgs<ExtArgs>
     _count?: boolean | StudioCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type StudioIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1592,6 +2094,8 @@ export namespace Prisma {
     name: "Studio"
     objects: {
       memberships: Prisma.$StudioMembershipPayload<ExtArgs>[]
+      smsTransactions: Prisma.$SmsTransactionPayload<ExtArgs>[]
+      subscriptions: Prisma.$SubscriptionEventPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -1600,8 +2104,25 @@ export namespace Prisma {
       dbName: string
       isActive: boolean
       plan: string
+      subscriptionStart: Date | null
+      subscriptionEnd: Date | null
+      maxEmployees: number
+      maxProjects: number
+      maxCustomers: number
+      maxStorageBytes: bigint
       storageQuotaBytes: bigint
       storageUsedBytes: bigint
+      studioPhone: string | null
+      ownerName: string | null
+      ownerPhone: string | null
+      city: string | null
+      address: string | null
+      notes: string | null
+      kavenegarApikey: string | null
+      kavenegarSender: string | null
+      kavenegarLocalId: string | null
+      kavenegarStatus: string
+      smsCreditRial: number
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["studio"]>
@@ -1999,6 +2520,8 @@ export namespace Prisma {
   export interface Prisma__StudioClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     memberships<T extends Studio$membershipsArgs<ExtArgs> = {}>(args?: Subset<T, Studio$membershipsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioMembershipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    smsTransactions<T extends Studio$smsTransactionsArgs<ExtArgs> = {}>(args?: Subset<T, Studio$smsTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    subscriptions<T extends Studio$subscriptionsArgs<ExtArgs> = {}>(args?: Subset<T, Studio$subscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2034,8 +2557,25 @@ export namespace Prisma {
     readonly dbName: FieldRef<"Studio", 'String'>
     readonly isActive: FieldRef<"Studio", 'Boolean'>
     readonly plan: FieldRef<"Studio", 'String'>
+    readonly subscriptionStart: FieldRef<"Studio", 'DateTime'>
+    readonly subscriptionEnd: FieldRef<"Studio", 'DateTime'>
+    readonly maxEmployees: FieldRef<"Studio", 'Int'>
+    readonly maxProjects: FieldRef<"Studio", 'Int'>
+    readonly maxCustomers: FieldRef<"Studio", 'Int'>
+    readonly maxStorageBytes: FieldRef<"Studio", 'BigInt'>
     readonly storageQuotaBytes: FieldRef<"Studio", 'BigInt'>
     readonly storageUsedBytes: FieldRef<"Studio", 'BigInt'>
+    readonly studioPhone: FieldRef<"Studio", 'String'>
+    readonly ownerName: FieldRef<"Studio", 'String'>
+    readonly ownerPhone: FieldRef<"Studio", 'String'>
+    readonly city: FieldRef<"Studio", 'String'>
+    readonly address: FieldRef<"Studio", 'String'>
+    readonly notes: FieldRef<"Studio", 'String'>
+    readonly kavenegarApikey: FieldRef<"Studio", 'String'>
+    readonly kavenegarSender: FieldRef<"Studio", 'String'>
+    readonly kavenegarLocalId: FieldRef<"Studio", 'String'>
+    readonly kavenegarStatus: FieldRef<"Studio", 'String'>
+    readonly smsCreditRial: FieldRef<"Studio", 'Int'>
     readonly createdAt: FieldRef<"Studio", 'DateTime'>
     readonly updatedAt: FieldRef<"Studio", 'DateTime'>
   }
@@ -2448,6 +2988,54 @@ export namespace Prisma {
   }
 
   /**
+   * Studio.smsTransactions
+   */
+  export type Studio$smsTransactionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    where?: SmsTransactionWhereInput
+    orderBy?: SmsTransactionOrderByWithRelationInput | SmsTransactionOrderByWithRelationInput[]
+    cursor?: SmsTransactionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SmsTransactionScalarFieldEnum | SmsTransactionScalarFieldEnum[]
+  }
+
+  /**
+   * Studio.subscriptions
+   */
+  export type Studio$subscriptionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    where?: SubscriptionEventWhereInput
+    orderBy?: SubscriptionEventOrderByWithRelationInput | SubscriptionEventOrderByWithRelationInput[]
+    cursor?: SubscriptionEventWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SubscriptionEventScalarFieldEnum | SubscriptionEventScalarFieldEnum[]
+  }
+
+  /**
    * Studio without action
    */
   export type StudioDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2481,6 +3069,7 @@ export namespace Prisma {
     phone: string | null
     passwordHash: string | null
     name: string | null
+    isSuperAdmin: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -2490,6 +3079,7 @@ export namespace Prisma {
     phone: string | null
     passwordHash: string | null
     name: string | null
+    isSuperAdmin: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -2499,6 +3089,7 @@ export namespace Prisma {
     phone: number
     passwordHash: number
     name: number
+    isSuperAdmin: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -2510,6 +3101,7 @@ export namespace Prisma {
     phone?: true
     passwordHash?: true
     name?: true
+    isSuperAdmin?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -2519,6 +3111,7 @@ export namespace Prisma {
     phone?: true
     passwordHash?: true
     name?: true
+    isSuperAdmin?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -2528,6 +3121,7 @@ export namespace Prisma {
     phone?: true
     passwordHash?: true
     name?: true
+    isSuperAdmin?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -2610,6 +3204,7 @@ export namespace Prisma {
     phone: string
     passwordHash: string | null
     name: string
+    isSuperAdmin: boolean
     createdAt: Date
     updatedAt: Date
     _count: MasterUserCountAggregateOutputType | null
@@ -2636,6 +3231,7 @@ export namespace Prisma {
     phone?: boolean
     passwordHash?: boolean
     name?: boolean
+    isSuperAdmin?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     memberships?: boolean | MasterUser$membershipsArgs<ExtArgs>
@@ -2648,6 +3244,7 @@ export namespace Prisma {
     phone?: boolean
     passwordHash?: boolean
     name?: boolean
+    isSuperAdmin?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["masterUser"]>
@@ -2657,6 +3254,7 @@ export namespace Prisma {
     phone?: boolean
     passwordHash?: boolean
     name?: boolean
+    isSuperAdmin?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["masterUser"]>
@@ -2666,11 +3264,12 @@ export namespace Prisma {
     phone?: boolean
     passwordHash?: boolean
     name?: boolean
+    isSuperAdmin?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type MasterUserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phone" | "passwordHash" | "name" | "createdAt" | "updatedAt", ExtArgs["result"]["masterUser"]>
+  export type MasterUserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phone" | "passwordHash" | "name" | "isSuperAdmin" | "createdAt" | "updatedAt", ExtArgs["result"]["masterUser"]>
   export type MasterUserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     memberships?: boolean | MasterUser$membershipsArgs<ExtArgs>
     sessions?: boolean | MasterUser$sessionsArgs<ExtArgs>
@@ -2690,6 +3289,7 @@ export namespace Prisma {
       phone: string
       passwordHash: string | null
       name: string
+      isSuperAdmin: boolean
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["masterUser"]>
@@ -3121,6 +3721,7 @@ export namespace Prisma {
     readonly phone: FieldRef<"MasterUser", 'String'>
     readonly passwordHash: FieldRef<"MasterUser", 'String'>
     readonly name: FieldRef<"MasterUser", 'String'>
+    readonly isSuperAdmin: FieldRef<"MasterUser", 'Boolean'>
     readonly createdAt: FieldRef<"MasterUser", 'DateTime'>
     readonly updatedAt: FieldRef<"MasterUser", 'DateTime'>
   }
@@ -6801,6 +7402,3300 @@ export namespace Prisma {
 
 
   /**
+   * Model SmsTransaction
+   */
+
+  export type AggregateSmsTransaction = {
+    _count: SmsTransactionCountAggregateOutputType | null
+    _avg: SmsTransactionAvgAggregateOutputType | null
+    _sum: SmsTransactionSumAggregateOutputType | null
+    _min: SmsTransactionMinAggregateOutputType | null
+    _max: SmsTransactionMaxAggregateOutputType | null
+  }
+
+  export type SmsTransactionAvgAggregateOutputType = {
+    amountRial: number | null
+  }
+
+  export type SmsTransactionSumAggregateOutputType = {
+    amountRial: number | null
+  }
+
+  export type SmsTransactionMinAggregateOutputType = {
+    id: string | null
+    studioId: string | null
+    type: string | null
+    amountRial: number | null
+    receptor: string | null
+    messageSnippet: string | null
+    description: string | null
+    kavenegarMessageId: string | null
+    status: string | null
+    createdAt: Date | null
+  }
+
+  export type SmsTransactionMaxAggregateOutputType = {
+    id: string | null
+    studioId: string | null
+    type: string | null
+    amountRial: number | null
+    receptor: string | null
+    messageSnippet: string | null
+    description: string | null
+    kavenegarMessageId: string | null
+    status: string | null
+    createdAt: Date | null
+  }
+
+  export type SmsTransactionCountAggregateOutputType = {
+    id: number
+    studioId: number
+    type: number
+    amountRial: number
+    receptor: number
+    messageSnippet: number
+    description: number
+    kavenegarMessageId: number
+    status: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type SmsTransactionAvgAggregateInputType = {
+    amountRial?: true
+  }
+
+  export type SmsTransactionSumAggregateInputType = {
+    amountRial?: true
+  }
+
+  export type SmsTransactionMinAggregateInputType = {
+    id?: true
+    studioId?: true
+    type?: true
+    amountRial?: true
+    receptor?: true
+    messageSnippet?: true
+    description?: true
+    kavenegarMessageId?: true
+    status?: true
+    createdAt?: true
+  }
+
+  export type SmsTransactionMaxAggregateInputType = {
+    id?: true
+    studioId?: true
+    type?: true
+    amountRial?: true
+    receptor?: true
+    messageSnippet?: true
+    description?: true
+    kavenegarMessageId?: true
+    status?: true
+    createdAt?: true
+  }
+
+  export type SmsTransactionCountAggregateInputType = {
+    id?: true
+    studioId?: true
+    type?: true
+    amountRial?: true
+    receptor?: true
+    messageSnippet?: true
+    description?: true
+    kavenegarMessageId?: true
+    status?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type SmsTransactionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SmsTransaction to aggregate.
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SmsTransactions to fetch.
+     */
+    orderBy?: SmsTransactionOrderByWithRelationInput | SmsTransactionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SmsTransactionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SmsTransactions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SmsTransactions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SmsTransactions
+    **/
+    _count?: true | SmsTransactionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SmsTransactionAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SmsTransactionSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SmsTransactionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SmsTransactionMaxAggregateInputType
+  }
+
+  export type GetSmsTransactionAggregateType<T extends SmsTransactionAggregateArgs> = {
+        [P in keyof T & keyof AggregateSmsTransaction]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSmsTransaction[P]>
+      : GetScalarType<T[P], AggregateSmsTransaction[P]>
+  }
+
+
+
+
+  export type SmsTransactionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SmsTransactionWhereInput
+    orderBy?: SmsTransactionOrderByWithAggregationInput | SmsTransactionOrderByWithAggregationInput[]
+    by: SmsTransactionScalarFieldEnum[] | SmsTransactionScalarFieldEnum
+    having?: SmsTransactionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SmsTransactionCountAggregateInputType | true
+    _avg?: SmsTransactionAvgAggregateInputType
+    _sum?: SmsTransactionSumAggregateInputType
+    _min?: SmsTransactionMinAggregateInputType
+    _max?: SmsTransactionMaxAggregateInputType
+  }
+
+  export type SmsTransactionGroupByOutputType = {
+    id: string
+    studioId: string
+    type: string
+    amountRial: number
+    receptor: string | null
+    messageSnippet: string | null
+    description: string | null
+    kavenegarMessageId: string | null
+    status: string
+    createdAt: Date
+    _count: SmsTransactionCountAggregateOutputType | null
+    _avg: SmsTransactionAvgAggregateOutputType | null
+    _sum: SmsTransactionSumAggregateOutputType | null
+    _min: SmsTransactionMinAggregateOutputType | null
+    _max: SmsTransactionMaxAggregateOutputType | null
+  }
+
+  type GetSmsTransactionGroupByPayload<T extends SmsTransactionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SmsTransactionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SmsTransactionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SmsTransactionGroupByOutputType[P]>
+            : GetScalarType<T[P], SmsTransactionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SmsTransactionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    type?: boolean
+    amountRial?: boolean
+    receptor?: boolean
+    messageSnippet?: boolean
+    description?: boolean
+    kavenegarMessageId?: boolean
+    status?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["smsTransaction"]>
+
+  export type SmsTransactionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    type?: boolean
+    amountRial?: boolean
+    receptor?: boolean
+    messageSnippet?: boolean
+    description?: boolean
+    kavenegarMessageId?: boolean
+    status?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["smsTransaction"]>
+
+  export type SmsTransactionSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    type?: boolean
+    amountRial?: boolean
+    receptor?: boolean
+    messageSnippet?: boolean
+    description?: boolean
+    kavenegarMessageId?: boolean
+    status?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["smsTransaction"]>
+
+  export type SmsTransactionSelectScalar = {
+    id?: boolean
+    studioId?: boolean
+    type?: boolean
+    amountRial?: boolean
+    receptor?: boolean
+    messageSnippet?: boolean
+    description?: boolean
+    kavenegarMessageId?: boolean
+    status?: boolean
+    createdAt?: boolean
+  }
+
+  export type SmsTransactionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "studioId" | "type" | "amountRial" | "receptor" | "messageSnippet" | "description" | "kavenegarMessageId" | "status" | "createdAt", ExtArgs["result"]["smsTransaction"]>
+  export type SmsTransactionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+  export type SmsTransactionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+  export type SmsTransactionIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+
+  export type $SmsTransactionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SmsTransaction"
+    objects: {
+      studio: Prisma.$StudioPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      studioId: string
+      type: string
+      amountRial: number
+      receptor: string | null
+      messageSnippet: string | null
+      description: string | null
+      kavenegarMessageId: string | null
+      status: string
+      createdAt: Date
+    }, ExtArgs["result"]["smsTransaction"]>
+    composites: {}
+  }
+
+  type SmsTransactionGetPayload<S extends boolean | null | undefined | SmsTransactionDefaultArgs> = $Result.GetResult<Prisma.$SmsTransactionPayload, S>
+
+  type SmsTransactionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SmsTransactionFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SmsTransactionCountAggregateInputType | true
+    }
+
+  export interface SmsTransactionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SmsTransaction'], meta: { name: 'SmsTransaction' } }
+    /**
+     * Find zero or one SmsTransaction that matches the filter.
+     * @param {SmsTransactionFindUniqueArgs} args - Arguments to find a SmsTransaction
+     * @example
+     * // Get one SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SmsTransactionFindUniqueArgs>(args: SelectSubset<T, SmsTransactionFindUniqueArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SmsTransaction that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SmsTransactionFindUniqueOrThrowArgs} args - Arguments to find a SmsTransaction
+     * @example
+     * // Get one SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SmsTransactionFindUniqueOrThrowArgs>(args: SelectSubset<T, SmsTransactionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SmsTransaction that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionFindFirstArgs} args - Arguments to find a SmsTransaction
+     * @example
+     * // Get one SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SmsTransactionFindFirstArgs>(args?: SelectSubset<T, SmsTransactionFindFirstArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SmsTransaction that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionFindFirstOrThrowArgs} args - Arguments to find a SmsTransaction
+     * @example
+     * // Get one SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SmsTransactionFindFirstOrThrowArgs>(args?: SelectSubset<T, SmsTransactionFindFirstOrThrowArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SmsTransactions that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SmsTransactions
+     * const smsTransactions = await prisma.smsTransaction.findMany()
+     * 
+     * // Get first 10 SmsTransactions
+     * const smsTransactions = await prisma.smsTransaction.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const smsTransactionWithIdOnly = await prisma.smsTransaction.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SmsTransactionFindManyArgs>(args?: SelectSubset<T, SmsTransactionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SmsTransaction.
+     * @param {SmsTransactionCreateArgs} args - Arguments to create a SmsTransaction.
+     * @example
+     * // Create one SmsTransaction
+     * const SmsTransaction = await prisma.smsTransaction.create({
+     *   data: {
+     *     // ... data to create a SmsTransaction
+     *   }
+     * })
+     * 
+     */
+    create<T extends SmsTransactionCreateArgs>(args: SelectSubset<T, SmsTransactionCreateArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SmsTransactions.
+     * @param {SmsTransactionCreateManyArgs} args - Arguments to create many SmsTransactions.
+     * @example
+     * // Create many SmsTransactions
+     * const smsTransaction = await prisma.smsTransaction.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SmsTransactionCreateManyArgs>(args?: SelectSubset<T, SmsTransactionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SmsTransactions and returns the data saved in the database.
+     * @param {SmsTransactionCreateManyAndReturnArgs} args - Arguments to create many SmsTransactions.
+     * @example
+     * // Create many SmsTransactions
+     * const smsTransaction = await prisma.smsTransaction.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SmsTransactions and only return the `id`
+     * const smsTransactionWithIdOnly = await prisma.smsTransaction.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SmsTransactionCreateManyAndReturnArgs>(args?: SelectSubset<T, SmsTransactionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SmsTransaction.
+     * @param {SmsTransactionDeleteArgs} args - Arguments to delete one SmsTransaction.
+     * @example
+     * // Delete one SmsTransaction
+     * const SmsTransaction = await prisma.smsTransaction.delete({
+     *   where: {
+     *     // ... filter to delete one SmsTransaction
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SmsTransactionDeleteArgs>(args: SelectSubset<T, SmsTransactionDeleteArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SmsTransaction.
+     * @param {SmsTransactionUpdateArgs} args - Arguments to update one SmsTransaction.
+     * @example
+     * // Update one SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SmsTransactionUpdateArgs>(args: SelectSubset<T, SmsTransactionUpdateArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SmsTransactions.
+     * @param {SmsTransactionDeleteManyArgs} args - Arguments to filter SmsTransactions to delete.
+     * @example
+     * // Delete a few SmsTransactions
+     * const { count } = await prisma.smsTransaction.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SmsTransactionDeleteManyArgs>(args?: SelectSubset<T, SmsTransactionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SmsTransactions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SmsTransactions
+     * const smsTransaction = await prisma.smsTransaction.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SmsTransactionUpdateManyArgs>(args: SelectSubset<T, SmsTransactionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SmsTransactions and returns the data updated in the database.
+     * @param {SmsTransactionUpdateManyAndReturnArgs} args - Arguments to update many SmsTransactions.
+     * @example
+     * // Update many SmsTransactions
+     * const smsTransaction = await prisma.smsTransaction.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SmsTransactions and only return the `id`
+     * const smsTransactionWithIdOnly = await prisma.smsTransaction.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SmsTransactionUpdateManyAndReturnArgs>(args: SelectSubset<T, SmsTransactionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SmsTransaction.
+     * @param {SmsTransactionUpsertArgs} args - Arguments to update or create a SmsTransaction.
+     * @example
+     * // Update or create a SmsTransaction
+     * const smsTransaction = await prisma.smsTransaction.upsert({
+     *   create: {
+     *     // ... data to create a SmsTransaction
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SmsTransaction we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SmsTransactionUpsertArgs>(args: SelectSubset<T, SmsTransactionUpsertArgs<ExtArgs>>): Prisma__SmsTransactionClient<$Result.GetResult<Prisma.$SmsTransactionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SmsTransactions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionCountArgs} args - Arguments to filter SmsTransactions to count.
+     * @example
+     * // Count the number of SmsTransactions
+     * const count = await prisma.smsTransaction.count({
+     *   where: {
+     *     // ... the filter for the SmsTransactions we want to count
+     *   }
+     * })
+    **/
+    count<T extends SmsTransactionCountArgs>(
+      args?: Subset<T, SmsTransactionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SmsTransactionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SmsTransaction.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SmsTransactionAggregateArgs>(args: Subset<T, SmsTransactionAggregateArgs>): Prisma.PrismaPromise<GetSmsTransactionAggregateType<T>>
+
+    /**
+     * Group by SmsTransaction.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SmsTransactionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SmsTransactionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SmsTransactionGroupByArgs['orderBy'] }
+        : { orderBy?: SmsTransactionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SmsTransactionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSmsTransactionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SmsTransaction model
+   */
+  readonly fields: SmsTransactionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SmsTransaction.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SmsTransactionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    studio<T extends StudioDefaultArgs<ExtArgs> = {}>(args?: Subset<T, StudioDefaultArgs<ExtArgs>>): Prisma__StudioClient<$Result.GetResult<Prisma.$StudioPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SmsTransaction model
+   */
+  interface SmsTransactionFieldRefs {
+    readonly id: FieldRef<"SmsTransaction", 'String'>
+    readonly studioId: FieldRef<"SmsTransaction", 'String'>
+    readonly type: FieldRef<"SmsTransaction", 'String'>
+    readonly amountRial: FieldRef<"SmsTransaction", 'Int'>
+    readonly receptor: FieldRef<"SmsTransaction", 'String'>
+    readonly messageSnippet: FieldRef<"SmsTransaction", 'String'>
+    readonly description: FieldRef<"SmsTransaction", 'String'>
+    readonly kavenegarMessageId: FieldRef<"SmsTransaction", 'String'>
+    readonly status: FieldRef<"SmsTransaction", 'String'>
+    readonly createdAt: FieldRef<"SmsTransaction", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SmsTransaction findUnique
+   */
+  export type SmsTransactionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter, which SmsTransaction to fetch.
+     */
+    where: SmsTransactionWhereUniqueInput
+  }
+
+  /**
+   * SmsTransaction findUniqueOrThrow
+   */
+  export type SmsTransactionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter, which SmsTransaction to fetch.
+     */
+    where: SmsTransactionWhereUniqueInput
+  }
+
+  /**
+   * SmsTransaction findFirst
+   */
+  export type SmsTransactionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter, which SmsTransaction to fetch.
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SmsTransactions to fetch.
+     */
+    orderBy?: SmsTransactionOrderByWithRelationInput | SmsTransactionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SmsTransactions.
+     */
+    cursor?: SmsTransactionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SmsTransactions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SmsTransactions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SmsTransactions.
+     */
+    distinct?: SmsTransactionScalarFieldEnum | SmsTransactionScalarFieldEnum[]
+  }
+
+  /**
+   * SmsTransaction findFirstOrThrow
+   */
+  export type SmsTransactionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter, which SmsTransaction to fetch.
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SmsTransactions to fetch.
+     */
+    orderBy?: SmsTransactionOrderByWithRelationInput | SmsTransactionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SmsTransactions.
+     */
+    cursor?: SmsTransactionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SmsTransactions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SmsTransactions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SmsTransactions.
+     */
+    distinct?: SmsTransactionScalarFieldEnum | SmsTransactionScalarFieldEnum[]
+  }
+
+  /**
+   * SmsTransaction findMany
+   */
+  export type SmsTransactionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter, which SmsTransactions to fetch.
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SmsTransactions to fetch.
+     */
+    orderBy?: SmsTransactionOrderByWithRelationInput | SmsTransactionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SmsTransactions.
+     */
+    cursor?: SmsTransactionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SmsTransactions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SmsTransactions.
+     */
+    skip?: number
+    distinct?: SmsTransactionScalarFieldEnum | SmsTransactionScalarFieldEnum[]
+  }
+
+  /**
+   * SmsTransaction create
+   */
+  export type SmsTransactionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SmsTransaction.
+     */
+    data: XOR<SmsTransactionCreateInput, SmsTransactionUncheckedCreateInput>
+  }
+
+  /**
+   * SmsTransaction createMany
+   */
+  export type SmsTransactionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SmsTransactions.
+     */
+    data: SmsTransactionCreateManyInput | SmsTransactionCreateManyInput[]
+  }
+
+  /**
+   * SmsTransaction createManyAndReturn
+   */
+  export type SmsTransactionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * The data used to create many SmsTransactions.
+     */
+    data: SmsTransactionCreateManyInput | SmsTransactionCreateManyInput[]
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SmsTransaction update
+   */
+  export type SmsTransactionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SmsTransaction.
+     */
+    data: XOR<SmsTransactionUpdateInput, SmsTransactionUncheckedUpdateInput>
+    /**
+     * Choose, which SmsTransaction to update.
+     */
+    where: SmsTransactionWhereUniqueInput
+  }
+
+  /**
+   * SmsTransaction updateMany
+   */
+  export type SmsTransactionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SmsTransactions.
+     */
+    data: XOR<SmsTransactionUpdateManyMutationInput, SmsTransactionUncheckedUpdateManyInput>
+    /**
+     * Filter which SmsTransactions to update
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * Limit how many SmsTransactions to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SmsTransaction updateManyAndReturn
+   */
+  export type SmsTransactionUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * The data used to update SmsTransactions.
+     */
+    data: XOR<SmsTransactionUpdateManyMutationInput, SmsTransactionUncheckedUpdateManyInput>
+    /**
+     * Filter which SmsTransactions to update
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * Limit how many SmsTransactions to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SmsTransaction upsert
+   */
+  export type SmsTransactionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SmsTransaction to update in case it exists.
+     */
+    where: SmsTransactionWhereUniqueInput
+    /**
+     * In case the SmsTransaction found by the `where` argument doesn't exist, create a new SmsTransaction with this data.
+     */
+    create: XOR<SmsTransactionCreateInput, SmsTransactionUncheckedCreateInput>
+    /**
+     * In case the SmsTransaction was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SmsTransactionUpdateInput, SmsTransactionUncheckedUpdateInput>
+  }
+
+  /**
+   * SmsTransaction delete
+   */
+  export type SmsTransactionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+    /**
+     * Filter which SmsTransaction to delete.
+     */
+    where: SmsTransactionWhereUniqueInput
+  }
+
+  /**
+   * SmsTransaction deleteMany
+   */
+  export type SmsTransactionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SmsTransactions to delete
+     */
+    where?: SmsTransactionWhereInput
+    /**
+     * Limit how many SmsTransactions to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SmsTransaction without action
+   */
+  export type SmsTransactionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SmsTransaction
+     */
+    select?: SmsTransactionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SmsTransaction
+     */
+    omit?: SmsTransactionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SmsTransactionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SubscriptionEvent
+   */
+
+  export type AggregateSubscriptionEvent = {
+    _count: SubscriptionEventCountAggregateOutputType | null
+    _avg: SubscriptionEventAvgAggregateOutputType | null
+    _sum: SubscriptionEventSumAggregateOutputType | null
+    _min: SubscriptionEventMinAggregateOutputType | null
+    _max: SubscriptionEventMaxAggregateOutputType | null
+  }
+
+  export type SubscriptionEventAvgAggregateOutputType = {
+    amountPaidToman: number | null
+    durationDays: number | null
+  }
+
+  export type SubscriptionEventSumAggregateOutputType = {
+    amountPaidToman: number | null
+    durationDays: number | null
+  }
+
+  export type SubscriptionEventMinAggregateOutputType = {
+    id: string | null
+    studioId: string | null
+    eventType: string | null
+    fromPlan: string | null
+    toPlan: string | null
+    amountPaidToman: number | null
+    durationDays: number | null
+    startAt: Date | null
+    endAt: Date | null
+    note: string | null
+    createdAt: Date | null
+  }
+
+  export type SubscriptionEventMaxAggregateOutputType = {
+    id: string | null
+    studioId: string | null
+    eventType: string | null
+    fromPlan: string | null
+    toPlan: string | null
+    amountPaidToman: number | null
+    durationDays: number | null
+    startAt: Date | null
+    endAt: Date | null
+    note: string | null
+    createdAt: Date | null
+  }
+
+  export type SubscriptionEventCountAggregateOutputType = {
+    id: number
+    studioId: number
+    eventType: number
+    fromPlan: number
+    toPlan: number
+    amountPaidToman: number
+    durationDays: number
+    startAt: number
+    endAt: number
+    note: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type SubscriptionEventAvgAggregateInputType = {
+    amountPaidToman?: true
+    durationDays?: true
+  }
+
+  export type SubscriptionEventSumAggregateInputType = {
+    amountPaidToman?: true
+    durationDays?: true
+  }
+
+  export type SubscriptionEventMinAggregateInputType = {
+    id?: true
+    studioId?: true
+    eventType?: true
+    fromPlan?: true
+    toPlan?: true
+    amountPaidToman?: true
+    durationDays?: true
+    startAt?: true
+    endAt?: true
+    note?: true
+    createdAt?: true
+  }
+
+  export type SubscriptionEventMaxAggregateInputType = {
+    id?: true
+    studioId?: true
+    eventType?: true
+    fromPlan?: true
+    toPlan?: true
+    amountPaidToman?: true
+    durationDays?: true
+    startAt?: true
+    endAt?: true
+    note?: true
+    createdAt?: true
+  }
+
+  export type SubscriptionEventCountAggregateInputType = {
+    id?: true
+    studioId?: true
+    eventType?: true
+    fromPlan?: true
+    toPlan?: true
+    amountPaidToman?: true
+    durationDays?: true
+    startAt?: true
+    endAt?: true
+    note?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type SubscriptionEventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SubscriptionEvent to aggregate.
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SubscriptionEvents to fetch.
+     */
+    orderBy?: SubscriptionEventOrderByWithRelationInput | SubscriptionEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SubscriptionEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SubscriptionEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SubscriptionEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SubscriptionEvents
+    **/
+    _count?: true | SubscriptionEventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SubscriptionEventAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SubscriptionEventSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SubscriptionEventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SubscriptionEventMaxAggregateInputType
+  }
+
+  export type GetSubscriptionEventAggregateType<T extends SubscriptionEventAggregateArgs> = {
+        [P in keyof T & keyof AggregateSubscriptionEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSubscriptionEvent[P]>
+      : GetScalarType<T[P], AggregateSubscriptionEvent[P]>
+  }
+
+
+
+
+  export type SubscriptionEventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SubscriptionEventWhereInput
+    orderBy?: SubscriptionEventOrderByWithAggregationInput | SubscriptionEventOrderByWithAggregationInput[]
+    by: SubscriptionEventScalarFieldEnum[] | SubscriptionEventScalarFieldEnum
+    having?: SubscriptionEventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SubscriptionEventCountAggregateInputType | true
+    _avg?: SubscriptionEventAvgAggregateInputType
+    _sum?: SubscriptionEventSumAggregateInputType
+    _min?: SubscriptionEventMinAggregateInputType
+    _max?: SubscriptionEventMaxAggregateInputType
+  }
+
+  export type SubscriptionEventGroupByOutputType = {
+    id: string
+    studioId: string
+    eventType: string
+    fromPlan: string | null
+    toPlan: string
+    amountPaidToman: number | null
+    durationDays: number | null
+    startAt: Date | null
+    endAt: Date | null
+    note: string | null
+    createdAt: Date
+    _count: SubscriptionEventCountAggregateOutputType | null
+    _avg: SubscriptionEventAvgAggregateOutputType | null
+    _sum: SubscriptionEventSumAggregateOutputType | null
+    _min: SubscriptionEventMinAggregateOutputType | null
+    _max: SubscriptionEventMaxAggregateOutputType | null
+  }
+
+  type GetSubscriptionEventGroupByPayload<T extends SubscriptionEventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SubscriptionEventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SubscriptionEventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SubscriptionEventGroupByOutputType[P]>
+            : GetScalarType<T[P], SubscriptionEventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SubscriptionEventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    eventType?: boolean
+    fromPlan?: boolean
+    toPlan?: boolean
+    amountPaidToman?: boolean
+    durationDays?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    note?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["subscriptionEvent"]>
+
+  export type SubscriptionEventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    eventType?: boolean
+    fromPlan?: boolean
+    toPlan?: boolean
+    amountPaidToman?: boolean
+    durationDays?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    note?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["subscriptionEvent"]>
+
+  export type SubscriptionEventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    studioId?: boolean
+    eventType?: boolean
+    fromPlan?: boolean
+    toPlan?: boolean
+    amountPaidToman?: boolean
+    durationDays?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    note?: boolean
+    createdAt?: boolean
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["subscriptionEvent"]>
+
+  export type SubscriptionEventSelectScalar = {
+    id?: boolean
+    studioId?: boolean
+    eventType?: boolean
+    fromPlan?: boolean
+    toPlan?: boolean
+    amountPaidToman?: boolean
+    durationDays?: boolean
+    startAt?: boolean
+    endAt?: boolean
+    note?: boolean
+    createdAt?: boolean
+  }
+
+  export type SubscriptionEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "studioId" | "eventType" | "fromPlan" | "toPlan" | "amountPaidToman" | "durationDays" | "startAt" | "endAt" | "note" | "createdAt", ExtArgs["result"]["subscriptionEvent"]>
+  export type SubscriptionEventInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+  export type SubscriptionEventIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+  export type SubscriptionEventIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    studio?: boolean | StudioDefaultArgs<ExtArgs>
+  }
+
+  export type $SubscriptionEventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SubscriptionEvent"
+    objects: {
+      studio: Prisma.$StudioPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      studioId: string
+      eventType: string
+      fromPlan: string | null
+      toPlan: string
+      amountPaidToman: number | null
+      durationDays: number | null
+      startAt: Date | null
+      endAt: Date | null
+      note: string | null
+      createdAt: Date
+    }, ExtArgs["result"]["subscriptionEvent"]>
+    composites: {}
+  }
+
+  type SubscriptionEventGetPayload<S extends boolean | null | undefined | SubscriptionEventDefaultArgs> = $Result.GetResult<Prisma.$SubscriptionEventPayload, S>
+
+  type SubscriptionEventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SubscriptionEventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SubscriptionEventCountAggregateInputType | true
+    }
+
+  export interface SubscriptionEventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SubscriptionEvent'], meta: { name: 'SubscriptionEvent' } }
+    /**
+     * Find zero or one SubscriptionEvent that matches the filter.
+     * @param {SubscriptionEventFindUniqueArgs} args - Arguments to find a SubscriptionEvent
+     * @example
+     * // Get one SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SubscriptionEventFindUniqueArgs>(args: SelectSubset<T, SubscriptionEventFindUniqueArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SubscriptionEvent that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SubscriptionEventFindUniqueOrThrowArgs} args - Arguments to find a SubscriptionEvent
+     * @example
+     * // Get one SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SubscriptionEventFindUniqueOrThrowArgs>(args: SelectSubset<T, SubscriptionEventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SubscriptionEvent that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventFindFirstArgs} args - Arguments to find a SubscriptionEvent
+     * @example
+     * // Get one SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SubscriptionEventFindFirstArgs>(args?: SelectSubset<T, SubscriptionEventFindFirstArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SubscriptionEvent that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventFindFirstOrThrowArgs} args - Arguments to find a SubscriptionEvent
+     * @example
+     * // Get one SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SubscriptionEventFindFirstOrThrowArgs>(args?: SelectSubset<T, SubscriptionEventFindFirstOrThrowArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SubscriptionEvents that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SubscriptionEvents
+     * const subscriptionEvents = await prisma.subscriptionEvent.findMany()
+     * 
+     * // Get first 10 SubscriptionEvents
+     * const subscriptionEvents = await prisma.subscriptionEvent.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const subscriptionEventWithIdOnly = await prisma.subscriptionEvent.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SubscriptionEventFindManyArgs>(args?: SelectSubset<T, SubscriptionEventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SubscriptionEvent.
+     * @param {SubscriptionEventCreateArgs} args - Arguments to create a SubscriptionEvent.
+     * @example
+     * // Create one SubscriptionEvent
+     * const SubscriptionEvent = await prisma.subscriptionEvent.create({
+     *   data: {
+     *     // ... data to create a SubscriptionEvent
+     *   }
+     * })
+     * 
+     */
+    create<T extends SubscriptionEventCreateArgs>(args: SelectSubset<T, SubscriptionEventCreateArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SubscriptionEvents.
+     * @param {SubscriptionEventCreateManyArgs} args - Arguments to create many SubscriptionEvents.
+     * @example
+     * // Create many SubscriptionEvents
+     * const subscriptionEvent = await prisma.subscriptionEvent.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SubscriptionEventCreateManyArgs>(args?: SelectSubset<T, SubscriptionEventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SubscriptionEvents and returns the data saved in the database.
+     * @param {SubscriptionEventCreateManyAndReturnArgs} args - Arguments to create many SubscriptionEvents.
+     * @example
+     * // Create many SubscriptionEvents
+     * const subscriptionEvent = await prisma.subscriptionEvent.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SubscriptionEvents and only return the `id`
+     * const subscriptionEventWithIdOnly = await prisma.subscriptionEvent.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SubscriptionEventCreateManyAndReturnArgs>(args?: SelectSubset<T, SubscriptionEventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SubscriptionEvent.
+     * @param {SubscriptionEventDeleteArgs} args - Arguments to delete one SubscriptionEvent.
+     * @example
+     * // Delete one SubscriptionEvent
+     * const SubscriptionEvent = await prisma.subscriptionEvent.delete({
+     *   where: {
+     *     // ... filter to delete one SubscriptionEvent
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SubscriptionEventDeleteArgs>(args: SelectSubset<T, SubscriptionEventDeleteArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SubscriptionEvent.
+     * @param {SubscriptionEventUpdateArgs} args - Arguments to update one SubscriptionEvent.
+     * @example
+     * // Update one SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SubscriptionEventUpdateArgs>(args: SelectSubset<T, SubscriptionEventUpdateArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SubscriptionEvents.
+     * @param {SubscriptionEventDeleteManyArgs} args - Arguments to filter SubscriptionEvents to delete.
+     * @example
+     * // Delete a few SubscriptionEvents
+     * const { count } = await prisma.subscriptionEvent.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SubscriptionEventDeleteManyArgs>(args?: SelectSubset<T, SubscriptionEventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SubscriptionEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SubscriptionEvents
+     * const subscriptionEvent = await prisma.subscriptionEvent.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SubscriptionEventUpdateManyArgs>(args: SelectSubset<T, SubscriptionEventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SubscriptionEvents and returns the data updated in the database.
+     * @param {SubscriptionEventUpdateManyAndReturnArgs} args - Arguments to update many SubscriptionEvents.
+     * @example
+     * // Update many SubscriptionEvents
+     * const subscriptionEvent = await prisma.subscriptionEvent.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SubscriptionEvents and only return the `id`
+     * const subscriptionEventWithIdOnly = await prisma.subscriptionEvent.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SubscriptionEventUpdateManyAndReturnArgs>(args: SelectSubset<T, SubscriptionEventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SubscriptionEvent.
+     * @param {SubscriptionEventUpsertArgs} args - Arguments to update or create a SubscriptionEvent.
+     * @example
+     * // Update or create a SubscriptionEvent
+     * const subscriptionEvent = await prisma.subscriptionEvent.upsert({
+     *   create: {
+     *     // ... data to create a SubscriptionEvent
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SubscriptionEvent we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SubscriptionEventUpsertArgs>(args: SelectSubset<T, SubscriptionEventUpsertArgs<ExtArgs>>): Prisma__SubscriptionEventClient<$Result.GetResult<Prisma.$SubscriptionEventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SubscriptionEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventCountArgs} args - Arguments to filter SubscriptionEvents to count.
+     * @example
+     * // Count the number of SubscriptionEvents
+     * const count = await prisma.subscriptionEvent.count({
+     *   where: {
+     *     // ... the filter for the SubscriptionEvents we want to count
+     *   }
+     * })
+    **/
+    count<T extends SubscriptionEventCountArgs>(
+      args?: Subset<T, SubscriptionEventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SubscriptionEventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SubscriptionEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SubscriptionEventAggregateArgs>(args: Subset<T, SubscriptionEventAggregateArgs>): Prisma.PrismaPromise<GetSubscriptionEventAggregateType<T>>
+
+    /**
+     * Group by SubscriptionEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SubscriptionEventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SubscriptionEventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SubscriptionEventGroupByArgs['orderBy'] }
+        : { orderBy?: SubscriptionEventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SubscriptionEventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSubscriptionEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SubscriptionEvent model
+   */
+  readonly fields: SubscriptionEventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SubscriptionEvent.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SubscriptionEventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    studio<T extends StudioDefaultArgs<ExtArgs> = {}>(args?: Subset<T, StudioDefaultArgs<ExtArgs>>): Prisma__StudioClient<$Result.GetResult<Prisma.$StudioPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SubscriptionEvent model
+   */
+  interface SubscriptionEventFieldRefs {
+    readonly id: FieldRef<"SubscriptionEvent", 'String'>
+    readonly studioId: FieldRef<"SubscriptionEvent", 'String'>
+    readonly eventType: FieldRef<"SubscriptionEvent", 'String'>
+    readonly fromPlan: FieldRef<"SubscriptionEvent", 'String'>
+    readonly toPlan: FieldRef<"SubscriptionEvent", 'String'>
+    readonly amountPaidToman: FieldRef<"SubscriptionEvent", 'Int'>
+    readonly durationDays: FieldRef<"SubscriptionEvent", 'Int'>
+    readonly startAt: FieldRef<"SubscriptionEvent", 'DateTime'>
+    readonly endAt: FieldRef<"SubscriptionEvent", 'DateTime'>
+    readonly note: FieldRef<"SubscriptionEvent", 'String'>
+    readonly createdAt: FieldRef<"SubscriptionEvent", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SubscriptionEvent findUnique
+   */
+  export type SubscriptionEventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter, which SubscriptionEvent to fetch.
+     */
+    where: SubscriptionEventWhereUniqueInput
+  }
+
+  /**
+   * SubscriptionEvent findUniqueOrThrow
+   */
+  export type SubscriptionEventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter, which SubscriptionEvent to fetch.
+     */
+    where: SubscriptionEventWhereUniqueInput
+  }
+
+  /**
+   * SubscriptionEvent findFirst
+   */
+  export type SubscriptionEventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter, which SubscriptionEvent to fetch.
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SubscriptionEvents to fetch.
+     */
+    orderBy?: SubscriptionEventOrderByWithRelationInput | SubscriptionEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SubscriptionEvents.
+     */
+    cursor?: SubscriptionEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SubscriptionEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SubscriptionEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SubscriptionEvents.
+     */
+    distinct?: SubscriptionEventScalarFieldEnum | SubscriptionEventScalarFieldEnum[]
+  }
+
+  /**
+   * SubscriptionEvent findFirstOrThrow
+   */
+  export type SubscriptionEventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter, which SubscriptionEvent to fetch.
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SubscriptionEvents to fetch.
+     */
+    orderBy?: SubscriptionEventOrderByWithRelationInput | SubscriptionEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SubscriptionEvents.
+     */
+    cursor?: SubscriptionEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SubscriptionEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SubscriptionEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SubscriptionEvents.
+     */
+    distinct?: SubscriptionEventScalarFieldEnum | SubscriptionEventScalarFieldEnum[]
+  }
+
+  /**
+   * SubscriptionEvent findMany
+   */
+  export type SubscriptionEventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter, which SubscriptionEvents to fetch.
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SubscriptionEvents to fetch.
+     */
+    orderBy?: SubscriptionEventOrderByWithRelationInput | SubscriptionEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SubscriptionEvents.
+     */
+    cursor?: SubscriptionEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SubscriptionEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SubscriptionEvents.
+     */
+    skip?: number
+    distinct?: SubscriptionEventScalarFieldEnum | SubscriptionEventScalarFieldEnum[]
+  }
+
+  /**
+   * SubscriptionEvent create
+   */
+  export type SubscriptionEventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SubscriptionEvent.
+     */
+    data: XOR<SubscriptionEventCreateInput, SubscriptionEventUncheckedCreateInput>
+  }
+
+  /**
+   * SubscriptionEvent createMany
+   */
+  export type SubscriptionEventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SubscriptionEvents.
+     */
+    data: SubscriptionEventCreateManyInput | SubscriptionEventCreateManyInput[]
+  }
+
+  /**
+   * SubscriptionEvent createManyAndReturn
+   */
+  export type SubscriptionEventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * The data used to create many SubscriptionEvents.
+     */
+    data: SubscriptionEventCreateManyInput | SubscriptionEventCreateManyInput[]
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SubscriptionEvent update
+   */
+  export type SubscriptionEventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SubscriptionEvent.
+     */
+    data: XOR<SubscriptionEventUpdateInput, SubscriptionEventUncheckedUpdateInput>
+    /**
+     * Choose, which SubscriptionEvent to update.
+     */
+    where: SubscriptionEventWhereUniqueInput
+  }
+
+  /**
+   * SubscriptionEvent updateMany
+   */
+  export type SubscriptionEventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SubscriptionEvents.
+     */
+    data: XOR<SubscriptionEventUpdateManyMutationInput, SubscriptionEventUncheckedUpdateManyInput>
+    /**
+     * Filter which SubscriptionEvents to update
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * Limit how many SubscriptionEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SubscriptionEvent updateManyAndReturn
+   */
+  export type SubscriptionEventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * The data used to update SubscriptionEvents.
+     */
+    data: XOR<SubscriptionEventUpdateManyMutationInput, SubscriptionEventUncheckedUpdateManyInput>
+    /**
+     * Filter which SubscriptionEvents to update
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * Limit how many SubscriptionEvents to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SubscriptionEvent upsert
+   */
+  export type SubscriptionEventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SubscriptionEvent to update in case it exists.
+     */
+    where: SubscriptionEventWhereUniqueInput
+    /**
+     * In case the SubscriptionEvent found by the `where` argument doesn't exist, create a new SubscriptionEvent with this data.
+     */
+    create: XOR<SubscriptionEventCreateInput, SubscriptionEventUncheckedCreateInput>
+    /**
+     * In case the SubscriptionEvent was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SubscriptionEventUpdateInput, SubscriptionEventUncheckedUpdateInput>
+  }
+
+  /**
+   * SubscriptionEvent delete
+   */
+  export type SubscriptionEventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+    /**
+     * Filter which SubscriptionEvent to delete.
+     */
+    where: SubscriptionEventWhereUniqueInput
+  }
+
+  /**
+   * SubscriptionEvent deleteMany
+   */
+  export type SubscriptionEventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SubscriptionEvents to delete
+     */
+    where?: SubscriptionEventWhereInput
+    /**
+     * Limit how many SubscriptionEvents to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SubscriptionEvent without action
+   */
+  export type SubscriptionEventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SubscriptionEvent
+     */
+    select?: SubscriptionEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SubscriptionEvent
+     */
+    omit?: SubscriptionEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SubscriptionEventInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model PlatformSetting
+   */
+
+  export type AggregatePlatformSetting = {
+    _count: PlatformSettingCountAggregateOutputType | null
+    _min: PlatformSettingMinAggregateOutputType | null
+    _max: PlatformSettingMaxAggregateOutputType | null
+  }
+
+  export type PlatformSettingMinAggregateOutputType = {
+    key: string | null
+    value: string | null
+    updatedAt: Date | null
+  }
+
+  export type PlatformSettingMaxAggregateOutputType = {
+    key: string | null
+    value: string | null
+    updatedAt: Date | null
+  }
+
+  export type PlatformSettingCountAggregateOutputType = {
+    key: number
+    value: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type PlatformSettingMinAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+  }
+
+  export type PlatformSettingMaxAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+  }
+
+  export type PlatformSettingCountAggregateInputType = {
+    key?: true
+    value?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type PlatformSettingAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PlatformSetting to aggregate.
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlatformSettings to fetch.
+     */
+    orderBy?: PlatformSettingOrderByWithRelationInput | PlatformSettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PlatformSettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlatformSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlatformSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PlatformSettings
+    **/
+    _count?: true | PlatformSettingCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PlatformSettingMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PlatformSettingMaxAggregateInputType
+  }
+
+  export type GetPlatformSettingAggregateType<T extends PlatformSettingAggregateArgs> = {
+        [P in keyof T & keyof AggregatePlatformSetting]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePlatformSetting[P]>
+      : GetScalarType<T[P], AggregatePlatformSetting[P]>
+  }
+
+
+
+
+  export type PlatformSettingGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PlatformSettingWhereInput
+    orderBy?: PlatformSettingOrderByWithAggregationInput | PlatformSettingOrderByWithAggregationInput[]
+    by: PlatformSettingScalarFieldEnum[] | PlatformSettingScalarFieldEnum
+    having?: PlatformSettingScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PlatformSettingCountAggregateInputType | true
+    _min?: PlatformSettingMinAggregateInputType
+    _max?: PlatformSettingMaxAggregateInputType
+  }
+
+  export type PlatformSettingGroupByOutputType = {
+    key: string
+    value: string
+    updatedAt: Date
+    _count: PlatformSettingCountAggregateOutputType | null
+    _min: PlatformSettingMinAggregateOutputType | null
+    _max: PlatformSettingMaxAggregateOutputType | null
+  }
+
+  type GetPlatformSettingGroupByPayload<T extends PlatformSettingGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PlatformSettingGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PlatformSettingGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PlatformSettingGroupByOutputType[P]>
+            : GetScalarType<T[P], PlatformSettingGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PlatformSettingSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["platformSetting"]>
+
+  export type PlatformSettingSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["platformSetting"]>
+
+  export type PlatformSettingSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["platformSetting"]>
+
+  export type PlatformSettingSelectScalar = {
+    key?: boolean
+    value?: boolean
+    updatedAt?: boolean
+  }
+
+  export type PlatformSettingOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"key" | "value" | "updatedAt", ExtArgs["result"]["platformSetting"]>
+
+  export type $PlatformSettingPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PlatformSetting"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      key: string
+      value: string
+      updatedAt: Date
+    }, ExtArgs["result"]["platformSetting"]>
+    composites: {}
+  }
+
+  type PlatformSettingGetPayload<S extends boolean | null | undefined | PlatformSettingDefaultArgs> = $Result.GetResult<Prisma.$PlatformSettingPayload, S>
+
+  type PlatformSettingCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<PlatformSettingFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: PlatformSettingCountAggregateInputType | true
+    }
+
+  export interface PlatformSettingDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PlatformSetting'], meta: { name: 'PlatformSetting' } }
+    /**
+     * Find zero or one PlatformSetting that matches the filter.
+     * @param {PlatformSettingFindUniqueArgs} args - Arguments to find a PlatformSetting
+     * @example
+     * // Get one PlatformSetting
+     * const platformSetting = await prisma.platformSetting.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PlatformSettingFindUniqueArgs>(args: SelectSubset<T, PlatformSettingFindUniqueArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one PlatformSetting that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {PlatformSettingFindUniqueOrThrowArgs} args - Arguments to find a PlatformSetting
+     * @example
+     * // Get one PlatformSetting
+     * const platformSetting = await prisma.platformSetting.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PlatformSettingFindUniqueOrThrowArgs>(args: SelectSubset<T, PlatformSettingFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PlatformSetting that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingFindFirstArgs} args - Arguments to find a PlatformSetting
+     * @example
+     * // Get one PlatformSetting
+     * const platformSetting = await prisma.platformSetting.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PlatformSettingFindFirstArgs>(args?: SelectSubset<T, PlatformSettingFindFirstArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PlatformSetting that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingFindFirstOrThrowArgs} args - Arguments to find a PlatformSetting
+     * @example
+     * // Get one PlatformSetting
+     * const platformSetting = await prisma.platformSetting.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PlatformSettingFindFirstOrThrowArgs>(args?: SelectSubset<T, PlatformSettingFindFirstOrThrowArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more PlatformSettings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PlatformSettings
+     * const platformSettings = await prisma.platformSetting.findMany()
+     * 
+     * // Get first 10 PlatformSettings
+     * const platformSettings = await prisma.platformSetting.findMany({ take: 10 })
+     * 
+     * // Only select the `key`
+     * const platformSettingWithKeyOnly = await prisma.platformSetting.findMany({ select: { key: true } })
+     * 
+     */
+    findMany<T extends PlatformSettingFindManyArgs>(args?: SelectSubset<T, PlatformSettingFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a PlatformSetting.
+     * @param {PlatformSettingCreateArgs} args - Arguments to create a PlatformSetting.
+     * @example
+     * // Create one PlatformSetting
+     * const PlatformSetting = await prisma.platformSetting.create({
+     *   data: {
+     *     // ... data to create a PlatformSetting
+     *   }
+     * })
+     * 
+     */
+    create<T extends PlatformSettingCreateArgs>(args: SelectSubset<T, PlatformSettingCreateArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many PlatformSettings.
+     * @param {PlatformSettingCreateManyArgs} args - Arguments to create many PlatformSettings.
+     * @example
+     * // Create many PlatformSettings
+     * const platformSetting = await prisma.platformSetting.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PlatformSettingCreateManyArgs>(args?: SelectSubset<T, PlatformSettingCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PlatformSettings and returns the data saved in the database.
+     * @param {PlatformSettingCreateManyAndReturnArgs} args - Arguments to create many PlatformSettings.
+     * @example
+     * // Create many PlatformSettings
+     * const platformSetting = await prisma.platformSetting.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PlatformSettings and only return the `key`
+     * const platformSettingWithKeyOnly = await prisma.platformSetting.createManyAndReturn({
+     *   select: { key: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PlatformSettingCreateManyAndReturnArgs>(args?: SelectSubset<T, PlatformSettingCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a PlatformSetting.
+     * @param {PlatformSettingDeleteArgs} args - Arguments to delete one PlatformSetting.
+     * @example
+     * // Delete one PlatformSetting
+     * const PlatformSetting = await prisma.platformSetting.delete({
+     *   where: {
+     *     // ... filter to delete one PlatformSetting
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PlatformSettingDeleteArgs>(args: SelectSubset<T, PlatformSettingDeleteArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one PlatformSetting.
+     * @param {PlatformSettingUpdateArgs} args - Arguments to update one PlatformSetting.
+     * @example
+     * // Update one PlatformSetting
+     * const platformSetting = await prisma.platformSetting.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PlatformSettingUpdateArgs>(args: SelectSubset<T, PlatformSettingUpdateArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more PlatformSettings.
+     * @param {PlatformSettingDeleteManyArgs} args - Arguments to filter PlatformSettings to delete.
+     * @example
+     * // Delete a few PlatformSettings
+     * const { count } = await prisma.platformSetting.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PlatformSettingDeleteManyArgs>(args?: SelectSubset<T, PlatformSettingDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PlatformSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PlatformSettings
+     * const platformSetting = await prisma.platformSetting.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PlatformSettingUpdateManyArgs>(args: SelectSubset<T, PlatformSettingUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PlatformSettings and returns the data updated in the database.
+     * @param {PlatformSettingUpdateManyAndReturnArgs} args - Arguments to update many PlatformSettings.
+     * @example
+     * // Update many PlatformSettings
+     * const platformSetting = await prisma.platformSetting.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more PlatformSettings and only return the `key`
+     * const platformSettingWithKeyOnly = await prisma.platformSetting.updateManyAndReturn({
+     *   select: { key: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends PlatformSettingUpdateManyAndReturnArgs>(args: SelectSubset<T, PlatformSettingUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one PlatformSetting.
+     * @param {PlatformSettingUpsertArgs} args - Arguments to update or create a PlatformSetting.
+     * @example
+     * // Update or create a PlatformSetting
+     * const platformSetting = await prisma.platformSetting.upsert({
+     *   create: {
+     *     // ... data to create a PlatformSetting
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PlatformSetting we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PlatformSettingUpsertArgs>(args: SelectSubset<T, PlatformSettingUpsertArgs<ExtArgs>>): Prisma__PlatformSettingClient<$Result.GetResult<Prisma.$PlatformSettingPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of PlatformSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingCountArgs} args - Arguments to filter PlatformSettings to count.
+     * @example
+     * // Count the number of PlatformSettings
+     * const count = await prisma.platformSetting.count({
+     *   where: {
+     *     // ... the filter for the PlatformSettings we want to count
+     *   }
+     * })
+    **/
+    count<T extends PlatformSettingCountArgs>(
+      args?: Subset<T, PlatformSettingCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PlatformSettingCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PlatformSetting.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PlatformSettingAggregateArgs>(args: Subset<T, PlatformSettingAggregateArgs>): Prisma.PrismaPromise<GetPlatformSettingAggregateType<T>>
+
+    /**
+     * Group by PlatformSetting.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlatformSettingGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PlatformSettingGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PlatformSettingGroupByArgs['orderBy'] }
+        : { orderBy?: PlatformSettingGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PlatformSettingGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPlatformSettingGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PlatformSetting model
+   */
+  readonly fields: PlatformSettingFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PlatformSetting.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PlatformSettingClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PlatformSetting model
+   */
+  interface PlatformSettingFieldRefs {
+    readonly key: FieldRef<"PlatformSetting", 'String'>
+    readonly value: FieldRef<"PlatformSetting", 'String'>
+    readonly updatedAt: FieldRef<"PlatformSetting", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PlatformSetting findUnique
+   */
+  export type PlatformSettingFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter, which PlatformSetting to fetch.
+     */
+    where: PlatformSettingWhereUniqueInput
+  }
+
+  /**
+   * PlatformSetting findUniqueOrThrow
+   */
+  export type PlatformSettingFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter, which PlatformSetting to fetch.
+     */
+    where: PlatformSettingWhereUniqueInput
+  }
+
+  /**
+   * PlatformSetting findFirst
+   */
+  export type PlatformSettingFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter, which PlatformSetting to fetch.
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlatformSettings to fetch.
+     */
+    orderBy?: PlatformSettingOrderByWithRelationInput | PlatformSettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PlatformSettings.
+     */
+    cursor?: PlatformSettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlatformSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlatformSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PlatformSettings.
+     */
+    distinct?: PlatformSettingScalarFieldEnum | PlatformSettingScalarFieldEnum[]
+  }
+
+  /**
+   * PlatformSetting findFirstOrThrow
+   */
+  export type PlatformSettingFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter, which PlatformSetting to fetch.
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlatformSettings to fetch.
+     */
+    orderBy?: PlatformSettingOrderByWithRelationInput | PlatformSettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PlatformSettings.
+     */
+    cursor?: PlatformSettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlatformSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlatformSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PlatformSettings.
+     */
+    distinct?: PlatformSettingScalarFieldEnum | PlatformSettingScalarFieldEnum[]
+  }
+
+  /**
+   * PlatformSetting findMany
+   */
+  export type PlatformSettingFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter, which PlatformSettings to fetch.
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlatformSettings to fetch.
+     */
+    orderBy?: PlatformSettingOrderByWithRelationInput | PlatformSettingOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PlatformSettings.
+     */
+    cursor?: PlatformSettingWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlatformSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlatformSettings.
+     */
+    skip?: number
+    distinct?: PlatformSettingScalarFieldEnum | PlatformSettingScalarFieldEnum[]
+  }
+
+  /**
+   * PlatformSetting create
+   */
+  export type PlatformSettingCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * The data needed to create a PlatformSetting.
+     */
+    data: XOR<PlatformSettingCreateInput, PlatformSettingUncheckedCreateInput>
+  }
+
+  /**
+   * PlatformSetting createMany
+   */
+  export type PlatformSettingCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PlatformSettings.
+     */
+    data: PlatformSettingCreateManyInput | PlatformSettingCreateManyInput[]
+  }
+
+  /**
+   * PlatformSetting createManyAndReturn
+   */
+  export type PlatformSettingCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * The data used to create many PlatformSettings.
+     */
+    data: PlatformSettingCreateManyInput | PlatformSettingCreateManyInput[]
+  }
+
+  /**
+   * PlatformSetting update
+   */
+  export type PlatformSettingUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * The data needed to update a PlatformSetting.
+     */
+    data: XOR<PlatformSettingUpdateInput, PlatformSettingUncheckedUpdateInput>
+    /**
+     * Choose, which PlatformSetting to update.
+     */
+    where: PlatformSettingWhereUniqueInput
+  }
+
+  /**
+   * PlatformSetting updateMany
+   */
+  export type PlatformSettingUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PlatformSettings.
+     */
+    data: XOR<PlatformSettingUpdateManyMutationInput, PlatformSettingUncheckedUpdateManyInput>
+    /**
+     * Filter which PlatformSettings to update
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * Limit how many PlatformSettings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PlatformSetting updateManyAndReturn
+   */
+  export type PlatformSettingUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * The data used to update PlatformSettings.
+     */
+    data: XOR<PlatformSettingUpdateManyMutationInput, PlatformSettingUncheckedUpdateManyInput>
+    /**
+     * Filter which PlatformSettings to update
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * Limit how many PlatformSettings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PlatformSetting upsert
+   */
+  export type PlatformSettingUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * The filter to search for the PlatformSetting to update in case it exists.
+     */
+    where: PlatformSettingWhereUniqueInput
+    /**
+     * In case the PlatformSetting found by the `where` argument doesn't exist, create a new PlatformSetting with this data.
+     */
+    create: XOR<PlatformSettingCreateInput, PlatformSettingUncheckedCreateInput>
+    /**
+     * In case the PlatformSetting was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PlatformSettingUpdateInput, PlatformSettingUncheckedUpdateInput>
+  }
+
+  /**
+   * PlatformSetting delete
+   */
+  export type PlatformSettingDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+    /**
+     * Filter which PlatformSetting to delete.
+     */
+    where: PlatformSettingWhereUniqueInput
+  }
+
+  /**
+   * PlatformSetting deleteMany
+   */
+  export type PlatformSettingDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PlatformSettings to delete
+     */
+    where?: PlatformSettingWhereInput
+    /**
+     * Limit how many PlatformSettings to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * PlatformSetting without action
+   */
+  export type PlatformSettingDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlatformSetting
+     */
+    select?: PlatformSettingSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlatformSetting
+     */
+    omit?: PlatformSettingOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -6818,8 +10713,25 @@ export namespace Prisma {
     dbName: 'dbName',
     isActive: 'isActive',
     plan: 'plan',
+    subscriptionStart: 'subscriptionStart',
+    subscriptionEnd: 'subscriptionEnd',
+    maxEmployees: 'maxEmployees',
+    maxProjects: 'maxProjects',
+    maxCustomers: 'maxCustomers',
+    maxStorageBytes: 'maxStorageBytes',
     storageQuotaBytes: 'storageQuotaBytes',
     storageUsedBytes: 'storageUsedBytes',
+    studioPhone: 'studioPhone',
+    ownerName: 'ownerName',
+    ownerPhone: 'ownerPhone',
+    city: 'city',
+    address: 'address',
+    notes: 'notes',
+    kavenegarApikey: 'kavenegarApikey',
+    kavenegarSender: 'kavenegarSender',
+    kavenegarLocalId: 'kavenegarLocalId',
+    kavenegarStatus: 'kavenegarStatus',
+    smsCreditRial: 'smsCreditRial',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -6832,6 +10744,7 @@ export namespace Prisma {
     phone: 'phone',
     passwordHash: 'passwordHash',
     name: 'name',
+    isSuperAdmin: 'isSuperAdmin',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -6878,6 +10791,48 @@ export namespace Prisma {
   export type SessionScalarFieldEnum = (typeof SessionScalarFieldEnum)[keyof typeof SessionScalarFieldEnum]
 
 
+  export const SmsTransactionScalarFieldEnum: {
+    id: 'id',
+    studioId: 'studioId',
+    type: 'type',
+    amountRial: 'amountRial',
+    receptor: 'receptor',
+    messageSnippet: 'messageSnippet',
+    description: 'description',
+    kavenegarMessageId: 'kavenegarMessageId',
+    status: 'status',
+    createdAt: 'createdAt'
+  };
+
+  export type SmsTransactionScalarFieldEnum = (typeof SmsTransactionScalarFieldEnum)[keyof typeof SmsTransactionScalarFieldEnum]
+
+
+  export const SubscriptionEventScalarFieldEnum: {
+    id: 'id',
+    studioId: 'studioId',
+    eventType: 'eventType',
+    fromPlan: 'fromPlan',
+    toPlan: 'toPlan',
+    amountPaidToman: 'amountPaidToman',
+    durationDays: 'durationDays',
+    startAt: 'startAt',
+    endAt: 'endAt',
+    note: 'note',
+    createdAt: 'createdAt'
+  };
+
+  export type SubscriptionEventScalarFieldEnum = (typeof SubscriptionEventScalarFieldEnum)[keyof typeof SubscriptionEventScalarFieldEnum]
+
+
+  export const PlatformSettingScalarFieldEnum: {
+    key: 'key',
+    value: 'value',
+    updatedAt: 'updatedAt'
+  };
+
+  export type PlatformSettingScalarFieldEnum = (typeof PlatformSettingScalarFieldEnum)[keyof typeof PlatformSettingScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -6914,13 +10869,6 @@ export namespace Prisma {
 
 
   /**
-   * Reference to a field of type 'BigInt'
-   */
-  export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
-    
-
-
-  /**
    * Reference to a field of type 'DateTime'
    */
   export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
@@ -6931,6 +10879,13 @@ export namespace Prisma {
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'BigInt'
+   */
+  export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
     
 
 
@@ -6954,11 +10909,30 @@ export namespace Prisma {
     dbName?: StringFilter<"Studio"> | string
     isActive?: BoolFilter<"Studio"> | boolean
     plan?: StringFilter<"Studio"> | string
+    subscriptionStart?: DateTimeNullableFilter<"Studio"> | Date | string | null
+    subscriptionEnd?: DateTimeNullableFilter<"Studio"> | Date | string | null
+    maxEmployees?: IntFilter<"Studio"> | number
+    maxProjects?: IntFilter<"Studio"> | number
+    maxCustomers?: IntFilter<"Studio"> | number
+    maxStorageBytes?: BigIntFilter<"Studio"> | bigint | number
     storageQuotaBytes?: BigIntFilter<"Studio"> | bigint | number
     storageUsedBytes?: BigIntFilter<"Studio"> | bigint | number
+    studioPhone?: StringNullableFilter<"Studio"> | string | null
+    ownerName?: StringNullableFilter<"Studio"> | string | null
+    ownerPhone?: StringNullableFilter<"Studio"> | string | null
+    city?: StringNullableFilter<"Studio"> | string | null
+    address?: StringNullableFilter<"Studio"> | string | null
+    notes?: StringNullableFilter<"Studio"> | string | null
+    kavenegarApikey?: StringNullableFilter<"Studio"> | string | null
+    kavenegarSender?: StringNullableFilter<"Studio"> | string | null
+    kavenegarLocalId?: StringNullableFilter<"Studio"> | string | null
+    kavenegarStatus?: StringFilter<"Studio"> | string
+    smsCreditRial?: IntFilter<"Studio"> | number
     createdAt?: DateTimeFilter<"Studio"> | Date | string
     updatedAt?: DateTimeFilter<"Studio"> | Date | string
     memberships?: StudioMembershipListRelationFilter
+    smsTransactions?: SmsTransactionListRelationFilter
+    subscriptions?: SubscriptionEventListRelationFilter
   }
 
   export type StudioOrderByWithRelationInput = {
@@ -6968,11 +10942,30 @@ export namespace Prisma {
     dbName?: SortOrder
     isActive?: SortOrder
     plan?: SortOrder
+    subscriptionStart?: SortOrderInput | SortOrder
+    subscriptionEnd?: SortOrderInput | SortOrder
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    studioPhone?: SortOrderInput | SortOrder
+    ownerName?: SortOrderInput | SortOrder
+    ownerPhone?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    address?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    kavenegarApikey?: SortOrderInput | SortOrder
+    kavenegarSender?: SortOrderInput | SortOrder
+    kavenegarLocalId?: SortOrderInput | SortOrder
+    kavenegarStatus?: SortOrder
+    smsCreditRial?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     memberships?: StudioMembershipOrderByRelationAggregateInput
+    smsTransactions?: SmsTransactionOrderByRelationAggregateInput
+    subscriptions?: SubscriptionEventOrderByRelationAggregateInput
   }
 
   export type StudioWhereUniqueInput = Prisma.AtLeast<{
@@ -6985,11 +10978,30 @@ export namespace Prisma {
     nameEn?: StringNullableFilter<"Studio"> | string | null
     isActive?: BoolFilter<"Studio"> | boolean
     plan?: StringFilter<"Studio"> | string
+    subscriptionStart?: DateTimeNullableFilter<"Studio"> | Date | string | null
+    subscriptionEnd?: DateTimeNullableFilter<"Studio"> | Date | string | null
+    maxEmployees?: IntFilter<"Studio"> | number
+    maxProjects?: IntFilter<"Studio"> | number
+    maxCustomers?: IntFilter<"Studio"> | number
+    maxStorageBytes?: BigIntFilter<"Studio"> | bigint | number
     storageQuotaBytes?: BigIntFilter<"Studio"> | bigint | number
     storageUsedBytes?: BigIntFilter<"Studio"> | bigint | number
+    studioPhone?: StringNullableFilter<"Studio"> | string | null
+    ownerName?: StringNullableFilter<"Studio"> | string | null
+    ownerPhone?: StringNullableFilter<"Studio"> | string | null
+    city?: StringNullableFilter<"Studio"> | string | null
+    address?: StringNullableFilter<"Studio"> | string | null
+    notes?: StringNullableFilter<"Studio"> | string | null
+    kavenegarApikey?: StringNullableFilter<"Studio"> | string | null
+    kavenegarSender?: StringNullableFilter<"Studio"> | string | null
+    kavenegarLocalId?: StringNullableFilter<"Studio"> | string | null
+    kavenegarStatus?: StringFilter<"Studio"> | string
+    smsCreditRial?: IntFilter<"Studio"> | number
     createdAt?: DateTimeFilter<"Studio"> | Date | string
     updatedAt?: DateTimeFilter<"Studio"> | Date | string
     memberships?: StudioMembershipListRelationFilter
+    smsTransactions?: SmsTransactionListRelationFilter
+    subscriptions?: SubscriptionEventListRelationFilter
   }, "id" | "dbName">
 
   export type StudioOrderByWithAggregationInput = {
@@ -6999,8 +11011,25 @@ export namespace Prisma {
     dbName?: SortOrder
     isActive?: SortOrder
     plan?: SortOrder
+    subscriptionStart?: SortOrderInput | SortOrder
+    subscriptionEnd?: SortOrderInput | SortOrder
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    studioPhone?: SortOrderInput | SortOrder
+    ownerName?: SortOrderInput | SortOrder
+    ownerPhone?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    address?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    kavenegarApikey?: SortOrderInput | SortOrder
+    kavenegarSender?: SortOrderInput | SortOrder
+    kavenegarLocalId?: SortOrderInput | SortOrder
+    kavenegarStatus?: SortOrder
+    smsCreditRial?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: StudioCountOrderByAggregateInput
@@ -7020,8 +11049,25 @@ export namespace Prisma {
     dbName?: StringWithAggregatesFilter<"Studio"> | string
     isActive?: BoolWithAggregatesFilter<"Studio"> | boolean
     plan?: StringWithAggregatesFilter<"Studio"> | string
+    subscriptionStart?: DateTimeNullableWithAggregatesFilter<"Studio"> | Date | string | null
+    subscriptionEnd?: DateTimeNullableWithAggregatesFilter<"Studio"> | Date | string | null
+    maxEmployees?: IntWithAggregatesFilter<"Studio"> | number
+    maxProjects?: IntWithAggregatesFilter<"Studio"> | number
+    maxCustomers?: IntWithAggregatesFilter<"Studio"> | number
+    maxStorageBytes?: BigIntWithAggregatesFilter<"Studio"> | bigint | number
     storageQuotaBytes?: BigIntWithAggregatesFilter<"Studio"> | bigint | number
     storageUsedBytes?: BigIntWithAggregatesFilter<"Studio"> | bigint | number
+    studioPhone?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    ownerName?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    ownerPhone?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    city?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    address?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    notes?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    kavenegarApikey?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    kavenegarSender?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    kavenegarLocalId?: StringNullableWithAggregatesFilter<"Studio"> | string | null
+    kavenegarStatus?: StringWithAggregatesFilter<"Studio"> | string
+    smsCreditRial?: IntWithAggregatesFilter<"Studio"> | number
     createdAt?: DateTimeWithAggregatesFilter<"Studio"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Studio"> | Date | string
   }
@@ -7034,6 +11080,7 @@ export namespace Prisma {
     phone?: StringFilter<"MasterUser"> | string
     passwordHash?: StringNullableFilter<"MasterUser"> | string | null
     name?: StringFilter<"MasterUser"> | string
+    isSuperAdmin?: BoolFilter<"MasterUser"> | boolean
     createdAt?: DateTimeFilter<"MasterUser"> | Date | string
     updatedAt?: DateTimeFilter<"MasterUser"> | Date | string
     memberships?: StudioMembershipListRelationFilter
@@ -7045,6 +11092,7 @@ export namespace Prisma {
     phone?: SortOrder
     passwordHash?: SortOrderInput | SortOrder
     name?: SortOrder
+    isSuperAdmin?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     memberships?: StudioMembershipOrderByRelationAggregateInput
@@ -7059,6 +11107,7 @@ export namespace Prisma {
     NOT?: MasterUserWhereInput | MasterUserWhereInput[]
     passwordHash?: StringNullableFilter<"MasterUser"> | string | null
     name?: StringFilter<"MasterUser"> | string
+    isSuperAdmin?: BoolFilter<"MasterUser"> | boolean
     createdAt?: DateTimeFilter<"MasterUser"> | Date | string
     updatedAt?: DateTimeFilter<"MasterUser"> | Date | string
     memberships?: StudioMembershipListRelationFilter
@@ -7070,6 +11119,7 @@ export namespace Prisma {
     phone?: SortOrder
     passwordHash?: SortOrderInput | SortOrder
     name?: SortOrder
+    isSuperAdmin?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: MasterUserCountOrderByAggregateInput
@@ -7085,6 +11135,7 @@ export namespace Prisma {
     phone?: StringWithAggregatesFilter<"MasterUser"> | string
     passwordHash?: StringNullableWithAggregatesFilter<"MasterUser"> | string | null
     name?: StringWithAggregatesFilter<"MasterUser"> | string
+    isSuperAdmin?: BoolWithAggregatesFilter<"MasterUser"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"MasterUser"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"MasterUser"> | Date | string
   }
@@ -7287,6 +11338,217 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Session"> | Date | string
   }
 
+  export type SmsTransactionWhereInput = {
+    AND?: SmsTransactionWhereInput | SmsTransactionWhereInput[]
+    OR?: SmsTransactionWhereInput[]
+    NOT?: SmsTransactionWhereInput | SmsTransactionWhereInput[]
+    id?: StringFilter<"SmsTransaction"> | string
+    studioId?: StringFilter<"SmsTransaction"> | string
+    type?: StringFilter<"SmsTransaction"> | string
+    amountRial?: IntFilter<"SmsTransaction"> | number
+    receptor?: StringNullableFilter<"SmsTransaction"> | string | null
+    messageSnippet?: StringNullableFilter<"SmsTransaction"> | string | null
+    description?: StringNullableFilter<"SmsTransaction"> | string | null
+    kavenegarMessageId?: StringNullableFilter<"SmsTransaction"> | string | null
+    status?: StringFilter<"SmsTransaction"> | string
+    createdAt?: DateTimeFilter<"SmsTransaction"> | Date | string
+    studio?: XOR<StudioScalarRelationFilter, StudioWhereInput>
+  }
+
+  export type SmsTransactionOrderByWithRelationInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    type?: SortOrder
+    amountRial?: SortOrder
+    receptor?: SortOrderInput | SortOrder
+    messageSnippet?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    kavenegarMessageId?: SortOrderInput | SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    studio?: StudioOrderByWithRelationInput
+  }
+
+  export type SmsTransactionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SmsTransactionWhereInput | SmsTransactionWhereInput[]
+    OR?: SmsTransactionWhereInput[]
+    NOT?: SmsTransactionWhereInput | SmsTransactionWhereInput[]
+    studioId?: StringFilter<"SmsTransaction"> | string
+    type?: StringFilter<"SmsTransaction"> | string
+    amountRial?: IntFilter<"SmsTransaction"> | number
+    receptor?: StringNullableFilter<"SmsTransaction"> | string | null
+    messageSnippet?: StringNullableFilter<"SmsTransaction"> | string | null
+    description?: StringNullableFilter<"SmsTransaction"> | string | null
+    kavenegarMessageId?: StringNullableFilter<"SmsTransaction"> | string | null
+    status?: StringFilter<"SmsTransaction"> | string
+    createdAt?: DateTimeFilter<"SmsTransaction"> | Date | string
+    studio?: XOR<StudioScalarRelationFilter, StudioWhereInput>
+  }, "id">
+
+  export type SmsTransactionOrderByWithAggregationInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    type?: SortOrder
+    amountRial?: SortOrder
+    receptor?: SortOrderInput | SortOrder
+    messageSnippet?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    kavenegarMessageId?: SortOrderInput | SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    _count?: SmsTransactionCountOrderByAggregateInput
+    _avg?: SmsTransactionAvgOrderByAggregateInput
+    _max?: SmsTransactionMaxOrderByAggregateInput
+    _min?: SmsTransactionMinOrderByAggregateInput
+    _sum?: SmsTransactionSumOrderByAggregateInput
+  }
+
+  export type SmsTransactionScalarWhereWithAggregatesInput = {
+    AND?: SmsTransactionScalarWhereWithAggregatesInput | SmsTransactionScalarWhereWithAggregatesInput[]
+    OR?: SmsTransactionScalarWhereWithAggregatesInput[]
+    NOT?: SmsTransactionScalarWhereWithAggregatesInput | SmsTransactionScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SmsTransaction"> | string
+    studioId?: StringWithAggregatesFilter<"SmsTransaction"> | string
+    type?: StringWithAggregatesFilter<"SmsTransaction"> | string
+    amountRial?: IntWithAggregatesFilter<"SmsTransaction"> | number
+    receptor?: StringNullableWithAggregatesFilter<"SmsTransaction"> | string | null
+    messageSnippet?: StringNullableWithAggregatesFilter<"SmsTransaction"> | string | null
+    description?: StringNullableWithAggregatesFilter<"SmsTransaction"> | string | null
+    kavenegarMessageId?: StringNullableWithAggregatesFilter<"SmsTransaction"> | string | null
+    status?: StringWithAggregatesFilter<"SmsTransaction"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"SmsTransaction"> | Date | string
+  }
+
+  export type SubscriptionEventWhereInput = {
+    AND?: SubscriptionEventWhereInput | SubscriptionEventWhereInput[]
+    OR?: SubscriptionEventWhereInput[]
+    NOT?: SubscriptionEventWhereInput | SubscriptionEventWhereInput[]
+    id?: StringFilter<"SubscriptionEvent"> | string
+    studioId?: StringFilter<"SubscriptionEvent"> | string
+    eventType?: StringFilter<"SubscriptionEvent"> | string
+    fromPlan?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    toPlan?: StringFilter<"SubscriptionEvent"> | string
+    amountPaidToman?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    durationDays?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    startAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    endAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    note?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    createdAt?: DateTimeFilter<"SubscriptionEvent"> | Date | string
+    studio?: XOR<StudioScalarRelationFilter, StudioWhereInput>
+  }
+
+  export type SubscriptionEventOrderByWithRelationInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    eventType?: SortOrder
+    fromPlan?: SortOrderInput | SortOrder
+    toPlan?: SortOrder
+    amountPaidToman?: SortOrderInput | SortOrder
+    durationDays?: SortOrderInput | SortOrder
+    startAt?: SortOrderInput | SortOrder
+    endAt?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    studio?: StudioOrderByWithRelationInput
+  }
+
+  export type SubscriptionEventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SubscriptionEventWhereInput | SubscriptionEventWhereInput[]
+    OR?: SubscriptionEventWhereInput[]
+    NOT?: SubscriptionEventWhereInput | SubscriptionEventWhereInput[]
+    studioId?: StringFilter<"SubscriptionEvent"> | string
+    eventType?: StringFilter<"SubscriptionEvent"> | string
+    fromPlan?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    toPlan?: StringFilter<"SubscriptionEvent"> | string
+    amountPaidToman?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    durationDays?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    startAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    endAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    note?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    createdAt?: DateTimeFilter<"SubscriptionEvent"> | Date | string
+    studio?: XOR<StudioScalarRelationFilter, StudioWhereInput>
+  }, "id">
+
+  export type SubscriptionEventOrderByWithAggregationInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    eventType?: SortOrder
+    fromPlan?: SortOrderInput | SortOrder
+    toPlan?: SortOrder
+    amountPaidToman?: SortOrderInput | SortOrder
+    durationDays?: SortOrderInput | SortOrder
+    startAt?: SortOrderInput | SortOrder
+    endAt?: SortOrderInput | SortOrder
+    note?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: SubscriptionEventCountOrderByAggregateInput
+    _avg?: SubscriptionEventAvgOrderByAggregateInput
+    _max?: SubscriptionEventMaxOrderByAggregateInput
+    _min?: SubscriptionEventMinOrderByAggregateInput
+    _sum?: SubscriptionEventSumOrderByAggregateInput
+  }
+
+  export type SubscriptionEventScalarWhereWithAggregatesInput = {
+    AND?: SubscriptionEventScalarWhereWithAggregatesInput | SubscriptionEventScalarWhereWithAggregatesInput[]
+    OR?: SubscriptionEventScalarWhereWithAggregatesInput[]
+    NOT?: SubscriptionEventScalarWhereWithAggregatesInput | SubscriptionEventScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SubscriptionEvent"> | string
+    studioId?: StringWithAggregatesFilter<"SubscriptionEvent"> | string
+    eventType?: StringWithAggregatesFilter<"SubscriptionEvent"> | string
+    fromPlan?: StringNullableWithAggregatesFilter<"SubscriptionEvent"> | string | null
+    toPlan?: StringWithAggregatesFilter<"SubscriptionEvent"> | string
+    amountPaidToman?: IntNullableWithAggregatesFilter<"SubscriptionEvent"> | number | null
+    durationDays?: IntNullableWithAggregatesFilter<"SubscriptionEvent"> | number | null
+    startAt?: DateTimeNullableWithAggregatesFilter<"SubscriptionEvent"> | Date | string | null
+    endAt?: DateTimeNullableWithAggregatesFilter<"SubscriptionEvent"> | Date | string | null
+    note?: StringNullableWithAggregatesFilter<"SubscriptionEvent"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"SubscriptionEvent"> | Date | string
+  }
+
+  export type PlatformSettingWhereInput = {
+    AND?: PlatformSettingWhereInput | PlatformSettingWhereInput[]
+    OR?: PlatformSettingWhereInput[]
+    NOT?: PlatformSettingWhereInput | PlatformSettingWhereInput[]
+    key?: StringFilter<"PlatformSetting"> | string
+    value?: StringFilter<"PlatformSetting"> | string
+    updatedAt?: DateTimeFilter<"PlatformSetting"> | Date | string
+  }
+
+  export type PlatformSettingOrderByWithRelationInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PlatformSettingWhereUniqueInput = Prisma.AtLeast<{
+    key?: string
+    AND?: PlatformSettingWhereInput | PlatformSettingWhereInput[]
+    OR?: PlatformSettingWhereInput[]
+    NOT?: PlatformSettingWhereInput | PlatformSettingWhereInput[]
+    value?: StringFilter<"PlatformSetting"> | string
+    updatedAt?: DateTimeFilter<"PlatformSetting"> | Date | string
+  }, "key">
+
+  export type PlatformSettingOrderByWithAggregationInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+    _count?: PlatformSettingCountOrderByAggregateInput
+    _max?: PlatformSettingMaxOrderByAggregateInput
+    _min?: PlatformSettingMinOrderByAggregateInput
+  }
+
+  export type PlatformSettingScalarWhereWithAggregatesInput = {
+    AND?: PlatformSettingScalarWhereWithAggregatesInput | PlatformSettingScalarWhereWithAggregatesInput[]
+    OR?: PlatformSettingScalarWhereWithAggregatesInput[]
+    NOT?: PlatformSettingScalarWhereWithAggregatesInput | PlatformSettingScalarWhereWithAggregatesInput[]
+    key?: StringWithAggregatesFilter<"PlatformSetting"> | string
+    value?: StringWithAggregatesFilter<"PlatformSetting"> | string
+    updatedAt?: DateTimeWithAggregatesFilter<"PlatformSetting"> | Date | string
+  }
+
   export type StudioCreateInput = {
     id?: string
     name: string
@@ -7294,11 +11556,30 @@ export namespace Prisma {
     dbName: string
     isActive?: boolean
     plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
     storageQuotaBytes?: bigint | number
     storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipCreateNestedManyWithoutStudioInput
+    smsTransactions?: SmsTransactionCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventCreateNestedManyWithoutStudioInput
   }
 
   export type StudioUncheckedCreateInput = {
@@ -7308,11 +11589,30 @@ export namespace Prisma {
     dbName: string
     isActive?: boolean
     plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
     storageQuotaBytes?: bigint | number
     storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipUncheckedCreateNestedManyWithoutStudioInput
+    smsTransactions?: SmsTransactionUncheckedCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventUncheckedCreateNestedManyWithoutStudioInput
   }
 
   export type StudioUpdateInput = {
@@ -7322,11 +11622,30 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUpdateManyWithoutStudioNestedInput
+    smsTransactions?: SmsTransactionUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUpdateManyWithoutStudioNestedInput
   }
 
   export type StudioUncheckedUpdateInput = {
@@ -7336,11 +11655,30 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUncheckedUpdateManyWithoutStudioNestedInput
+    smsTransactions?: SmsTransactionUncheckedUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUncheckedUpdateManyWithoutStudioNestedInput
   }
 
   export type StudioCreateManyInput = {
@@ -7350,8 +11688,25 @@ export namespace Prisma {
     dbName: string
     isActive?: boolean
     plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
     storageQuotaBytes?: bigint | number
     storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -7363,8 +11718,25 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -7376,8 +11748,25 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -7387,6 +11776,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipCreateNestedManyWithoutUserInput
@@ -7398,6 +11788,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipUncheckedCreateNestedManyWithoutUserInput
@@ -7409,6 +11800,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUpdateManyWithoutUserNestedInput
@@ -7420,6 +11812,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUncheckedUpdateManyWithoutUserNestedInput
@@ -7431,6 +11824,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -7440,6 +11834,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -7449,6 +11844,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -7660,6 +12056,235 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type SmsTransactionCreateInput = {
+    id?: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+    studio: StudioCreateNestedOneWithoutSmsTransactionsInput
+  }
+
+  export type SmsTransactionUncheckedCreateInput = {
+    id?: string
+    studioId: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type SmsTransactionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    studio?: StudioUpdateOneRequiredWithoutSmsTransactionsNestedInput
+  }
+
+  export type SmsTransactionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    studioId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SmsTransactionCreateManyInput = {
+    id?: string
+    studioId: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type SmsTransactionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SmsTransactionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    studioId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventCreateInput = {
+    id?: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
+    createdAt?: Date | string
+    studio: StudioCreateNestedOneWithoutSubscriptionsInput
+  }
+
+  export type SubscriptionEventUncheckedCreateInput = {
+    id?: string
+    studioId: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SubscriptionEventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    studio?: StudioUpdateOneRequiredWithoutSubscriptionsNestedInput
+  }
+
+  export type SubscriptionEventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    studioId?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventCreateManyInput = {
+    id?: string
+    studioId: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SubscriptionEventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    studioId?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PlatformSettingCreateInput = {
+    key: string
+    value?: string
+    updatedAt?: Date | string
+  }
+
+  export type PlatformSettingUncheckedCreateInput = {
+    key: string
+    value?: string
+    updatedAt?: Date | string
+  }
+
+  export type PlatformSettingUpdateInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PlatformSettingUncheckedUpdateInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PlatformSettingCreateManyInput = {
+    key: string
+    value?: string
+    updatedAt?: Date | string
+  }
+
+  export type PlatformSettingUpdateManyMutationInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PlatformSettingUncheckedUpdateManyInput = {
+    key?: StringFieldUpdateOperationsInput | string
+    value?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[]
@@ -7693,6 +12318,28 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
+  export type DateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | null
+    notIn?: Date[] | string[] | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
   export type BigIntFilter<$PrismaModel = never> = {
     equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
     in?: bigint[] | number[]
@@ -7721,12 +12368,32 @@ export namespace Prisma {
     none?: StudioMembershipWhereInput
   }
 
+  export type SmsTransactionListRelationFilter = {
+    every?: SmsTransactionWhereInput
+    some?: SmsTransactionWhereInput
+    none?: SmsTransactionWhereInput
+  }
+
+  export type SubscriptionEventListRelationFilter = {
+    every?: SubscriptionEventWhereInput
+    some?: SubscriptionEventWhereInput
+    none?: SubscriptionEventWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
   }
 
   export type StudioMembershipOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SmsTransactionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SubscriptionEventOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -7737,15 +12404,37 @@ export namespace Prisma {
     dbName?: SortOrder
     isActive?: SortOrder
     plan?: SortOrder
+    subscriptionStart?: SortOrder
+    subscriptionEnd?: SortOrder
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    studioPhone?: SortOrder
+    ownerName?: SortOrder
+    ownerPhone?: SortOrder
+    city?: SortOrder
+    address?: SortOrder
+    notes?: SortOrder
+    kavenegarApikey?: SortOrder
+    kavenegarSender?: SortOrder
+    kavenegarLocalId?: SortOrder
+    kavenegarStatus?: SortOrder
+    smsCreditRial?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type StudioAvgOrderByAggregateInput = {
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    smsCreditRial?: SortOrder
   }
 
   export type StudioMaxOrderByAggregateInput = {
@@ -7755,8 +12444,25 @@ export namespace Prisma {
     dbName?: SortOrder
     isActive?: SortOrder
     plan?: SortOrder
+    subscriptionStart?: SortOrder
+    subscriptionEnd?: SortOrder
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    studioPhone?: SortOrder
+    ownerName?: SortOrder
+    ownerPhone?: SortOrder
+    city?: SortOrder
+    address?: SortOrder
+    notes?: SortOrder
+    kavenegarApikey?: SortOrder
+    kavenegarSender?: SortOrder
+    kavenegarLocalId?: SortOrder
+    kavenegarStatus?: SortOrder
+    smsCreditRial?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -7768,15 +12474,37 @@ export namespace Prisma {
     dbName?: SortOrder
     isActive?: SortOrder
     plan?: SortOrder
+    subscriptionStart?: SortOrder
+    subscriptionEnd?: SortOrder
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    studioPhone?: SortOrder
+    ownerName?: SortOrder
+    ownerPhone?: SortOrder
+    city?: SortOrder
+    address?: SortOrder
+    notes?: SortOrder
+    kavenegarApikey?: SortOrder
+    kavenegarSender?: SortOrder
+    kavenegarLocalId?: SortOrder
+    kavenegarStatus?: SortOrder
+    smsCreditRial?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type StudioSumOrderByAggregateInput = {
+    maxEmployees?: SortOrder
+    maxProjects?: SortOrder
+    maxCustomers?: SortOrder
+    maxStorageBytes?: SortOrder
     storageQuotaBytes?: SortOrder
     storageUsedBytes?: SortOrder
+    smsCreditRial?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -7819,6 +12547,36 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
+  }
+
+  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | null
+    notIn?: Date[] | string[] | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type BigIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -7866,6 +12624,7 @@ export namespace Prisma {
     phone?: SortOrder
     passwordHash?: SortOrder
     name?: SortOrder
+    isSuperAdmin?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -7875,6 +12634,7 @@ export namespace Prisma {
     phone?: SortOrder
     passwordHash?: SortOrder
     name?: SortOrder
+    isSuperAdmin?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -7884,6 +12644,7 @@ export namespace Prisma {
     phone?: SortOrder
     passwordHash?: SortOrder
     name?: SortOrder
+    isSuperAdmin?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -7930,17 +12691,6 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
-  export type IntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[]
-    notIn?: number[]
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-
   export type OtpCodeCountOrderByAggregateInput = {
     id?: SortOrder
     phone?: SortOrder
@@ -7982,22 +12732,6 @@ export namespace Prisma {
     attempts?: SortOrder
   }
 
-  export type IntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[]
-    notIn?: number[]
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
-  }
-
   export type SessionCountOrderByAggregateInput = {
     id?: SortOrder
     token?: SortOrder
@@ -8028,6 +12762,150 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type SmsTransactionCountOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    type?: SortOrder
+    amountRial?: SortOrder
+    receptor?: SortOrder
+    messageSnippet?: SortOrder
+    description?: SortOrder
+    kavenegarMessageId?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SmsTransactionAvgOrderByAggregateInput = {
+    amountRial?: SortOrder
+  }
+
+  export type SmsTransactionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    type?: SortOrder
+    amountRial?: SortOrder
+    receptor?: SortOrder
+    messageSnippet?: SortOrder
+    description?: SortOrder
+    kavenegarMessageId?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SmsTransactionMinOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    type?: SortOrder
+    amountRial?: SortOrder
+    receptor?: SortOrder
+    messageSnippet?: SortOrder
+    description?: SortOrder
+    kavenegarMessageId?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SmsTransactionSumOrderByAggregateInput = {
+    amountRial?: SortOrder
+  }
+
+  export type IntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | null
+    notIn?: number[] | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type SubscriptionEventCountOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    eventType?: SortOrder
+    fromPlan?: SortOrder
+    toPlan?: SortOrder
+    amountPaidToman?: SortOrder
+    durationDays?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SubscriptionEventAvgOrderByAggregateInput = {
+    amountPaidToman?: SortOrder
+    durationDays?: SortOrder
+  }
+
+  export type SubscriptionEventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    eventType?: SortOrder
+    fromPlan?: SortOrder
+    toPlan?: SortOrder
+    amountPaidToman?: SortOrder
+    durationDays?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SubscriptionEventMinOrderByAggregateInput = {
+    id?: SortOrder
+    studioId?: SortOrder
+    eventType?: SortOrder
+    fromPlan?: SortOrder
+    toPlan?: SortOrder
+    amountPaidToman?: SortOrder
+    durationDays?: SortOrder
+    startAt?: SortOrder
+    endAt?: SortOrder
+    note?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SubscriptionEventSumOrderByAggregateInput = {
+    amountPaidToman?: SortOrder
+    durationDays?: SortOrder
+  }
+
+  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | null
+    notIn?: number[] | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type PlatformSettingCountOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PlatformSettingMaxOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type PlatformSettingMinOrderByAggregateInput = {
+    key?: SortOrder
+    value?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type StudioMembershipCreateNestedManyWithoutStudioInput = {
     create?: XOR<StudioMembershipCreateWithoutStudioInput, StudioMembershipUncheckedCreateWithoutStudioInput> | StudioMembershipCreateWithoutStudioInput[] | StudioMembershipUncheckedCreateWithoutStudioInput[]
     connectOrCreate?: StudioMembershipCreateOrConnectWithoutStudioInput | StudioMembershipCreateOrConnectWithoutStudioInput[]
@@ -8035,11 +12913,39 @@ export namespace Prisma {
     connect?: StudioMembershipWhereUniqueInput | StudioMembershipWhereUniqueInput[]
   }
 
+  export type SmsTransactionCreateNestedManyWithoutStudioInput = {
+    create?: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput> | SmsTransactionCreateWithoutStudioInput[] | SmsTransactionUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SmsTransactionCreateOrConnectWithoutStudioInput | SmsTransactionCreateOrConnectWithoutStudioInput[]
+    createMany?: SmsTransactionCreateManyStudioInputEnvelope
+    connect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+  }
+
+  export type SubscriptionEventCreateNestedManyWithoutStudioInput = {
+    create?: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput> | SubscriptionEventCreateWithoutStudioInput[] | SubscriptionEventUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SubscriptionEventCreateOrConnectWithoutStudioInput | SubscriptionEventCreateOrConnectWithoutStudioInput[]
+    createMany?: SubscriptionEventCreateManyStudioInputEnvelope
+    connect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+  }
+
   export type StudioMembershipUncheckedCreateNestedManyWithoutStudioInput = {
     create?: XOR<StudioMembershipCreateWithoutStudioInput, StudioMembershipUncheckedCreateWithoutStudioInput> | StudioMembershipCreateWithoutStudioInput[] | StudioMembershipUncheckedCreateWithoutStudioInput[]
     connectOrCreate?: StudioMembershipCreateOrConnectWithoutStudioInput | StudioMembershipCreateOrConnectWithoutStudioInput[]
     createMany?: StudioMembershipCreateManyStudioInputEnvelope
     connect?: StudioMembershipWhereUniqueInput | StudioMembershipWhereUniqueInput[]
+  }
+
+  export type SmsTransactionUncheckedCreateNestedManyWithoutStudioInput = {
+    create?: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput> | SmsTransactionCreateWithoutStudioInput[] | SmsTransactionUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SmsTransactionCreateOrConnectWithoutStudioInput | SmsTransactionCreateOrConnectWithoutStudioInput[]
+    createMany?: SmsTransactionCreateManyStudioInputEnvelope
+    connect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+  }
+
+  export type SubscriptionEventUncheckedCreateNestedManyWithoutStudioInput = {
+    create?: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput> | SubscriptionEventCreateWithoutStudioInput[] | SubscriptionEventUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SubscriptionEventCreateOrConnectWithoutStudioInput | SubscriptionEventCreateOrConnectWithoutStudioInput[]
+    createMany?: SubscriptionEventCreateManyStudioInputEnvelope
+    connect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -8052,6 +12958,18 @@ export namespace Prisma {
 
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
+  }
+
+  export type NullableDateTimeFieldUpdateOperationsInput = {
+    set?: Date | string | null
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type BigIntFieldUpdateOperationsInput = {
@@ -8080,6 +12998,34 @@ export namespace Prisma {
     deleteMany?: StudioMembershipScalarWhereInput | StudioMembershipScalarWhereInput[]
   }
 
+  export type SmsTransactionUpdateManyWithoutStudioNestedInput = {
+    create?: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput> | SmsTransactionCreateWithoutStudioInput[] | SmsTransactionUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SmsTransactionCreateOrConnectWithoutStudioInput | SmsTransactionCreateOrConnectWithoutStudioInput[]
+    upsert?: SmsTransactionUpsertWithWhereUniqueWithoutStudioInput | SmsTransactionUpsertWithWhereUniqueWithoutStudioInput[]
+    createMany?: SmsTransactionCreateManyStudioInputEnvelope
+    set?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    disconnect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    delete?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    connect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    update?: SmsTransactionUpdateWithWhereUniqueWithoutStudioInput | SmsTransactionUpdateWithWhereUniqueWithoutStudioInput[]
+    updateMany?: SmsTransactionUpdateManyWithWhereWithoutStudioInput | SmsTransactionUpdateManyWithWhereWithoutStudioInput[]
+    deleteMany?: SmsTransactionScalarWhereInput | SmsTransactionScalarWhereInput[]
+  }
+
+  export type SubscriptionEventUpdateManyWithoutStudioNestedInput = {
+    create?: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput> | SubscriptionEventCreateWithoutStudioInput[] | SubscriptionEventUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SubscriptionEventCreateOrConnectWithoutStudioInput | SubscriptionEventCreateOrConnectWithoutStudioInput[]
+    upsert?: SubscriptionEventUpsertWithWhereUniqueWithoutStudioInput | SubscriptionEventUpsertWithWhereUniqueWithoutStudioInput[]
+    createMany?: SubscriptionEventCreateManyStudioInputEnvelope
+    set?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    disconnect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    delete?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    connect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    update?: SubscriptionEventUpdateWithWhereUniqueWithoutStudioInput | SubscriptionEventUpdateWithWhereUniqueWithoutStudioInput[]
+    updateMany?: SubscriptionEventUpdateManyWithWhereWithoutStudioInput | SubscriptionEventUpdateManyWithWhereWithoutStudioInput[]
+    deleteMany?: SubscriptionEventScalarWhereInput | SubscriptionEventScalarWhereInput[]
+  }
+
   export type StudioMembershipUncheckedUpdateManyWithoutStudioNestedInput = {
     create?: XOR<StudioMembershipCreateWithoutStudioInput, StudioMembershipUncheckedCreateWithoutStudioInput> | StudioMembershipCreateWithoutStudioInput[] | StudioMembershipUncheckedCreateWithoutStudioInput[]
     connectOrCreate?: StudioMembershipCreateOrConnectWithoutStudioInput | StudioMembershipCreateOrConnectWithoutStudioInput[]
@@ -8092,6 +13038,34 @@ export namespace Prisma {
     update?: StudioMembershipUpdateWithWhereUniqueWithoutStudioInput | StudioMembershipUpdateWithWhereUniqueWithoutStudioInput[]
     updateMany?: StudioMembershipUpdateManyWithWhereWithoutStudioInput | StudioMembershipUpdateManyWithWhereWithoutStudioInput[]
     deleteMany?: StudioMembershipScalarWhereInput | StudioMembershipScalarWhereInput[]
+  }
+
+  export type SmsTransactionUncheckedUpdateManyWithoutStudioNestedInput = {
+    create?: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput> | SmsTransactionCreateWithoutStudioInput[] | SmsTransactionUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SmsTransactionCreateOrConnectWithoutStudioInput | SmsTransactionCreateOrConnectWithoutStudioInput[]
+    upsert?: SmsTransactionUpsertWithWhereUniqueWithoutStudioInput | SmsTransactionUpsertWithWhereUniqueWithoutStudioInput[]
+    createMany?: SmsTransactionCreateManyStudioInputEnvelope
+    set?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    disconnect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    delete?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    connect?: SmsTransactionWhereUniqueInput | SmsTransactionWhereUniqueInput[]
+    update?: SmsTransactionUpdateWithWhereUniqueWithoutStudioInput | SmsTransactionUpdateWithWhereUniqueWithoutStudioInput[]
+    updateMany?: SmsTransactionUpdateManyWithWhereWithoutStudioInput | SmsTransactionUpdateManyWithWhereWithoutStudioInput[]
+    deleteMany?: SmsTransactionScalarWhereInput | SmsTransactionScalarWhereInput[]
+  }
+
+  export type SubscriptionEventUncheckedUpdateManyWithoutStudioNestedInput = {
+    create?: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput> | SubscriptionEventCreateWithoutStudioInput[] | SubscriptionEventUncheckedCreateWithoutStudioInput[]
+    connectOrCreate?: SubscriptionEventCreateOrConnectWithoutStudioInput | SubscriptionEventCreateOrConnectWithoutStudioInput[]
+    upsert?: SubscriptionEventUpsertWithWhereUniqueWithoutStudioInput | SubscriptionEventUpsertWithWhereUniqueWithoutStudioInput[]
+    createMany?: SubscriptionEventCreateManyStudioInputEnvelope
+    set?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    disconnect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    delete?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    connect?: SubscriptionEventWhereUniqueInput | SubscriptionEventWhereUniqueInput[]
+    update?: SubscriptionEventUpdateWithWhereUniqueWithoutStudioInput | SubscriptionEventUpdateWithWhereUniqueWithoutStudioInput[]
+    updateMany?: SubscriptionEventUpdateManyWithWhereWithoutStudioInput | SubscriptionEventUpdateManyWithWhereWithoutStudioInput[]
+    deleteMany?: SubscriptionEventScalarWhereInput | SubscriptionEventScalarWhereInput[]
   }
 
   export type StudioMembershipCreateNestedManyWithoutUserInput = {
@@ -8206,14 +13180,6 @@ export namespace Prisma {
     update?: XOR<XOR<StudioUpdateToOneWithWhereWithoutMembershipsInput, StudioUpdateWithoutMembershipsInput>, StudioUncheckedUpdateWithoutMembershipsInput>
   }
 
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
   export type MasterUserCreateNestedOneWithoutSessionsInput = {
     create?: XOR<MasterUserCreateWithoutSessionsInput, MasterUserUncheckedCreateWithoutSessionsInput>
     connectOrCreate?: MasterUserCreateOrConnectWithoutSessionsInput
@@ -8226,6 +13192,42 @@ export namespace Prisma {
     upsert?: MasterUserUpsertWithoutSessionsInput
     connect?: MasterUserWhereUniqueInput
     update?: XOR<XOR<MasterUserUpdateToOneWithWhereWithoutSessionsInput, MasterUserUpdateWithoutSessionsInput>, MasterUserUncheckedUpdateWithoutSessionsInput>
+  }
+
+  export type StudioCreateNestedOneWithoutSmsTransactionsInput = {
+    create?: XOR<StudioCreateWithoutSmsTransactionsInput, StudioUncheckedCreateWithoutSmsTransactionsInput>
+    connectOrCreate?: StudioCreateOrConnectWithoutSmsTransactionsInput
+    connect?: StudioWhereUniqueInput
+  }
+
+  export type StudioUpdateOneRequiredWithoutSmsTransactionsNestedInput = {
+    create?: XOR<StudioCreateWithoutSmsTransactionsInput, StudioUncheckedCreateWithoutSmsTransactionsInput>
+    connectOrCreate?: StudioCreateOrConnectWithoutSmsTransactionsInput
+    upsert?: StudioUpsertWithoutSmsTransactionsInput
+    connect?: StudioWhereUniqueInput
+    update?: XOR<XOR<StudioUpdateToOneWithWhereWithoutSmsTransactionsInput, StudioUpdateWithoutSmsTransactionsInput>, StudioUncheckedUpdateWithoutSmsTransactionsInput>
+  }
+
+  export type StudioCreateNestedOneWithoutSubscriptionsInput = {
+    create?: XOR<StudioCreateWithoutSubscriptionsInput, StudioUncheckedCreateWithoutSubscriptionsInput>
+    connectOrCreate?: StudioCreateOrConnectWithoutSubscriptionsInput
+    connect?: StudioWhereUniqueInput
+  }
+
+  export type NullableIntFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type StudioUpdateOneRequiredWithoutSubscriptionsNestedInput = {
+    create?: XOR<StudioCreateWithoutSubscriptionsInput, StudioUncheckedCreateWithoutSubscriptionsInput>
+    connectOrCreate?: StudioCreateOrConnectWithoutSubscriptionsInput
+    upsert?: StudioUpsertWithoutSubscriptionsInput
+    connect?: StudioWhereUniqueInput
+    update?: XOR<XOR<StudioUpdateToOneWithWhereWithoutSubscriptionsInput, StudioUpdateWithoutSubscriptionsInput>, StudioUncheckedUpdateWithoutSubscriptionsInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -8259,6 +13261,28 @@ export namespace Prisma {
   export type NestedBoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
+  }
+
+  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | null
+    notIn?: Date[] | string[] | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
+  export type NestedIntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
   }
 
   export type NestedBigIntFilter<$PrismaModel = never> = {
@@ -8300,17 +13324,6 @@ export namespace Prisma {
     _max?: NestedStringFilter<$PrismaModel>
   }
 
-  export type NestedIntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[]
-    notIn?: number[]
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | null
@@ -8347,45 +13360,18 @@ export namespace Prisma {
     _max?: NestedBoolFilter<$PrismaModel>
   }
 
-  export type NestedBigIntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    in?: bigint[] | number[]
-    notIn?: bigint[] | number[]
-    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
-    not?: NestedBigIntWithAggregatesFilter<$PrismaModel> | bigint | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedBigIntFilter<$PrismaModel>
-    _min?: NestedBigIntFilter<$PrismaModel>
-    _max?: NestedBigIntFilter<$PrismaModel>
-  }
-
-  export type NestedFloatFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel>
-    in?: number[]
-    notIn?: number[]
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatFilter<$PrismaModel> | number
-  }
-
-  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[]
-    notIn?: Date[] | string[]
+  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | null
+    notIn?: Date[] | string[] | null
     lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -8402,6 +13388,74 @@ export namespace Prisma {
     _sum?: NestedIntFilter<$PrismaModel>
     _min?: NestedIntFilter<$PrismaModel>
     _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type NestedBigIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: bigint | number | BigIntFieldRefInput<$PrismaModel>
+    in?: bigint[] | number[]
+    notIn?: bigint[] | number[]
+    lt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
+    lte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
+    gt?: bigint | number | BigIntFieldRefInput<$PrismaModel>
+    gte?: bigint | number | BigIntFieldRefInput<$PrismaModel>
+    not?: NestedBigIntWithAggregatesFilter<$PrismaModel> | bigint | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedBigIntFilter<$PrismaModel>
+    _min?: NestedBigIntFilter<$PrismaModel>
+    _max?: NestedBigIntFilter<$PrismaModel>
+  }
+
+  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[]
+    notIn?: Date[] | string[]
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
+  }
+
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | null
+    notIn?: number[] | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | null
+    notIn?: number[] | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
 
   export type StudioMembershipCreateWithoutStudioInput = {
@@ -8427,6 +13481,74 @@ export namespace Prisma {
 
   export type StudioMembershipCreateManyStudioInputEnvelope = {
     data: StudioMembershipCreateManyStudioInput | StudioMembershipCreateManyStudioInput[]
+  }
+
+  export type SmsTransactionCreateWithoutStudioInput = {
+    id?: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type SmsTransactionUncheckedCreateWithoutStudioInput = {
+    id?: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type SmsTransactionCreateOrConnectWithoutStudioInput = {
+    where: SmsTransactionWhereUniqueInput
+    create: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput>
+  }
+
+  export type SmsTransactionCreateManyStudioInputEnvelope = {
+    data: SmsTransactionCreateManyStudioInput | SmsTransactionCreateManyStudioInput[]
+  }
+
+  export type SubscriptionEventCreateWithoutStudioInput = {
+    id?: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SubscriptionEventUncheckedCreateWithoutStudioInput = {
+    id?: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
+    createdAt?: Date | string
+  }
+
+  export type SubscriptionEventCreateOrConnectWithoutStudioInput = {
+    where: SubscriptionEventWhereUniqueInput
+    create: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput>
+  }
+
+  export type SubscriptionEventCreateManyStudioInputEnvelope = {
+    data: SubscriptionEventCreateManyStudioInput | SubscriptionEventCreateManyStudioInput[]
   }
 
   export type StudioMembershipUpsertWithWhereUniqueWithoutStudioInput = {
@@ -8455,6 +13577,71 @@ export namespace Prisma {
     role?: StringFilter<"StudioMembership"> | string
     isActive?: BoolFilter<"StudioMembership"> | boolean
     createdAt?: DateTimeFilter<"StudioMembership"> | Date | string
+  }
+
+  export type SmsTransactionUpsertWithWhereUniqueWithoutStudioInput = {
+    where: SmsTransactionWhereUniqueInput
+    update: XOR<SmsTransactionUpdateWithoutStudioInput, SmsTransactionUncheckedUpdateWithoutStudioInput>
+    create: XOR<SmsTransactionCreateWithoutStudioInput, SmsTransactionUncheckedCreateWithoutStudioInput>
+  }
+
+  export type SmsTransactionUpdateWithWhereUniqueWithoutStudioInput = {
+    where: SmsTransactionWhereUniqueInput
+    data: XOR<SmsTransactionUpdateWithoutStudioInput, SmsTransactionUncheckedUpdateWithoutStudioInput>
+  }
+
+  export type SmsTransactionUpdateManyWithWhereWithoutStudioInput = {
+    where: SmsTransactionScalarWhereInput
+    data: XOR<SmsTransactionUpdateManyMutationInput, SmsTransactionUncheckedUpdateManyWithoutStudioInput>
+  }
+
+  export type SmsTransactionScalarWhereInput = {
+    AND?: SmsTransactionScalarWhereInput | SmsTransactionScalarWhereInput[]
+    OR?: SmsTransactionScalarWhereInput[]
+    NOT?: SmsTransactionScalarWhereInput | SmsTransactionScalarWhereInput[]
+    id?: StringFilter<"SmsTransaction"> | string
+    studioId?: StringFilter<"SmsTransaction"> | string
+    type?: StringFilter<"SmsTransaction"> | string
+    amountRial?: IntFilter<"SmsTransaction"> | number
+    receptor?: StringNullableFilter<"SmsTransaction"> | string | null
+    messageSnippet?: StringNullableFilter<"SmsTransaction"> | string | null
+    description?: StringNullableFilter<"SmsTransaction"> | string | null
+    kavenegarMessageId?: StringNullableFilter<"SmsTransaction"> | string | null
+    status?: StringFilter<"SmsTransaction"> | string
+    createdAt?: DateTimeFilter<"SmsTransaction"> | Date | string
+  }
+
+  export type SubscriptionEventUpsertWithWhereUniqueWithoutStudioInput = {
+    where: SubscriptionEventWhereUniqueInput
+    update: XOR<SubscriptionEventUpdateWithoutStudioInput, SubscriptionEventUncheckedUpdateWithoutStudioInput>
+    create: XOR<SubscriptionEventCreateWithoutStudioInput, SubscriptionEventUncheckedCreateWithoutStudioInput>
+  }
+
+  export type SubscriptionEventUpdateWithWhereUniqueWithoutStudioInput = {
+    where: SubscriptionEventWhereUniqueInput
+    data: XOR<SubscriptionEventUpdateWithoutStudioInput, SubscriptionEventUncheckedUpdateWithoutStudioInput>
+  }
+
+  export type SubscriptionEventUpdateManyWithWhereWithoutStudioInput = {
+    where: SubscriptionEventScalarWhereInput
+    data: XOR<SubscriptionEventUpdateManyMutationInput, SubscriptionEventUncheckedUpdateManyWithoutStudioInput>
+  }
+
+  export type SubscriptionEventScalarWhereInput = {
+    AND?: SubscriptionEventScalarWhereInput | SubscriptionEventScalarWhereInput[]
+    OR?: SubscriptionEventScalarWhereInput[]
+    NOT?: SubscriptionEventScalarWhereInput | SubscriptionEventScalarWhereInput[]
+    id?: StringFilter<"SubscriptionEvent"> | string
+    studioId?: StringFilter<"SubscriptionEvent"> | string
+    eventType?: StringFilter<"SubscriptionEvent"> | string
+    fromPlan?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    toPlan?: StringFilter<"SubscriptionEvent"> | string
+    amountPaidToman?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    durationDays?: IntNullableFilter<"SubscriptionEvent"> | number | null
+    startAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    endAt?: DateTimeNullableFilter<"SubscriptionEvent"> | Date | string | null
+    note?: StringNullableFilter<"SubscriptionEvent"> | string | null
+    createdAt?: DateTimeFilter<"SubscriptionEvent"> | Date | string
   }
 
   export type StudioMembershipCreateWithoutUserInput = {
@@ -8559,6 +13746,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
@@ -8569,6 +13757,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
@@ -8586,10 +13775,29 @@ export namespace Prisma {
     dbName: string
     isActive?: boolean
     plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
     storageQuotaBytes?: bigint | number
     storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    smsTransactions?: SmsTransactionCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventCreateNestedManyWithoutStudioInput
   }
 
   export type StudioUncheckedCreateWithoutMembershipsInput = {
@@ -8599,10 +13807,29 @@ export namespace Prisma {
     dbName: string
     isActive?: boolean
     plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
     storageQuotaBytes?: bigint | number
     storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+    smsTransactions?: SmsTransactionUncheckedCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventUncheckedCreateNestedManyWithoutStudioInput
   }
 
   export type StudioCreateOrConnectWithoutMembershipsInput = {
@@ -8626,6 +13853,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
@@ -8636,6 +13864,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
@@ -8659,10 +13888,29 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    smsTransactions?: SmsTransactionUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUpdateManyWithoutStudioNestedInput
   }
 
   export type StudioUncheckedUpdateWithoutMembershipsInput = {
@@ -8672,10 +13920,29 @@ export namespace Prisma {
     dbName?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
     plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
     storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    smsTransactions?: SmsTransactionUncheckedUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUncheckedUpdateManyWithoutStudioNestedInput
   }
 
   export type MasterUserCreateWithoutSessionsInput = {
@@ -8683,6 +13950,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipCreateNestedManyWithoutUserInput
@@ -8693,6 +13961,7 @@ export namespace Prisma {
     phone: string
     passwordHash?: string | null
     name: string
+    isSuperAdmin?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     memberships?: StudioMembershipUncheckedCreateNestedManyWithoutUserInput
@@ -8719,6 +13988,7 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUpdateManyWithoutUserNestedInput
@@ -8729,9 +13999,298 @@ export namespace Prisma {
     phone?: StringFieldUpdateOperationsInput | string
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     name?: StringFieldUpdateOperationsInput | string
+    isSuperAdmin?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     memberships?: StudioMembershipUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type StudioCreateWithoutSmsTransactionsInput = {
+    id?: string
+    name: string
+    nameEn?: string | null
+    dbName: string
+    isActive?: boolean
+    plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
+    storageQuotaBytes?: bigint | number
+    storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    memberships?: StudioMembershipCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventCreateNestedManyWithoutStudioInput
+  }
+
+  export type StudioUncheckedCreateWithoutSmsTransactionsInput = {
+    id?: string
+    name: string
+    nameEn?: string | null
+    dbName: string
+    isActive?: boolean
+    plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
+    storageQuotaBytes?: bigint | number
+    storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    memberships?: StudioMembershipUncheckedCreateNestedManyWithoutStudioInput
+    subscriptions?: SubscriptionEventUncheckedCreateNestedManyWithoutStudioInput
+  }
+
+  export type StudioCreateOrConnectWithoutSmsTransactionsInput = {
+    where: StudioWhereUniqueInput
+    create: XOR<StudioCreateWithoutSmsTransactionsInput, StudioUncheckedCreateWithoutSmsTransactionsInput>
+  }
+
+  export type StudioUpsertWithoutSmsTransactionsInput = {
+    update: XOR<StudioUpdateWithoutSmsTransactionsInput, StudioUncheckedUpdateWithoutSmsTransactionsInput>
+    create: XOR<StudioCreateWithoutSmsTransactionsInput, StudioUncheckedCreateWithoutSmsTransactionsInput>
+    where?: StudioWhereInput
+  }
+
+  export type StudioUpdateToOneWithWhereWithoutSmsTransactionsInput = {
+    where?: StudioWhereInput
+    data: XOR<StudioUpdateWithoutSmsTransactionsInput, StudioUncheckedUpdateWithoutSmsTransactionsInput>
+  }
+
+  export type StudioUpdateWithoutSmsTransactionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    nameEn?: NullableStringFieldUpdateOperationsInput | string | null
+    dbName?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: StudioMembershipUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUpdateManyWithoutStudioNestedInput
+  }
+
+  export type StudioUncheckedUpdateWithoutSmsTransactionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    nameEn?: NullableStringFieldUpdateOperationsInput | string | null
+    dbName?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: StudioMembershipUncheckedUpdateManyWithoutStudioNestedInput
+    subscriptions?: SubscriptionEventUncheckedUpdateManyWithoutStudioNestedInput
+  }
+
+  export type StudioCreateWithoutSubscriptionsInput = {
+    id?: string
+    name: string
+    nameEn?: string | null
+    dbName: string
+    isActive?: boolean
+    plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
+    storageQuotaBytes?: bigint | number
+    storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    memberships?: StudioMembershipCreateNestedManyWithoutStudioInput
+    smsTransactions?: SmsTransactionCreateNestedManyWithoutStudioInput
+  }
+
+  export type StudioUncheckedCreateWithoutSubscriptionsInput = {
+    id?: string
+    name: string
+    nameEn?: string | null
+    dbName: string
+    isActive?: boolean
+    plan?: string
+    subscriptionStart?: Date | string | null
+    subscriptionEnd?: Date | string | null
+    maxEmployees?: number
+    maxProjects?: number
+    maxCustomers?: number
+    maxStorageBytes?: bigint | number
+    storageQuotaBytes?: bigint | number
+    storageUsedBytes?: bigint | number
+    studioPhone?: string | null
+    ownerName?: string | null
+    ownerPhone?: string | null
+    city?: string | null
+    address?: string | null
+    notes?: string | null
+    kavenegarApikey?: string | null
+    kavenegarSender?: string | null
+    kavenegarLocalId?: string | null
+    kavenegarStatus?: string
+    smsCreditRial?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    memberships?: StudioMembershipUncheckedCreateNestedManyWithoutStudioInput
+    smsTransactions?: SmsTransactionUncheckedCreateNestedManyWithoutStudioInput
+  }
+
+  export type StudioCreateOrConnectWithoutSubscriptionsInput = {
+    where: StudioWhereUniqueInput
+    create: XOR<StudioCreateWithoutSubscriptionsInput, StudioUncheckedCreateWithoutSubscriptionsInput>
+  }
+
+  export type StudioUpsertWithoutSubscriptionsInput = {
+    update: XOR<StudioUpdateWithoutSubscriptionsInput, StudioUncheckedUpdateWithoutSubscriptionsInput>
+    create: XOR<StudioCreateWithoutSubscriptionsInput, StudioUncheckedCreateWithoutSubscriptionsInput>
+    where?: StudioWhereInput
+  }
+
+  export type StudioUpdateToOneWithWhereWithoutSubscriptionsInput = {
+    where?: StudioWhereInput
+    data: XOR<StudioUpdateWithoutSubscriptionsInput, StudioUncheckedUpdateWithoutSubscriptionsInput>
+  }
+
+  export type StudioUpdateWithoutSubscriptionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    nameEn?: NullableStringFieldUpdateOperationsInput | string | null
+    dbName?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: StudioMembershipUpdateManyWithoutStudioNestedInput
+    smsTransactions?: SmsTransactionUpdateManyWithoutStudioNestedInput
+  }
+
+  export type StudioUncheckedUpdateWithoutSubscriptionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    nameEn?: NullableStringFieldUpdateOperationsInput | string | null
+    dbName?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    plan?: StringFieldUpdateOperationsInput | string
+    subscriptionStart?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    subscriptionEnd?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    maxEmployees?: IntFieldUpdateOperationsInput | number
+    maxProjects?: IntFieldUpdateOperationsInput | number
+    maxCustomers?: IntFieldUpdateOperationsInput | number
+    maxStorageBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageQuotaBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    storageUsedBytes?: BigIntFieldUpdateOperationsInput | bigint | number
+    studioPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerName?: NullableStringFieldUpdateOperationsInput | string | null
+    ownerPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    address?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarApikey?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarSender?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarLocalId?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarStatus?: StringFieldUpdateOperationsInput | string
+    smsCreditRial?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    memberships?: StudioMembershipUncheckedUpdateManyWithoutStudioNestedInput
+    smsTransactions?: SmsTransactionUncheckedUpdateManyWithoutStudioNestedInput
   }
 
   export type StudioMembershipCreateManyStudioInput = {
@@ -8739,6 +14298,31 @@ export namespace Prisma {
     userId: string
     role: string
     isActive?: boolean
+    createdAt?: Date | string
+  }
+
+  export type SmsTransactionCreateManyStudioInput = {
+    id?: string
+    type: string
+    amountRial: number
+    receptor?: string | null
+    messageSnippet?: string | null
+    description?: string | null
+    kavenegarMessageId?: string | null
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type SubscriptionEventCreateManyStudioInput = {
+    id?: string
+    eventType: string
+    fromPlan?: string | null
+    toPlan: string
+    amountPaidToman?: number | null
+    durationDays?: number | null
+    startAt?: Date | string | null
+    endAt?: Date | string | null
+    note?: string | null
     createdAt?: Date | string
   }
 
@@ -8763,6 +14347,81 @@ export namespace Prisma {
     userId?: StringFieldUpdateOperationsInput | string
     role?: StringFieldUpdateOperationsInput | string
     isActive?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SmsTransactionUpdateWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SmsTransactionUncheckedUpdateWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SmsTransactionUncheckedUpdateManyWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    amountRial?: IntFieldUpdateOperationsInput | number
+    receptor?: NullableStringFieldUpdateOperationsInput | string | null
+    messageSnippet?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    kavenegarMessageId?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventUpdateWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventUncheckedUpdateWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SubscriptionEventUncheckedUpdateManyWithoutStudioInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventType?: StringFieldUpdateOperationsInput | string
+    fromPlan?: NullableStringFieldUpdateOperationsInput | string | null
+    toPlan?: StringFieldUpdateOperationsInput | string
+    amountPaidToman?: NullableIntFieldUpdateOperationsInput | number | null
+    durationDays?: NullableIntFieldUpdateOperationsInput | number | null
+    startAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    endAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
