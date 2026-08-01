@@ -16,32 +16,25 @@ import {
 export { getAuthUser as getCurrentUser }
 export type { AuthUser } from "./auth"
 
-/**
- * نقش کاربر فعلی را برمی‌گرداند.
- * اگر کاربر لاگین نکرده باشد، رشته خالی برمی‌گرداند (نه "admin").
- * API‌ها باید این مقدار خالی را به‌عنوان 401 handle کنند.
- */
 export async function getCurrentRole(): Promise<string> {
   const user = await getAuthUser()
   return user?.role ?? ""
 }
 
 /**
- * دیتابیس استودیوی فعلی کاربر را برمی‌گرداند.
- * اگر کاربر لاگین نکرده باشد یا در حالت "all studios" باشد، null برمی‌گرداند.
- * API‌ها باید null را به‌عنوان 401/403 handle کنند.
+ * ✅ SECURITY FIX: حذف fallback به دیتابیس پیش‌فرض
+ * اگر کاربر استودیو انتخاب نکرده، null برگردان (نه دیتابیس پیش‌فرض)
+ * این از نشت اطلاعات بین استودیوها جلوگیری می‌کند
  */
 export async function getCurrentStudioDb(): Promise<PrismaClient | null> {
   const user = await getAuthUser()
-  if (!user) return null  // ← کاربر ناشناس: هیچ دیتابیسی
-  if (user?.studioId && user.studioId !== "all") {
+  if (!user) return null
+  if (user.studioId && user.studioId !== "all") {
     const studio = await masterDb.studio.findUnique({ where: { id: user.studioId } })
     if (studio) return getStudioDb(studio.dbName)
   }
-  if (user?.studioId === "all") return null
-  // fallback: اگه studioId ست نشده ولی کاربر لاگین کرده، دیتابیس default
-  const { db } = await import("./db")
-  return db
+  // ✅ SECURITY: دیگر به دیتابیس پیش‌فرض fallback نمی‌کنیم
+  return null
 }
 
 export async function getAllStudioDbs() {
@@ -231,33 +224,6 @@ export async function requirePermission(perm: PermissionKey): Promise<void> {
   if (!(await currentUserHasPermission(perm))) {
     throw new Error(`Forbidden: missing permission "${perm}"`)
   }
-}
-
-/**
- * بررسی می‌کند که کاربر فعلی احراز هویت شده باشد.
- * اگر نه، خطا می‌اندازد تا API route بتونه 401 بده.
- *
- * استفاده:
- *   try { await requireAuth() } catch { return NextResponse.json({error:"نشست معتبر نیست"}, {status: 401}) }
- *   const role = await getCurrentRole()
- */
-export async function requireAuth(): Promise<void> {
-  const user = await getAuthUser()
-  if (!user) throw new Error("Unauthorized")
-}
-
-/**
- * بررسی احراز هویت + دریافت دیتابیس استودیو.
- * اگر کاربر لاگین نکرده باشد یا استودیویی انتخاب نکرده باشد، null برمی‌گرداند.
- *
- * استفاده:
- *   const db = await requireStudioDb()
- *   if (!db) return NextResponse.json({error:"نشست معتبر نیست"}, {status: 401})
- */
-export async function requireStudioDb(): Promise<PrismaClient | null> {
-  const user = await getAuthUser()
-  if (!user) return null
-  return getCurrentStudioDb()
 }
 
 /**

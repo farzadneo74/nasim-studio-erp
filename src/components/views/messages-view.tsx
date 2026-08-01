@@ -823,7 +823,15 @@ function useMarkConversationRead() {
 // ============================================================
 // Mention rendering
 // ============================================================
-function renderBodyWithMentions(body: string, mentions: Mention[]): React.ReactNode {
+// ✅ FIXES-7B: mentions render as clickable spans with a distinct style
+//    (`bg-primary/10 text-primary cursor-pointer rounded px-1`).
+//    - customer mention → openCustomer(customerId)
+//    - project mention  → openProject(projectId)
+//    - payment mention  → openProject(projectId) (payment's id IS the project id)
+//    Mentions are stored on the Message row as a `mentions: Mention[]` array
+//    ({ type, id, label }); the body contains `@label` substrings which the
+//    renderer parses and turns into clickable spans.
+function renderBodyWithMentions(body: string, mentions: Mention[], onMentionClick?: (m: Mention) => void): React.ReactNode {
   if (!body) return null
   if (!mentions || mentions.length === 0) {
     return <span className="whitespace-pre-wrap break-words">{body}</span>
@@ -848,14 +856,24 @@ function renderBodyWithMentions(body: string, mentions: Mention[]): React.ReactN
     }
     const label = match[1]
     const mention = sorted.find((m) => m.label === label)
-    const color = mention ? MENTION_COLORS[mention.type] : "#64748b"
     const typeLabel = mention ? MENTION_TYPE_LABELS[mention.type] : "اشاره"
+    const clickable = !!mention && !!onMentionClick
+    // ✅ Per FIXES-7B spec: distinct style for mentions —
+    //   bg-primary/10 text-primary cursor-pointer rounded px-1
+    // We add `mx-0.5` for a tiny bit of horizontal breathing room between
+    // neighbouring text and `align-baseline` so the chip sits on the text
+    // baseline (it would otherwise float above the line).
+    const baseClass = "mx-0.5 inline-flex items-center rounded px-1 align-baseline text-[0.92em] font-medium"
+    const clickableClass = clickable
+      ? `${baseClass} bg-primary/10 text-primary cursor-pointer transition-opacity hover:opacity-80`
+      : `${baseClass} bg-muted text-muted-foreground`
     parts.push(
       <span
         key={key++}
-        className="mx-0.5 inline-flex items-center rounded px-1.5 py-0.5 text-[0.85em] font-medium align-baseline"
-        style={{ backgroundColor: color + "22", color }}
-        title={typeLabel}
+        className={clickableClass}
+        title={clickable ? `${typeLabel} — کلیک برای باز کردن` : typeLabel}
+        onClick={clickable && mention ? (e) => { e.stopPropagation(); onMentionClick!(mention) } : undefined}
+        role={clickable ? "button" : undefined}
       >
         @{label}
       </span>
@@ -870,6 +888,35 @@ function renderBodyWithMentions(body: string, mentions: Mention[]): React.ReactN
     )
   }
   return <span className="break-words">{parts}</span>
+}
+
+// ✅ Wrapper component that wires the mention click handler to workspace navigation:
+//   - customer mention → openCustomer(customerId)
+//   - project mention  → openProject(projectId)
+//   - payment mention  → openProject(projectId) (the payment mention's id is the
+//     associated project id; the financials section is no longer a separate tab
+//     so we just open the project).
+function MessageBodyWithMentions({ body, mentions }: { body: string; mentions: Mention[] }) {
+  const openCustomer = useWorkspace((s) => s.openCustomer)
+  const openProject = useWorkspace((s) => s.openProject)
+
+  const handleMentionClick = React.useCallback((m: Mention) => {
+    if (!m.id) return
+    if (m.type === "customer") {
+      openCustomer(m.id)
+    } else if (m.type === "project") {
+      openProject(m.id)
+    } else if (m.type === "payment") {
+      // The payment mention's id is the project id (see MentionPickerDialog usage).
+      openProject(m.id)
+    }
+  }, [openCustomer, openProject])
+
+  return (
+    <>
+      {renderBodyWithMentions(body, mentions, handleMentionClick)}
+    </>
+  )
 }
 
 // ============================================================
@@ -1155,7 +1202,7 @@ function MessageBubble({
               {/* Body */}
               {message.body && (
                 <div className="leading-relaxed">
-                  {renderBodyWithMentions(message.body, message.mentions)}
+                  <MessageBodyWithMentions body={message.body} mentions={message.mentions} />
                 </div>
               )}
 

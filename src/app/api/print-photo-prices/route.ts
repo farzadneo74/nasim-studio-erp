@@ -14,6 +14,7 @@ function shape(p: {
   photoLocation: string
   isFormal: boolean
   printOrder: string
+  priority?: string
   price: { toString(): string }
   isActive: boolean
   createdAt: Date
@@ -27,6 +28,7 @@ function shape(p: {
     photoLocation: p.photoLocation,
     isFormal: p.isFormal,
     printOrder: p.printOrder,
+    priority: (p as any).priority ?? "normal",
     price: Number(p.price.toString()), // Rials
     isActive: p.isActive,
     createdAt: p.createdAt,
@@ -115,6 +117,8 @@ export async function POST(req: NextRequest) {
 
   const isFormal = Boolean(body.isFormal)
   const printOrder = ["none", "first", "second"].includes(body.printOrder) ? body.printOrder : "none"
+  // ✅ priority: normal | formal
+  const priority = body.priority === "formal" ? "formal" : "normal"
 
   const created = await db.printPhotoPrice.create({
     data: {
@@ -124,6 +128,7 @@ export async function POST(req: NextRequest) {
       photoLocation,
       isFormal,
       printOrder,
+      priority,
       price: priceNum,
       isActive,
     },

@@ -49,6 +49,7 @@ import {
   UserCog,
   Check,
   Minus,
+  Unlock,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -140,6 +141,14 @@ import {
   CommandItem,
 } from "@/components/ui/command"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import {
   AlertDialog,
@@ -194,14 +203,18 @@ interface CustomerProject {
   startDatetime: string | null
   endDatetime: string | null
   deliveryDeadline: string | null
-  actualStartDatetime: string | null
-  actualEndDatetime: string | null
   printedDescription: string | null
   effectivePrice: number | null
   calculatedPrice: number | null
   discountAmount: number
+  priceAdjustment: number
+  packageCurrentPrice: number | null
   totalPaid: number | null
   balance: number | null
+  // ✅ عکس‌های چاپی — جمع مبلغ + پرداخت + مانده
+  printPhotoTotal: number | null
+  printPhotoPaid: number | null
+  printPhotoBalance: number | null
   isDelivered: boolean
   team: { id: string; name: string; role: string }[]
   payments: {
@@ -272,8 +285,8 @@ export function ProjectsView() {
 // ============================================================
 // Helpers
 // ============================================================
-function parseStrArr(v: unknown): string[] {
-  if (Array.isArray(v)) return v as string[]
+function parseStrArr(v: unknown): any[] {
+  if (Array.isArray(v)) return v
   if (typeof v === "string" && v.trim()) {
     try {
       const parsed = JSON.parse(v)
@@ -298,13 +311,29 @@ function sameLocalDay(iso: string | null, gregorian: string): boolean {
 /** Combine a JalaliDatePicker ISO date with a "HH:MM" 24h time string into a single ISO datetime. */
 function combineDateAndTime(dateIso: string | null, time: string): string | null {
   if (!dateIso) return null
+  // ✅ FIX: زمان رو به UTC تبدیل می‌کنیم (Tehran time → UTC)
+  // اینطوری getTehranHourMinute که از timeZone: "Asia/Tehran" استفاده می‌کنه،
+  // دوباره اون رو به Tehran time تبدیل می‌کنه و زمان درست نشون داده می‌شه.
+  // مثال: کاربر 15:00 وارد می‌کنه → UTC 11:30 ذخیره می‌شه → تقویم 15:00 نشون می‌ده
   const d = new Date(dateIso)
   if (Number.isNaN(d.getTime())) return null
+  // تاریخ رو از JalaliDatePicker بگیر (که یه ISO date هست)
+  const datePart = dateIso.split("T")[0] // YYYY-MM-DD
   if (time && /^\d{1,2}:\d{2}$/.test(time)) {
     const [h, m] = time.split(":").map(Number)
-    d.setHours(h || 0, m || 0, 0, 0)
+    // Tehran = UTC + 3:30 → UTC = Tehran - 3:30
+    const tehranOffsetMinutes = 210
+    let utcH = (h || 0) - 3  // 3 ساعت کم
+    let utcM = (m || 0) - 30 // 30 دقیقه کم
+    let finalDate = datePart
+    // normalize minutes
+    if (utcM < 0) { utcM += 60; utcH -= 1 }
+    // normalize hours
+    if (utcH < 0) { utcH += 24; finalDate = new Date(new Date(finalDate).getTime() - 86400000).toISOString().split("T")[0] }
+    if (utcH >= 24) { utcH -= 24; finalDate = new Date(new Date(finalDate).getTime() + 86400000).toISOString().split("T")[0] }
+    return `${finalDate}T${String(utcH).padStart(2, "0")}:${String(utcM).padStart(2, "0")}:00.000Z`
   }
-  return d.toISOString()
+  return `${datePart}T00:00:00.000Z`
 }
 
 // ============================================================
@@ -312,12 +341,11 @@ function combineDateAndTime(dateIso: string | null, time: string): string | null
 // ============================================================
 function CustomerList() {
   const api = useApi()
-  const { openProjectCustomer, openProject, role, projectStatusFilter, setProjectStatusFilter } = useWorkspace()
+  const { openProjectCustomer, openProject, role, projectStatusFilter, setProjectStatusFilter, wizardOpen, wizardInitialCustomerId, openProjectWizard, closeProjectWizard } = useWorkspace()
   const [search, setSearch] = React.useState("")
   const [showCompletedOnly, setShowCompletedOnly] = React.useState<"all" | "active" | "delivered">("all")
   const [dateFilter, setDateFilter] = React.useState<string | null>(null)
   const [groupByPackage, setGroupByPackage] = React.useState(false)
-  const [wizardOpen, setWizardOpen] = React.useState(false)
 
   const canCreate = role === "admin" || role === "manager" || role === "sales"
 
@@ -378,7 +406,7 @@ function CustomerList() {
         icon="🎬"
         actions={
           canCreate ? (
-            <Button onClick={() => setWizardOpen(true)}>
+            <Button onClick={() => openProjectWizard(null)}>
               <Plus className="ml-1 h-4 w-4" /> پروژه جدید
             </Button>
           ) : null
@@ -544,9 +572,10 @@ function CustomerList() {
       {wizardOpen && (
         <NewProjectWizard
           open={wizardOpen}
-          onOpenChange={setWizardOpen}
+          initialCustomerId={wizardInitialCustomerId}
+          onOpenChange={(v) => { if (!v) closeProjectWizard() }}
           onCreated={(customerId, newProjectId) => {
-            setWizardOpen(false)
+            closeProjectWizard()
             // Prefer opening the new project directly; otherwise fall back to the customer list.
             if (newProjectId) {
               openProject(newProjectId)
@@ -664,8 +693,8 @@ interface PkgOption {
   currentPrice: number
   pricingStrategy: string
   defaultDescription: string | null
-  defaultTasks: string[]
-  defaultEquipment: string[]
+  defaultTasks: any[]
+  defaultEquipment: any[]
   isActive: boolean
 }
 interface CustomerOption {
@@ -719,10 +748,15 @@ function NewProjectWizard({
   open,
   onOpenChange,
   onCreated,
+  initialCustomerId,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   onCreated: (customerId?: string, newProjectId?: string) => void
+  // ✅ When provided, the wizard starts at step 2 with this customer pre-selected
+  // (skipping the customer-picker step). Used by the "پروژه جدید برای این مشتری"
+  // buttons in the customer profile sheet and CustomerProjects page.
+  initialCustomerId?: string | null
 }) {
   const api = useApi()
   const qc = useQueryClient()
@@ -735,6 +769,10 @@ function NewProjectWizard({
   const [customerMode, setCustomerMode] = React.useState<"existing" | "new">("existing")
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [customerSearch, setCustomerSearch] = React.useState("")
+  // ✅ Pre-selected customer's display name (when `initialCustomerId` is set),
+  // shown in the dialog header so the user knows which customer the new project
+  // is being created for.
+  const [initialCustomerName, setInitialCustomerName] = React.useState<string | null>(null)
   // New-customer form
   const [newName, setNewName] = React.useState("")
   const [newPhone, setNewPhone] = React.useState("")
@@ -764,17 +802,18 @@ function NewProjectWizard({
   const [pkgCategoryFilter, setPkgCategoryFilter] = React.useState("all")
   const [pkgQualityFilter, setPkgQualityFilter] = React.useState("all")
 
-  // ---- Step 3: team + freeze ----
-  const [startDate, setStartDate] = React.useState<string | null>(null)
+  // ---- Step 3: team + schedule + multi-location + notes ----
+  const [executionDate, setExecutionDate] = React.useState<string | null>(null)
   const [startTime, setStartTime] = React.useState("")
-  const [endDate, setEndDate] = React.useState<string | null>(null)
   const [endTime, setEndTime] = React.useState("")
-  const [deliveryDeadline, setDeliveryDeadline] = React.useState<string | null>(null)
+  const [referralRewardToman, setReferralRewardToman] = React.useState(0)
+  // ✅ Multi-select locations + schedule notes (replaces single ProjectLocationPicker)
+  const [selectedLocationIds, setSelectedLocationIds] = React.useState<string[]>([])
+  const [scheduleNotes, setScheduleNotes] = React.useState("")
   const [fieldTeamIds, setFieldTeamIds] = React.useState<string[]>([])
-  const [studioTeamIds, setStudioTeamIds] = React.useState<string[]>([])
-  const [
-setDeliveryTeamIds] = React.useState<string[]>([])
   const [isPriceFrozen, setIsPriceFrozen] = React.useState(false)
+  // ✅ آتلیه — flag for studio-shoot projects (wizard step 3)
+  const [isStudio, setIsStudio] = React.useState(false)
 
   // ---- Data fetches ----
   const { data: customerResults, isLoading: customersLoading } = useQuery({
@@ -849,6 +888,33 @@ setDeliveryTeamIds] = React.useState<string[]>([])
     }
   }, [open, customerMode, referrerQuery, role])
 
+  // ✅ Initialize the wizard state when the dialog opens.
+  //   - If `initialCustomerId` is provided → skip to step 2 with that customer
+  //     pre-selected (used by the "پروژه جدید برای این مشتری" buttons).
+  //   - Otherwise → start at step 1 with no customer (default flow).
+  // We also fetch the pre-selected customer's name for display in the header.
+  React.useEffect(() => {
+    if (!open) return
+    if (initialCustomerId) {
+      setCustomerId(initialCustomerId)
+      setCustomerMode("existing")
+      setStep(2)
+      // Best-effort name lookup for the dialog header.
+      api
+        .get<{ items: CustomerOption[] }>(`/api/customers?limit=1&search=${encodeURIComponent(initialCustomerId)}`)
+        .then((r) => {
+          const found = (r.items ?? []).find((c) => c.id === initialCustomerId)
+          if (found) setInitialCustomerName(found.name)
+        })
+        .catch(() => {})
+    } else {
+      setStep(1)
+      setCustomerId(null)
+      setInitialCustomerName(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCustomerId])
+
   // Sync editable description/tasks/equipment when package changes
   const lastPkgIdRef = React.useRef<string>("")
   React.useEffect(() => {
@@ -868,6 +934,9 @@ setDeliveryTeamIds] = React.useState<string[]>([])
           typeof e === "string" ? { name: e, price: 0 } : { name: e.name || "", price: Number(e.price) || 0 }
         )
       )
+      // ✅ سود معرف پیش‌فرض از پکیج
+      const pkgReward = (pkg as any).defaultReferralReward ?? 0
+      setReferralRewardToman(Math.round(Number(pkgReward) / 10)) // Rials → Toman
       if (!pricingStrategy) setPricingStrategy(pkg.pricingStrategy)
     }
   }, [packageId, packages, pricingStrategy])
@@ -888,21 +957,41 @@ setDeliveryTeamIds] = React.useState<string[]>([])
   // ---- Submit ----
   const createMut = useMutation({
     mutationFn: async () => {
+      // ✅ date + start time = startDatetime; date + end time = endDatetime
+      const startIso = combineDateAndTime(executionDate, startTime)
+      const endIso = combineDateAndTime(executionDate, endTime)
+
       const payload: Record<string, unknown> = {
         customerId,
         servicePackageId: packageId,
-        pricingStrategy: pricingStrategy || undefined,
+        // ✅ Strategy inherits from the package automatically (no UI selector in wizard).
         customDescription: editedDescription.trim() || undefined,
         customTasks: editedTasks.filter((t) => t.name.trim().length > 0),
         customEquipment: editedEquipment.filter((e) => e.name.trim().length > 0),
         discountAmount: discountToman > 0 ? discountToman : 0,
         priceAdjustment: priceAdjustmentToman || 0,
-        startDatetime: combineDateAndTime(startDate, startTime) || undefined,
-        endDatetime: combineDateAndTime(endDate, endTime) || undefined,
-        deliveryDeadline: deliveryDeadline || undefined,
+        // ✅ اعتبار معرف (Toman → API تبدیل به Rials می‌کنه)
+        referralRewardOverride: referralRewardToman || 0,
+        // ✅ Schedule: single execution date + start/end time. deliveryDeadline removed.
+        startDatetime: startIso || undefined,
+        endDatetime: endIso || undefined,
+        deliveryDeadline: undefined, // explicitly removed from wizard
         fieldTeamIds,
-        studioTeamIds,
-isPriceFrozen,
+        isPriceFrozen,
+        // ✅ آتلیه — flag for studio-shoot projects
+        isStudio,
+      }
+
+      // ✅ Build schedules array — one ProjectSchedule entry per selected location,
+      // each carrying the same execution date/time and the schedule notes.
+      if (selectedLocationIds.length > 0) {
+        const trimmedNotes = scheduleNotes.trim()
+        payload.schedules = selectedLocationIds.map((locId) => ({
+          locationId: locId,
+          startDatetime: startIso,
+          endDatetime: endIso,
+          note: trimmedNotes || undefined,
+        }))
       }
 
       // SMS assignments: collect enabled ones (with override if provided)
@@ -950,15 +1039,15 @@ isPriceFrozen,
     setEditedEquipment([])
     setDiscountToman(0)
     setSmsStates({})
-    setStartDate(null)
+    setExecutionDate(null)
     setStartTime("")
-    setEndDate(null)
     setEndTime("")
-    setDeliveryDeadline(null)
+    setSelectedLocationIds([])
+    setScheduleNotes("")
     setFieldTeamIds([])
-    setStudioTeamIds([])
-    
     setIsPriceFrozen(false)
+    // ✅ آتلیه — reset studio flag too
+    setIsStudio(false)
     lastPkgIdRef.current = ""
   }
 
@@ -973,26 +1062,31 @@ isPriceFrozen,
 
   // ---- Team filters ----
   // تیم اجرایی: عکاس، تصویربردار، کادر حرفه‌ای
+  // (تیم استودیو/ادیت و تدوین از wizard حذف شده — فقط تیم اجرایی انتخاب می‌شود.)
   const photographers = (users ?? []).filter((u) => ["photographer", "videographer", "pro_crew"].includes(migrateRole(u.role)))
-  // تیم استودیو/ادیت/تدوین: ادیتور، تدوین‌کار
-  const editors = (users ?? []).filter((u) => ["editor", "film_editor"].includes(migrateRole(u.role)))
-  // تیم تحویل: مسئول فروش
-  const logistics = (users ?? []).filter((u) => migrateRole(u.role) === "sales")
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? null : close())}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>ساخت پروژه جدید</DialogTitle>
-          <DialogDescription>با طی کردن سه گام، پروژه را ثبت کنید.</DialogDescription>
+          <DialogTitle>
+            {initialCustomerName
+              ? `پروژه جدید برای ${initialCustomerName}`
+              : "ساخت پروژه جدید"}
+          </DialogTitle>
+          <DialogDescription>
+            {initialCustomerName
+              ? "مشتری از قبل انتخاب شده — مستقیم به گام ۲ بروید."
+              : "با طی کردن سه گام، پروژه را ثبت کنید."}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Stepper */}
         <div className="mb-4 flex items-center justify-between gap-2">
           {[
-            { n: 1, label: "مشتری" },
-            { n: 2, label: "پکیج، قیمت، زمان و پیامک" },
-            { n: 3, label: "تیم و تحویل" },
+            { n: 1, label: "انتخاب مشتری" },
+            { n: 2, label: "پکیج، قیمت و پیامک" },
+            { n: 3, label: "تیم و زمان اجرا" },
           ].map((s) => (
             <div key={s.n} className="flex flex-1 items-center gap-2">
               <div
@@ -1262,24 +1356,29 @@ isPriceFrozen,
               </div>
             )}
 
-            {/* Pricing strategy + discount + price adjustment + freeze */}
+            {/* ✅ Pricing strategy selector was REMOVED from the wizard.
+                The project inherits the package's pricingStrategy automatically.
+                Discount + price adjustment + freeze remain. */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label className="mb-1.5 block text-xs">استراتژی قیمت‌گذاری</Label>
-                <Select value={pricingStrategy} onValueChange={setPricingStrategy}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="استراتژی" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRICING_STRATEGIES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {PRICING_STRATEGY_LABELS[s]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {/* Price freeze — next to strategy, disabled initially */}
-                <label className="mt-1.5 flex cursor-pointer items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-1.5">
+              <div className="space-y-3">
+                {/* Strategy info card (read-only badge — derived from the selected package) */}
+                <div className="rounded-md border bg-muted/30 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">استراتژی قیمت‌گذاری:</span>
+                    {selectedPkg ? (
+                      <Badge variant="secondary" className="text-[10px] font-semibold">
+                        {PRICING_STRATEGY_LABELS[selectedPkg.pricingStrategy as keyof typeof PRICING_STRATEGY_LABELS] ?? selectedPkg.pricingStrategy}
+                      </Badge>
+                    ) : (
+                      <span className="text-[10px] font-medium text-amber-600">ابتدا یک پکیج انتخاب کنید</span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 text-[10px] text-muted-foreground">
+                    استراتژی به‌صورت خودکار از پکیج انتخاب می‌شود و در این مرحله قابل تغییر نیست.
+                  </div>
+                </div>
+                {/* Price freeze — next to strategy info */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-1.5">
                   <Checkbox
                     checked={isPriceFrozen}
                     onCheckedChange={(v) => setIsPriceFrozen(Boolean(v))}
@@ -1367,30 +1466,22 @@ isPriceFrozen,
               </div>
             </div>
 
-            {/* Schedule — moved from step 3 */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <ScheduleField
-                label="شروع اجرا"
-                date={startDate}
-                onDateChange={setStartDate}
-                time={startTime}
-                onTimeChange={setStartTime}
-              />
-              <ScheduleField
-                label="پایان اجرا"
-                date={endDate}
-                onDateChange={setEndDate}
-                time={endTime}
-                onTimeChange={setEndTime}
-              />
-              <div>
-                <Label className="mb-1.5 block text-xs">مهلت تحویل</Label>
-                <JalaliDatePicker
-                  value={deliveryDeadline}
-                  onChange={setDeliveryDeadline}
-                  placeholder="انتخاب تاریخ"
+            {/* ✅ اعتبار معرف (referral reward) */}
+            <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3 dark:border-violet-800 dark:bg-violet-950/20">
+              <Label className="mb-1.5 block text-xs font-medium">اعتبار معرف (تومان)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  dir="ltr"
+                  value={referralRewardToman ? Number(referralRewardToman).toLocaleString("en-US") : ""}
+                  onChange={(e) => setReferralRewardToman(Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                  placeholder="0"
+                  className="h-9 text-center font-mono text-sm"
                 />
+                <span className="shrink-0 text-[10px] text-muted-foreground">تومان</span>
               </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                این مبلغ به اعتبار مشتری معرف اضافه می‌شود. مقدار پیش‌فرض از پکیج گرفته شده است.
+              </p>
             </div>
 
             {/* Freeze price — moved from step 3, disabled initially */}
@@ -1485,35 +1576,104 @@ isPriceFrozen,
                 برای مدیریت اتوماسیون‌ها به «تنظیمات ← قالب‌های پیامک» بروید.
               </p>
             </div>
+
+            {/* ✅ آتلیه — checkbox for studio-shoot projects (placed at the bottom of step 2) */}
+            <div className="rounded-lg border bg-card p-3">
+              <label className="flex cursor-pointer items-start gap-2.5 text-right" dir="rtl">
+                <Checkbox
+                  checked={isStudio}
+                  onCheckedChange={(v) => setIsStudio(Boolean(v))}
+                  className="mt-0.5"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">آتلیه</div>
+                  <div className="text-[11px] text-muted-foreground leading-relaxed">
+                    این پروژه در آتلیه استودیو انجام می‌شود
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
         )}
 
         {/* =====================================================
-            Step 3: Schedule + Team + Freeze
+            Step 3: Schedule + Multi-Location + Notes + Map + Team
         ===================================================== */}
         {step === 3 && (
-          <div className="space-y-3">
-            {users && users.length > 0 && (
+          <div className="space-y-4">
+            {/* ✅ زمان‌بندی اجرا — یک تاریخ + ساعت شروع + ساعت پایان */}
+            <div className="rounded-lg border bg-card p-3">
+              <h4 className="mb-3 text-sm font-semibold">زمان و تاریخ اجرا</h4>
               <div className="grid gap-3 sm:grid-cols-3">
-                <TeamPicker
-                  label="تیم اجرایی (عکاس/تصویربردار)"
-                  options={photographers}
-                  selected={fieldTeamIds}
-                  onChange={setFieldTeamIds}
-                />
-                <TeamPicker
-                  label="تیم استودیو/ادیت و تدوین"
-                  options={editors}
-                  selected={studioTeamIds}
-                  onChange={setStudioTeamIds}
-                />
+                <div>
+                  <Label className="mb-1.5 block text-xs">تاریخ اجرا</Label>
+                  <JalaliDatePicker
+                    value={executionDate}
+                    onChange={setExecutionDate}
+                    placeholder="انتخاب تاریخ"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1.5 block text-xs">ساعت شروع</Label>
+                  <TimeWheelPicker value={startTime || undefined} onChange={setStartTime} />
+                  {startTime && (
+                    <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(startTime)}</div>
+                  )}
+                </div>
+                <div>
+                  <Label className="mb-1.5 block text-xs">ساعت پایان</Label>
+                  <TimeWheelPicker value={endTime || undefined} onChange={setEndTime} />
+                  {endTime && (
+                    <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(endTime)}</div>
+                  )}
+                </div>
               </div>
-            )}
-            {users && users.length === 0 && (
-              <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center text-xs text-muted-foreground">
-                کاربری برای انتخاب تیم وجود ندارد. به «تنظیمات ← کاربران» بروید.
-              </div>
-            )}
+            </div>
+
+            {/* ✅ مکان‌های اجرا — multi-select با جستجو + افزودن مکان جدید */}
+            <WizardMultiLocationPicker
+              selectedLocationIds={selectedLocationIds}
+              onChange={setSelectedLocationIds}
+            />
+
+            {/* ✅ توضیحات مکان و زمان اجرا */}
+            <div className="rounded-lg border bg-card p-3">
+              <h4 className="mb-2 text-sm font-semibold">توضیحات مکان و زمان اجرا</h4>
+              <Textarea
+                value={scheduleNotes}
+                onChange={(e) => setScheduleNotes(e.target.value)}
+                placeholder="مثلاً: مراسم عقد در هتل اسپیناس ساعت ۱۸، عکس‌برداری استودیویی قبل از مراسم…"
+                rows={3}
+                className="resize-none text-sm"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                این یادداشت روی همه زمان‌بندی‌های این پروژه ذخیره می‌شود.
+              </p>
+            </div>
+
+            {/* ✅ نقشه گوگل — نمایش مکان انتخاب‌شده */}
+            <WizardGoogleMapsEmbed
+              selectedLocationIds={selectedLocationIds}
+            />
+
+            {/* ✅ تیم */}
+            <div className="rounded-lg border bg-card p-3">
+              <h4 className="mb-3 text-sm font-semibold">تیم اجرایی</h4>
+              {users && users.length > 0 ? (
+                <div className="grid gap-3">
+                  <TeamPicker
+                    label="تیم اجرایی (عکاس/تصویربردار)"
+                    options={photographers}
+                    selected={fieldTeamIds}
+                    onChange={setFieldTeamIds}
+                  />
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+                  کاربری برای انتخاب تیم وجود ندارد. به «تنظیمات ← کارمندان» بروید.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1886,6 +2046,395 @@ function MiniReferrerCombobox({
   )
 }
 
+// ✅ Project Location Picker — searchable combobox + address input
+function ProjectLocationPicker({
+  address,
+  onAddressChange,
+  locationId,
+  onLocationChange,
+}: {
+  address: string
+  onAddressChange: (v: string) => void
+  locationId: string | null
+  onLocationChange: (v: string | null) => void
+}) {
+  const api = useApi()
+  const [search, setSearch] = React.useState("")
+  const [open, setOpen] = React.useState(false)
+  const apiRef = React.useRef(api)
+  apiRef.current = api
+
+  const { data: locations } = useQuery({
+    queryKey: ["project-locations", search],
+    queryFn: () => apiRef.current.get<{ items: { id: string; name: string; address: string | null; city: string | null; phone: string | null }[] }>(
+      `/api/project-locations${search ? `?search=${encodeURIComponent(search)}` : ""}`
+    ),
+    enabled: open,
+  })
+
+  const items = locations?.items ?? []
+  const selected = items.find((l) => l.id === locationId) ?? null
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <h4 className="mb-3 text-sm font-semibold">مکان و آدرس اجرا</h4>
+      <div className="space-y-3">
+        {/* Searchable location selector */}
+        <div>
+          <Label className="mb-1.5 block text-xs">انتخاب مکان از قبل ثبت‌شده (اختیاری)</Label>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between text-xs"
+              >
+                {selected ? selected.name : "جستجوی مکان..."}
+                <Search className="h-3.5 w-3.5 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-0" align="start">
+              <div className="border-b p-2">
+                <Input
+                  placeholder="جستجوی نام مکان..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto scroll-thin">
+                {items.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-muted-foreground">مکانی یافت نشد</div>
+                ) : (
+                  items.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className="flex w-full flex-col items-start gap-0.5 border-b p-2 text-right text-xs hover:bg-accent"
+                      onClick={() => {
+                        onLocationChange(l.id)
+                        if (l.address) onAddressChange(l.address)
+                        setOpen(false)
+                      }}
+                    >
+                      <span className="font-medium">{l.name}</span>
+                      {l.address && <span className="text-muted-foreground">{l.address}</span>}
+                      {l.city && <span className="text-[10px] text-muted-foreground">{l.city}</span>}
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Address input */}
+        <div>
+          <Label className="mb-1.5 block text-xs">آدرس پروژه</Label>
+          <Textarea
+            value={address}
+            onChange={(e) => onAddressChange(e.target.value)}
+            placeholder="آدرس کامل محل اجرا..."
+            rows={2}
+            className="resize-none text-sm"
+          />
+        </div>
+
+        {selected && (
+          <div className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1">
+            <span className="text-[10px] text-muted-foreground">مکان انتخاب‌شده: {selected.name}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[10px]"
+              onClick={() => { onLocationChange(null) }}
+            >
+              حذف انتخاب
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ✅ Wizard multi-location picker — searchable combobox, multi-select, "add new location" dialog.
+function WizardMultiLocationPicker({
+  selectedLocationIds,
+  onChange,
+}: {
+  selectedLocationIds: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = role === "admin" || role === "manager"
+  const [search, setSearch] = React.useState("")
+  const [open, setOpen] = React.useState(false)
+  const [newLocOpen, setNewLocOpen] = React.useState(false)
+  const [newLoc, setNewLoc] = React.useState({ name: "", address: "", city: "", phone: "", notes: "" })
+
+  const { data: locationsData } = useQuery<{ items: ProjectLocationItem[] }>({
+    queryKey: ["project-locations", search],
+    queryFn: () => api.get<{ items: ProjectLocationItem[] }>(
+      `/api/project-locations${search ? `?search=${encodeURIComponent(search)}` : ""}`
+    ),
+    enabled: open,
+  })
+  const items = locationsData?.items ?? []
+  const selectedLocations = items.filter((l) => selectedLocationIds.includes(l.id))
+
+  function toggle(id: string) {
+    if (selectedLocationIds.includes(id)) {
+      onChange(selectedLocationIds.filter((x) => x !== id))
+    } else {
+      onChange([...selectedLocationIds, id])
+    }
+  }
+
+  const createLocMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/project-locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-demo-role": role },
+        body: JSON.stringify(newLoc),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error((d as any)?.error || `Request failed (${res.status})`)
+      return d as ProjectLocationItem
+    },
+    onSuccess: (created) => {
+      toast.success("مکان جدید ایجاد شد")
+      onChange([...selectedLocationIds, created.id])
+      setNewLocOpen(false)
+      setNewLoc({ name: "", address: "", city: "", phone: "", notes: "" })
+      qc.invalidateQueries({ queryKey: ["project-locations"] })
+    },
+    onError: (e: Error) => toast.error(e.message || "ساخت مکان ناموفق بود"),
+  })
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-sm font-semibold">مکان‌های اجرای پروژه</h4>
+        {canManage && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setNewLocOpen(true)}
+          >
+            <Plus className="h-3.5 w-3.5" /> مکان جدید
+          </Button>
+        )}
+      </div>
+
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            className="w-full justify-between text-xs"
+          >
+            <span className="truncate">
+              {selectedLocationIds.length > 0
+                ? `${toPersianDigits(selectedLocationIds.length)} مکان انتخاب‌شده`
+                : "انتخاب مکان‌ها..."}
+            </span>
+            <Search className="h-3.5 w-3.5 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0" align="start">
+          <div className="border-b p-2">
+            <Input
+              placeholder="جستجوی نام/آدرس/شهر مکان..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto scroll-thin">
+            {items.length === 0 ? (
+              <div className="p-3 text-center text-xs text-muted-foreground">مکانی یافت نشد</div>
+            ) : (
+              items.map((l) => {
+                const checked = selectedLocationIds.includes(l.id)
+                return (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={cn(
+                      "flex w-full items-start gap-2 border-b p-2 text-right text-xs hover:bg-accent transition",
+                      checked && "bg-primary/5"
+                    )}
+                    onClick={() => toggle(l.id)}
+                  >
+                    <Checkbox checked={checked} className="mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">{l.name}</div>
+                      {(l.address || l.city) && (
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {[l.city, l.address].filter(Boolean).join(" — ")}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {selectedLocations.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {selectedLocations.map((l) => (
+            <span
+              key={l.id}
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px]"
+            >
+              <MapPin className="h-3 w-3 text-primary" />
+              <span className="font-medium">{l.name}</span>
+              <button
+                type="button"
+                onClick={() => onChange(selectedLocationIds.filter((x) => x !== l.id))}
+                className="rounded-full p-0.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                aria-label="حذف"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* New location dialog */}
+      <Dialog open={newLocOpen} onOpenChange={setNewLocOpen}>
+        <DialogContent dir="rtl" className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>مکان جدید</DialogTitle>
+            <DialogDescription>
+              مکان اجرای جدید را ثبت کنید تا در پروژه‌های بعدی قابل استفاده باشد.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">نام مکان *</Label>
+              <Input
+                value={newLoc.name}
+                onChange={(e) => setNewLoc((f) => ({ ...f, name: e.target.value }))}
+                placeholder="مثلاً: هتل اسپیناس"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">آدرس</Label>
+              <Input
+                value={newLoc.address}
+                onChange={(e) => setNewLoc((f) => ({ ...f, address: e.target.value }))}
+                placeholder="آدرس کامل"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">شهر</Label>
+                <Input
+                  value={newLoc.city}
+                  onChange={(e) => setNewLoc((f) => ({ ...f, city: e.target.value }))}
+                  placeholder="مثلاً: تهران"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">تلفن</Label>
+                <Input
+                  value={newLoc.phone}
+                  onChange={(e) => setNewLoc((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="شماره تماس مکان"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">یادداشت</Label>
+              <Input
+                value={newLoc.notes}
+                onChange={(e) => setNewLoc((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="مثلاً: پارکینگ رایگان"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setNewLocOpen(false)}>انصراف</Button>
+            <Button
+              disabled={!newLoc.name.trim() || createLocMut.isPending}
+              onClick={() => createLocMut.mutate()}
+            >
+              {createLocMut.isPending ? "در حال ساخت..." : "ساخت مکان"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ✅ Google Maps embed — shows the selected location (or first one) on an iframe map.
+function WizardGoogleMapsEmbed({
+  selectedLocationIds,
+}: {
+  selectedLocationIds: string[]
+}) {
+  const api = useApi()
+  // Fetch all locations (cached) so we can resolve names/addresses for the map URL.
+  const { data: locationsData } = useQuery<{ items: ProjectLocationItem[] }>({
+    queryKey: ["project-locations", ""],
+    queryFn: () => api.get<{ items: ProjectLocationItem[] }>(`/api/project-locations`),
+  })
+  const allLocations = locationsData?.items ?? []
+  const selectedLocations = allLocations.filter((l) => selectedLocationIds.includes(l.id))
+
+  // Show the first selected location on the map.
+  const loc = selectedLocations[0] ?? null
+  const query = loc ? (loc.address || loc.name) : ""
+  // ✅ Use the canonical Google Maps embed URL (works without an API key).
+  const mapSrc = query ? `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : ""
+
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+        <MapPin className="h-4 w-4 text-primary" />
+        نقشه مکان اجرا
+      </h4>
+      {loc && (
+        <div className="mb-2 text-[10px] text-muted-foreground">
+          نمایش: {loc.name}
+          {selectedLocations.length > 1 && ` (+${toPersianDigits(selectedLocations.length - 1)} مکان دیگر)`}
+        </div>
+      )}
+      {mapSrc ? (
+        <iframe
+          title="Google Maps"
+          src={mapSrc}
+          width="100%"
+          height={200}
+          style={{ border: 0, borderRadius: 8 }}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
+      ) : (
+        <div className="flex h-[200px] w-full items-center justify-center rounded-lg border border-dashed bg-muted/20 text-xs text-muted-foreground">
+          برای مشاهده نقشه، یک مکان انتخاب کنید
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ScheduleField({
   label,
   date,
@@ -1972,10 +2521,16 @@ function TeamPicker({
 function CustomerProjects() {
   const api = useApi()
   const qc = useQueryClient()
-  const { activeProjectCustomerId, openProject, backToProjectCustomerList, role } = useWorkspace()
-  const [showCompleted, setShowCompleted] = React.useState(true)
+  const { activeProjectCustomerId, openProject, backToProjectCustomerList, role, openProjectWizard } = useWorkspace()
+  const [showCompleted, setShowCompleted] = React.useState(false)
+  const [strategyFilter, setStrategyFilter] = React.useState<string>("all")
   const [pdfOpen, setPdfOpen] = React.useState(false)
-  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; title: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<{
+    id: string
+    title: string
+    paymentsCount: number
+    paymentsTotal: number
+  } | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ["customer-projects", activeProjectCustomerId],
@@ -2039,9 +2594,13 @@ function CustomerProjects() {
   }
 
   const { customer, projects, notes, seeFinance, seeBalance, canManage } = data
-  const visibleProjects = showCompleted ? projects : projects.filter((p) => !p.isDelivered)
-  const totalPaid = projects.reduce((s, p) => s + (p.totalPaid ?? 0), 0)
-  const totalBalance = projects.reduce((s, p) => s + (p.balance ?? 0), 0)
+  const visibleProjects = (showCompleted ? projects : projects.filter((p) => !p.isDelivered))
+    .filter((p) => strategyFilter === "all" ? true : p.pricingStrategy === strategyFilter)
+  const totalPaid = projects.reduce((s, p) => s + (p.totalPaid ?? 0) + (p.printPhotoPaid ?? 0), 0)
+  const totalBalance = projects.reduce((s, p) => s + (p.balance ?? 0) + (p.printPhotoBalance ?? 0), 0)
+
+  // ✅ Only admin/manager/sales can create new projects.
+  const canCreate = role === "admin" || role === "manager" || role === "sales"
 
   return (
     <div>
@@ -2079,32 +2638,68 @@ function CustomerProjects() {
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {seeFinance && customer.totalRevenue != null && (
-            <StatCard label="درآمد کل" value={`${formatRialsShort(customer.totalRevenue)} تومان`} accent="#10b981" />
+        <div className="flex flex-wrap items-stretch gap-2">
+          {/* ✅ پروژه جدید برای این مشتری — opens wizard at step 2 with this customer pre-selected */}
+          {canCreate && (
+            <Button
+              onClick={() => openProjectWizard(customer.id)}
+              className="self-stretch"
+            >
+              <Plus className="ml-1 h-4 w-4" /> پروژه جدید
+            </Button>
           )}
           {seeBalance && (
             <StatCard label="مانده کل" value={`${formatRialsShort(totalBalance)} تومان`} accent="#f59e0b" />
           )}
           {seeBalance && (
-            <Button variant="outline" size="sm" onClick={() => setPdfOpen(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setPdfOpen(true)}
+              className="self-stretch"
+            >
               <FileText className="ml-1 h-4 w-4" /> خروجی قرارداد
             </Button>
           )}
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        {/* Projects column */}
-        <div className="lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+      {/* ✅ Notes ABOVE projects — full-width stack instead of the old side-by-side grid. */}
+      <div className="flex flex-col gap-5">
+        {/* Notes section — appears first, right under the customer header */}
+        <div>
+          <CustomerNotesPanel
+            customerId={customer.id}
+            notes={notes}
+            canManage={canManage}
+          />
+        </div>
+
+        {/* Projects section — appears below notes */}
+        <div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
               <Film className="h-4 w-4" /> پروژه‌های این مشتری
               <Badge variant="secondary" className="text-[10px]">{toPersianDigits(projects.length)}</Badge>
             </h2>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">نمایش پروژه‌های تکمیل‌شده</span>
-              <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={strategyFilter} onValueChange={setStrategyFilter}>
+                <SelectTrigger className="h-8 w-[140px] text-[11px]">
+                  <SelectValue placeholder="استراتژی" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">همه استراتژی‌ها</SelectItem>
+                  <SelectItem value="fixed">ثابت</SelectItem>
+                  <SelectItem value="variable">متغیر</SelectItem>
+                  <SelectItem value="delayed">مهلت‌دار</SelectItem>
+                </SelectContent>
+              </Select>
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-[11px]">
+                <Checkbox
+                  checked={showCompleted}
+                  onCheckedChange={(v) => setShowCompleted(Boolean(v))}
+                />
+                <span className="text-muted-foreground">نمایش پروژه‌های تکمیل‌شده</span>
+              </label>
             </div>
           </div>
 
@@ -2123,20 +2718,16 @@ function CustomerProjects() {
                   onOpen={() => openProject(p.id)}
                   onComplete={() => completeMut.mutate(p.id)}
                   completing={completeMut.isPending}
-                  onDelete={() => setDeleteTarget({ id: p.id, title: p.title })}
+                  onDelete={() => setDeleteTarget({
+                    id: p.id,
+                    title: p.title,
+                    paymentsCount: p.payments?.length ?? 0,
+                    paymentsTotal: (p.payments ?? []).reduce((s, pay) => s + (pay.amount || 0), 0),
+                  })}
                 />
               ))}
             </div>
           )}
-        </div>
-
-        {/* Notes column */}
-        <div>
-          <CustomerNotesPanel
-            customerId={customer.id}
-            notes={notes}
-            canManage={canManage}
-          />
         </div>
       </div>
 
@@ -2156,7 +2747,17 @@ function CustomerProjects() {
             <AlertDialogHeader>
               <AlertDialogTitle>حذف پروژه؟</AlertDialogTitle>
               <AlertDialogDescription>
-                آیا از حذف پروژه «{deleteTarget.title}» مطمئن هستید؟ این عمل قابل بازگشت نیست و تمام پرداخت‌ها، یادداشت‌ها، وظایف و پیامک‌های اختصاص‌یافتهٔ این پروژه نیز حذف خواهند شد.
+                {deleteTarget.paymentsCount > 0 ? (
+                  <>
+                    {"⚠️ این پروژه دارای "}
+                    <strong>{toPersianDigits(deleteTarget.paymentsCount)}</strong>
+                    {" پرداخت به مبلغ "}
+                    <strong>{formatRials(deleteTarget.paymentsTotal)}</strong>
+                    {" تومان است. آیا مطمئن هستید که می‌خواهید آن را حذف کنید؟ این پرداخت‌ها حذف خواهند شد."}
+                  </>
+                ) : (
+                  "آیا از حذف این پروژه مطمئن هستید؟"
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -2391,12 +2992,17 @@ function CustomerNotesPanel({
   const qc = useQueryClient()
   const { role } = useWorkspace()
   const [content, setContent] = React.useState("")
+  // ✅ Notes list is COLLAPSED by default per FIXES-10 task #3.
+  const [notesExpanded, setNotesExpanded] = React.useState(false)
   const [pendingAttachments, setPendingAttachments] = React.useState<CustomerNoteAttachment[]>([])
   // uploads in-flight: { uid, name, size, progress, error }
   const [uploads, setUploads] = React.useState<
     { uid: string; name: string; size: number; progress: number; error?: string }[]
   >([])
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  // ✅ Delete is only for admin/manager (per FIXES-10 task #3).
+  const canDeleteNotes = role === "admin" || role === "manager"
 
   const isUploading = uploads.length > 0
   const overallPct = uploads.length
@@ -2415,8 +3021,21 @@ function CustomerNotesPanel({
       setPendingAttachments([])
       if (fileInputRef.current) fileInputRef.current.value = ""
       toast.success("یادداشت ثبت شد")
+      // ✅ Auto-expand so the user sees the freshly-added note.
+      setNotesExpanded(true)
     },
     onError: (e: Error) => toast.error(e.message || "ثبت یادداشت ناموفق بود"),
+  })
+
+  // ✅ Delete a note via DELETE /api/customers/[id]/notes/[noteId] (FIXES-10 #3).
+  const deleteNoteMut = useMutation({
+    mutationFn: (noteId: string) =>
+      api.del(`/api/customers/${customerId}/notes/${noteId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["customer-projects", customerId] })
+      toast.success("یادداشت حذف شد")
+    },
+    onError: (e: Error) => toast.error(e.message || "حذف یادداشت ناموفق بود"),
   })
 
   async function handleFilesSelected(files: FileList | null) {
@@ -2453,10 +3072,32 @@ function CustomerNotesPanel({
 
   return (
     <SectionCard>
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <StickyNote className="h-4 w-4" /> یادداشت‌های مشتری
-        <Badge variant="secondary" className="text-[10px]">{toPersianDigits(notes.length)}</Badge>
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <StickyNote className="h-4 w-4" /> یادداشت‌های مشتری
+          <Badge variant="secondary" className="text-[10px]">{toPersianDigits(notes.length)}</Badge>
+        </h2>
+        {/* ✅ Toggle button — collapses/expands the notes list (collapsed by default). */}
+        {notes.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-[11px]"
+            onClick={() => setNotesExpanded((v) => !v)}
+          >
+            {notesExpanded ? (
+              <>
+                <ChevronUp className="ml-1 h-3.5 w-3.5" /> مخفی کردن یادداشت‌ها
+              </>
+            ) : (
+              <>
+                <ChevronDown className="ml-1 h-3.5 w-3.5" /> نمایش یادداشت‌ها
+              </>
+            )}
+          </Button>
+        )}
+      </div>
 
       {canManage && (
         <div className="mb-3 border-b pb-3">
@@ -2564,22 +3205,42 @@ function CustomerNotesPanel({
         </div>
       )}
 
-      <div className="max-h-[480px] space-y-2 overflow-y-auto scroll-thin pl-1">
-        {notes.length === 0 ? (
-          <div className="py-8 text-center text-xs text-muted-foreground">
-            هنوز یادداشتی ثبت نشده است.
-          </div>
-        ) : (
-          notes.map((n) => (
-            <CustomerNoteItem key={n.id} note={n} />
-          ))
-        )}
-      </div>
+      {/* ✅ Notes list — only rendered when expanded (or when there are zero
+          notes, in which case we show a friendly empty hint). */}
+      {notesExpanded || notes.length === 0 ? (
+        <div className="max-h-[480px] space-y-2 overflow-y-auto scroll-thin pl-1">
+          {notes.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              هنوز یادداشتی ثبت نشده است.
+            </div>
+          ) : (
+            notes.map((n) => (
+              <CustomerNoteItem
+                key={n.id}
+                note={n}
+                canDelete={canDeleteNotes}
+                onDelete={() => deleteNoteMut.mutate(n.id)}
+                deleting={deleteNoteMut.isPending}
+              />
+            ))
+          )}
+        </div>
+      ) : null}
     </SectionCard>
   )
 }
 
-function CustomerNoteItem({ note }: { note: CustomerNote }) {
+function CustomerNoteItem({
+  note,
+  canDelete = false,
+  onDelete,
+  deleting = false,
+}: {
+  note: CustomerNote
+  canDelete?: boolean
+  onDelete?: () => void
+  deleting?: boolean
+}) {
   const attCount = note.attachments?.length ?? 0
   return (
     <div className="rounded-lg border bg-muted/30 p-2.5">
@@ -2592,7 +3253,30 @@ function CustomerNoteItem({ note }: { note: CustomerNote }) {
             </span>
           )}
         </span>
-        <span>{timeAgo(note.createdAt)}</span>
+        <div className="flex items-center gap-1">
+          <span>{timeAgo(note.createdAt)}</span>
+          {/* ✅ Delete button — only admin/manager (FIXES-10 #3). */}
+          {canDelete && onDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+              onClick={() => {
+                if (confirm("این یادداشت حذف شود؟")) onDelete()
+              }}
+              disabled={deleting}
+              aria-label="حذف یادداشت"
+              title="حذف یادداشت"
+            >
+              {deleting ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
       {note.content && (
         <div className="whitespace-pre-wrap text-xs leading-relaxed">{note.content}</div>
@@ -3032,35 +3716,77 @@ function ProjectCard({
             </div>
           )}
 
-          {/* Payments / balance — include discount row when present */}
+          {/* Payments / balance — project + print photos */}
           {seeBalance && p.effectivePrice != null && (
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
-              <div>
-                <div className="text-[10px] text-muted-foreground">قیمت مؤثر</div>
-                <div className="text-xs font-semibold">{formatRialsShort(p.effectivePrice)} تومان</div>
-                {seeFinance && p.discountAmount > 0 && (
-                  <div className="mt-0.5 text-[10px] font-medium text-amber-600">
-                    تخفیف: − {formatRials(p.discountAmount)} تومان
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="text-[10px] text-muted-foreground">پرداخت‌شده</div>
-                <div className="text-xs font-semibold text-emerald-600">
-                  {formatRialsShort(p.totalPaid ?? 0)} تومان
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] text-muted-foreground">مانده</div>
-                <div
-                  className={cn(
-                    "text-xs font-semibold",
-                    (p.balance ?? 0) > 0 ? "text-amber-600" : "text-emerald-600"
+            <div className="mt-3 space-y-2 border-t pt-3">
+              {/* پروژه اصلی */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <div className="text-[10px] text-muted-foreground">قیمت مؤثر (پروژه)</div>
+                  <div className="text-xs font-semibold">{formatRialsShort(p.effectivePrice)} ت</div>
+                  {seeFinance && p.packageCurrentPrice != null && p.priceAdjustment !== 0 && (
+                    <div className="mt-0.5 text-[9px] text-muted-foreground">
+                      پایه: {formatRialsShort(p.packageCurrentPrice)} ت
+                    </div>
                   )}
-                >
-                  {formatRialsShort(p.balance ?? 0)} تومان
+                  {seeFinance && p.priceAdjustment !== 0 && (
+                    <div className={cn("text-[9px] font-medium", p.priceAdjustment > 0 ? "text-sky-600" : "text-rose-600")}>
+                      اصلاح: {p.priceAdjustment > 0 ? "+" : "−"}{formatRialsShort(Math.abs(p.priceAdjustment))} ت
+                    </div>
+                  )}
+                  {seeFinance && p.discountAmount > 0 && (
+                    <div className="mt-0.5 text-[9px] font-medium text-amber-600">
+                      تخفیف: − {formatRialsShort(p.discountAmount)} ت
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">پرداخت‌شده</div>
+                  <div className="text-xs font-semibold text-emerald-600">
+                    {formatRialsShort(p.totalPaid ?? 0)} ت
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-muted-foreground">مانده</div>
+                  <div className={cn("text-xs font-semibold", (p.balance ?? 0) > 0 ? "text-amber-600" : "text-emerald-600")}>
+                    {formatRialsShort(p.balance ?? 0)} ت
+                  </div>
                 </div>
               </div>
+
+              {/* عکس‌های چاپی — فقط اگر وجود داشته باشن */}
+              {(p.printPhotoTotal ?? 0) > 0 && (
+                <div className="grid grid-cols-3 gap-2 border-t border-dashed pt-2">
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">قیمت عکس‌های چاپی</div>
+                    <div className="text-xs font-semibold text-violet-600 dark:text-violet-400">
+                      {formatRialsShort(p.printPhotoTotal ?? 0)} ت
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">پرداخت عکس‌ها</div>
+                    <div className="text-xs font-semibold text-emerald-600">
+                      {formatRialsShort(p.printPhotoPaid ?? 0)} ت
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-muted-foreground">مانده عکس‌ها</div>
+                    <div className={cn("text-xs font-semibold", (p.printPhotoBalance ?? 0) > 0 ? "text-amber-600" : "text-emerald-600")}>
+                      {formatRialsShort(p.printPhotoBalance ?? 0)} ت
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* جمع کل مانده */}
+              {((p.balance ?? 0) + (p.printPhotoBalance ?? 0)) > 0 && (
+                <div className="flex items-center justify-between rounded-md bg-amber-50 dark:bg-amber-950/20 px-3 py-1.5">
+                  <span className="text-[10px] font-medium text-amber-700 dark:text-amber-400">جمع کل مانده (پروژه + عکس‌ها)</span>
+                  <span className="text-xs font-bold text-amber-600">
+                    {formatRialsShort((p.balance ?? 0) + (p.printPhotoBalance ?? 0))} ت
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -3169,6 +3895,7 @@ function ProjectCard({
           projectId={p.id}
           projectName={p.title}
           balance={p.balance ?? 0}
+          printPhotoBalance={p.printPhotoBalance ?? 0}
         />
       )}
     </div>
@@ -3184,26 +3911,28 @@ function AddPaymentDialog({
   projectId,
   projectName,
   balance,
+  printPhotoBalance,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   projectId: string
   projectName: string
   balance: number
+  printPhotoBalance?: number
 }) {
   const api = useApi()
   const qc = useQueryClient()
+  const [paymentFor, setPaymentFor] = React.useState<"project" | "print_photo">("project")
   const [toman, setToman] = React.useState(0)
   const [paymentType, setPaymentType] = React.useState<PaymentType>("deposit")
   const [method, setMethod] = React.useState<PaymentMethod>("cash")
-  // Jalali date picker returns a Gregorian ISO; default to today.
   const [datePaid, setDatePaid] = React.useState<string | null>(() => new Date().toISOString())
   const [note, setNote] = React.useState("")
   const [isConfirmed, setIsConfirmed] = React.useState(true)
 
-  // Reset on close
   React.useEffect(() => {
     if (!open) {
+      setPaymentFor("project")
       setToman(0)
       setPaymentType("deposit")
       setMethod("cash")
@@ -3222,6 +3951,7 @@ function AddPaymentDialog({
         amount,
         paymentType,
         method,
+        paymentFor,
         datePaid: datePaid ? new Date(datePaid).toISOString() : undefined,
         note: note.trim(),
         isConfirmed,
@@ -3238,6 +3968,7 @@ function AddPaymentDialog({
   })
 
   const canSubmit = toman > 0 && note.trim().length > 0
+  const currentBalance = paymentFor === "print_photo" ? (printPhotoBalance ?? 0) : balance
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? null : onOpenChange(false))}>
@@ -3246,13 +3977,50 @@ function AddPaymentDialog({
           <DialogTitle>افزودن پرداخت</DialogTitle>
           <DialogDescription>
             پروژه: {projectName}
-            {balance > 0 && (
-              <span className="mt-1 block text-amber-600">مانده فعلی: {formatRials(balance)} تومان</span>
+            {currentBalance > 0 && (
+              <span className="mt-1 block text-amber-600">
+                مانده فعلی: {formatRials(currentBalance)} تومان
+              </span>
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* ✅ انتخاب نوع پرداخت: پروژه اصلی یا عکس‌های چاپی */}
+          <div>
+            <Label className="mb-1.5 block text-xs">پرداخت برای:</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentFor("project")}
+                className={cn(
+                  "rounded-lg border p-2 text-xs font-medium transition",
+                  paymentFor === "project"
+                    ? "border-sky-400 bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-300"
+                    : "border-muted hover:bg-muted/50"
+                )}
+              >
+                پروژه اصلی
+                {balance > 0 && <div className="text-[10px] text-muted-foreground">مانده: {formatRialsShort(balance)} ت</div>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentFor("print_photo")}
+                disabled={(printPhotoBalance ?? 0) === 0}
+                className={cn(
+                  "rounded-lg border p-2 text-xs font-medium transition",
+                  paymentFor === "print_photo"
+                    ? "border-violet-400 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300"
+                    : "border-muted hover:bg-muted/50",
+                  (printPhotoBalance ?? 0) === 0 && "cursor-not-allowed opacity-50"
+                )}
+              >
+                عکس‌های چاپی
+                {(printPhotoBalance ?? 0) > 0 && <div className="text-[10px] text-muted-foreground">مانده: {formatRialsShort(printPhotoBalance ?? 0)} ت</div>}
+              </button>
+            </div>
+          </div>
+
           <div>
             <Label className="mb-1.5 block text-xs">مبلغ (تومان)</Label>
             <TomanInput value={toman} onValueChange={setToman} placeholder="مبلغ به تومان" />
@@ -3713,35 +4481,129 @@ function EditProjectDialog({ projectId, data }: { projectId: string; data: Proje
   const qc = useQueryClient()
   const [open, setOpen] = React.useState(false)
   const p = data.project
+  const role = useWorkspace((s) => s.role)
+  const isAdmin = role === "admin"
 
-  const [startDate, setStartDate] = React.useState<string | null>(p.startDatetime)
+  // ✅ Single date applies to both start and end. deliveryDeadline removed.
+  const initialDate = p.startDatetime ?? p.endDatetime ?? null
+  const [executionDate, setExecutionDate] = React.useState<string | null>(initialDate)
   const [startTime, setStartTime] = React.useState(p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : "")
-  const [endDate, setEndDate] = React.useState<string | null>(p.endDatetime)
   const [endTime, setEndTime] = React.useState(p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : "")
-  const [deliveryDeadline, setDeliveryDeadline] = React.useState<string | null>(p.deliveryDeadline)
   const [discountToman, setDiscountToman] = React.useState(Math.round((p.discountAmount ?? 0) / 10))
   const [isPriceFrozen, setIsPriceFrozen] = React.useState(p.isPriceFrozen)
+  // ✅ New editable fields
+  const [servicePackageId, setServicePackageId] = React.useState<string>(p.servicePackage.id)
+  const [pricingStrategy, setPricingStrategy] = React.useState<string>(p.pricingStrategy)
+  const [priceAdjustment, setPriceAdjustment] = React.useState<number>(
+    Math.round((p.priceAdjustment ?? 0) / 10)
+  )
+  const [referralRewardOverride, setReferralRewardOverride] = React.useState<string>(
+    p.referralRewardOverride != null ? String(Math.round(p.referralRewardOverride / 10)) : ""
+  )
+  const [printedDescription, setPrintedDescription] = React.useState<string>(p.printedDescription ?? "")
+  // ✅ Editable tasks/equipment (per-project overrides)
+  const [editedTasks, setEditedTasks] = React.useState<Array<{ name: string; price: number }>>([])
+  const [editedEquipment, setEditedEquipment] = React.useState<Array<{ name: string; price: number }>>([])
+
+  // Load packages (admin only — needed to change package)
+  const { data: packagesData } = useQuery<PkgOption[]>({
+    queryKey: ["packages-for-edit", open],
+    queryFn: () => api.get<PkgOption[]>("/api/packages?activeOnly=true"),
+    enabled: open && isAdmin,
+  })
+  const packages = packagesData ?? []
+
+  // Helper: convert package's defaultTasks (which may be strings or {name,price}) to {name, price}[]
+  function normalizeItems(items: any[]): Array<{ name: string; price: number }> {
+    if (!Array.isArray(items)) return []
+    return items
+      .map((t) => {
+        if (typeof t === "string") return { name: t, price: 0 }
+        if (t && typeof t === "object") {
+          return { name: String(t.name ?? ""), price: Number(t.price ?? 0) || 0 }
+        }
+        return null
+      })
+      .filter((t): t is { name: string; price: number } => !!t && t.name.trim().length > 0)
+  }
+
+  // Helper: load tasks/equipment from the project's overrides first; fall back to package defaults.
+  function loadItemsFromProjectOrPackage(projectOverride: any[] | undefined, packageItems: any[]): Array<{ name: string; price: number }> {
+    const override = normalizeItems(projectOverride ?? [])
+    if (override.length > 0) return override
+    return normalizeItems(packageItems)
+  }
+
+  // Initialize tasks/equipment when the dialog opens OR when servicePackageId changes
+  React.useEffect(() => {
+    if (!open) return
+    // Find the currently-selected package (the new one if it changed, else the project's package)
+    const selectedPkg = packages.find((pk) => pk.id === servicePackageId) ?? null
+    const isNewPackage = servicePackageId !== p.servicePackage.id
+    if (isNewPackage && selectedPkg) {
+      // Package changed → load the new package's defaults (the user can then edit them)
+      setEditedTasks(normalizeItems(selectedPkg.defaultTasks))
+      setEditedEquipment(normalizeItems(selectedPkg.defaultEquipment))
+      // ✅ Also follow the new package's pricing strategy automatically
+      if (selectedPkg.pricingStrategy) setPricingStrategy(selectedPkg.pricingStrategy)
+    } else {
+      // Initial open or same package → use the project's overrides (or fall back to its package defaults)
+      setEditedTasks(loadItemsFromProjectOrPackage(p.customTasks, p.servicePackage.defaultTasks))
+      setEditedEquipment(loadItemsFromProjectOrPackage(p.customEquipment, p.servicePackage.defaultEquipment))
+    }
+  }, [open, servicePackageId, packages]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     if (open) {
-      setStartDate(p.startDatetime)
+      setExecutionDate(p.startDatetime ?? p.endDatetime ?? null)
       setStartTime(p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : "")
-      setEndDate(p.endDatetime)
       setEndTime(p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : "")
-      setDeliveryDeadline(p.deliveryDeadline)
       setDiscountToman(Math.round((p.discountAmount ?? 0) / 10))
       setIsPriceFrozen(p.isPriceFrozen)
+      setServicePackageId(p.servicePackage.id)
+      setPricingStrategy(p.pricingStrategy)
+      setPriceAdjustment(Math.round((p.priceAdjustment ?? 0) / 10))
+      setReferralRewardOverride(
+        p.referralRewardOverride != null ? String(Math.round(p.referralRewardOverride / 10)) : ""
+      )
+      setPrintedDescription(p.printedDescription ?? "")
+      setEditedTasks(loadItemsFromProjectOrPackage(p.customTasks, p.servicePackage.defaultTasks))
+      setEditedEquipment(loadItemsFromProjectOrPackage(p.customEquipment, p.servicePackage.defaultEquipment))
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveMut = useMutation({
     mutationFn: async () => {
+      // ✅ startDatetime = date + startTime; endDatetime = date + endTime
+      const startIso = combineDateAndTime(executionDate, startTime)
+      const endIso = combineDateAndTime(executionDate, endTime)
       const payload: Record<string, unknown> = {
-        startDatetime: combineDateAndTime(startDate, startTime) || null,
-        endDatetime: combineDateAndTime(endDate, endTime) || null,
-        deliveryDeadline: deliveryDeadline || null,
+        startDatetime: startIso || null,
+        endDatetime: endIso || null,
+        // ✅ deliveryDeadline removed — explicitly clear it.
+        deliveryDeadline: null,
         discountAmount: Math.max(0, Number(discountToman || 0)),
         isPriceFrozen,
+        priceAdjustment: Number(priceAdjustment || 0),
+        printedDescription: printedDescription.trim() || null,
+        // ✅ Always send customTasks/customEquipment so the override is persisted (even if empty)
+        customTasks: editedTasks.filter((t) => t.name.trim().length > 0),
+        customEquipment: editedEquipment.filter((e) => e.name.trim().length > 0),
+      }
+      // referralRewardOverride: empty → null (use package default), number → Rials
+      if (referralRewardOverride.trim() === "") {
+        payload.referralRewardOverride = null
+      } else {
+        const v = Number(referralRewardOverride.replace(/,/g, ""))
+        payload.referralRewardOverride = Number.isFinite(v) && v > 0 ? v : null
+      }
+      // servicePackageId — admin only, only if changed
+      if (isAdmin && servicePackageId && servicePackageId !== p.servicePackage.id) {
+        payload.servicePackageId = servicePackageId
+      }
+      // pricingStrategy — admin only
+      if (isAdmin && pricingStrategy && PRICING_STRATEGIES.includes(pricingStrategy as never)) {
+        payload.pricingStrategy = pricingStrategy
       }
       return api.patch(`/api/projects/${projectId}`, payload)
     },
@@ -3772,44 +4634,234 @@ function EditProjectDialog({ projectId, data }: { projectId: string; data: Proje
           <DialogHeader>
             <DialogTitle>ویرایش پروژه</DialogTitle>
             <DialogDescription>
-              تاریخ‌ها، تخفیف و وضعیت فریز قیمت را ویرایش کنید.
+              پکیج، استراتژی قیمت، تخفیف، اصلاح قیمت، سود معرف، توضیحات چاپی و زمان‌بندی را ویرایش کنید.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
+            {/* Service package (admin only) */}
+            {isAdmin && (
+              <div>
+                <Label className="mb-1.5 block text-xs">پکیج خدمتی</Label>
+                <Select value={servicePackageId} onValueChange={setServicePackageId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="انتخاب پکیج" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {packages.map((pkg) => (
+                      <SelectItem key={pkg.id} value={pkg.id}>
+                        {pkg.title} — {CATEGORY_LABELS[pkg.category as keyof typeof CATEGORY_LABELS] ?? pkg.category}
+                        {pkg.currentPrice ? ` (${formatRialsShort(pkg.currentPrice)} ت)` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  توجه: تغییر پکیج، قیمت پایه را به‌روزرسانی و قیمت نهایی را بازمحاسبه می‌کند.
+                </div>
+              </div>
+            )}
+
+            {/* Pricing strategy (admin only) */}
+            {isAdmin && (
+              <div>
+                <Label className="mb-1.5 block text-xs">استراتژی قیمت‌گذاری</Label>
+                <Select value={pricingStrategy} onValueChange={setPricingStrategy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="استراتژی" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRICING_STRATEGIES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {PRICING_STRATEGY_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2">
-              <ScheduleField
-                label="شروع اجرا"
-                date={startDate}
-                onDateChange={setStartDate}
-                time={startTime}
-                onTimeChange={setStartTime}
-              />
-              <ScheduleField
-                label="پایان اجرا"
-                date={endDate}
-                onDateChange={setEndDate}
-                time={endTime}
-                onTimeChange={setEndTime}
+              <div>
+                <Label className="mb-1.5 block text-xs">اصلاح قیمت (تومان)</Label>
+                <TomanInput
+                  value={priceAdjustment}
+                  onValueChange={setPriceAdjustment}
+                  placeholder="مثلاً ۵۰۰۰۰۰ (مثبت = افزایش)"
+                />
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  مثبت = افزایش قیمت، منفی = کاهش قیمت
+                </div>
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs">تخفیف (تومان)</Label>
+                <TomanInput
+                  value={discountToman}
+                  onValueChange={setDiscountToman}
+                  placeholder="مبلغ تخفیف به تومان"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block text-xs">سود معرف (تومان) — خالی = پیش‌فرض پکیج</Label>
+              <Input
+                dir="ltr"
+                value={referralRewardOverride}
+                onChange={(e) => setReferralRewardOverride(e.target.value.replace(/[^0-9-]/g, ""))}
+                placeholder="خالی = استفاده از پیش‌فرض پکیج"
               />
             </div>
 
             <div>
-              <Label className="mb-1.5 block text-xs">مهلت تحویل</Label>
-              <JalaliDatePicker
-                value={deliveryDeadline}
-                onChange={setDeliveryDeadline}
-                placeholder="انتخاب تاریخ"
+              <Label className="mb-1.5 block text-xs">توضیحات چاپی (برای قرارداد)</Label>
+              <Textarea
+                value={printedDescription}
+                onChange={(e) => setPrintedDescription(e.target.value)}
+                placeholder="توضیحات اختصاصی برای این پروژه (در قرارداد چاپ می‌شود)"
+                rows={3}
+                className="resize-none text-sm"
               />
             </div>
 
-            <div>
-              <Label className="mb-1.5 block text-xs">تخفیف (تومان)</Label>
-              <TomanInput
-                value={discountToman}
-                onValueChange={setDiscountToman}
-                placeholder="مبلغ تخفیف به تومان"
-              />
+            {/* ✅ Editable tasks (per-project override of package defaults) */}
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="text-xs font-medium">کارهای پروژه (با قیمت راهنما)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => setEditedTasks([...editedTasks, { name: "", price: 0 }])}
+                >
+                  <Plus className="ml-1 size-3" /> افزودن
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {editedTasks.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">کاری ثبت نشده.</p>
+                )}
+                {editedTasks.map((task, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <Input
+                      value={task.name}
+                      onChange={(e) => {
+                        const next = [...editedTasks]
+                        next[i] = { ...next[i], name: e.target.value }
+                        setEditedTasks(next)
+                      }}
+                      className="h-8 flex-1 text-xs"
+                      placeholder="نام کار…"
+                    />
+                    <Input
+                      type="number"
+                      dir="ltr"
+                      value={task.price || ""}
+                      onChange={(e) => {
+                        const next = [...editedTasks]
+                        next[i] = { ...next[i], price: Number(e.target.value) || 0 }
+                        setEditedTasks(next)
+                      }}
+                      className="h-8 w-28 text-left text-xs"
+                      placeholder="قیمت"
+                    />
+                    <span className="shrink-0 text-[9px] text-muted-foreground">ت</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0 text-muted-foreground hover:text-rose-600"
+                      onClick={() => setEditedTasks(editedTasks.filter((_, idx) => idx !== i))}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ✅ Editable equipment (per-project override) */}
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="text-xs font-medium">تجهیزات پروژه (با قیمت راهنما)</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => setEditedEquipment([...editedEquipment, { name: "", price: 0 }])}
+                >
+                  <Plus className="ml-1 size-3" /> افزودن
+                </Button>
+              </div>
+              <div className="space-y-1.5">
+                {editedEquipment.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground">تجهیزی ثبت نشده.</p>
+                )}
+                {editedEquipment.map((eq, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <Input
+                      value={eq.name}
+                      onChange={(e) => {
+                        const next = [...editedEquipment]
+                        next[i] = { ...next[i], name: e.target.value }
+                        setEditedEquipment(next)
+                      }}
+                      className="h-8 flex-1 text-xs"
+                      placeholder="نام تجهیز…"
+                    />
+                    <Input
+                      type="number"
+                      dir="ltr"
+                      value={eq.price || ""}
+                      onChange={(e) => {
+                        const next = [...editedEquipment]
+                        next[i] = { ...next[i], price: Number(e.target.value) || 0 }
+                        setEditedEquipment(next)
+                      }}
+                      className="h-8 w-28 text-left text-xs"
+                      placeholder="قیمت"
+                    />
+                    <span className="shrink-0 text-[9px] text-muted-foreground">ت</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0 text-muted-foreground hover:text-rose-600"
+                      onClick={() => setEditedEquipment(editedEquipment.filter((_, idx) => idx !== i))}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ✅ Single date + start time + end time (date applies to both start and end) */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="mb-1.5 block text-xs">تاریخ اجرا</Label>
+                <JalaliDatePicker
+                  value={executionDate}
+                  onChange={setExecutionDate}
+                  placeholder="انتخاب تاریخ"
+                />
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs">ساعت شروع</Label>
+                <TimeWheelPicker value={startTime || undefined} onChange={setStartTime} />
+                {startTime && (
+                  <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(startTime)}</div>
+                )}
+              </div>
+              <div>
+                <Label className="mb-1.5 block text-xs">ساعت پایان</Label>
+                <TimeWheelPicker value={endTime || undefined} onChange={setEndTime} />
+                {endTime && (
+                  <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(endTime)}</div>
+                )}
+              </div>
             </div>
 
             <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
@@ -3859,16 +4911,24 @@ function ProjectDetail() {
         status: p.status,
         pricingStrategy: p.pricingStrategy,
         isPriceFrozen: p.isPriceFrozen,
+        exemptFromPhotoPriceUpdate: p.exemptFromPhotoPriceUpdate ?? false,
         isReadyForDelivery: p.isReadyForDelivery,
         calculatedPrice: p.calculatedPrice != null ? Number(p.calculatedPrice) : null,
         lockedPrice: p.lockedPrice != null ? Number(p.lockedPrice) : null,
         discountAmount: p.discountAmount != null ? Number(p.discountAmount) : 0,
+        // ✅ فیلدهای جدید
+        priceAdjustment: p.priceAdjustment != null ? Number(p.priceAdjustment) : 0,
+        referralRewardOverride:
+          p.referralRewardOverride != null ? Number(p.referralRewardOverride) : null,
+        projectAddress: p.projectAddress ?? null,
+        projectLocationId: p.projectLocationId ?? null,
         startDatetime: p.startDatetime ?? null,
         endDatetime: p.endDatetime ?? null,
         deliveryDeadline: p.deliveryDeadline ?? null,
-        actualStartDatetime: p.actualStartDatetime ?? null,
-        actualEndDatetime: p.actualEndDatetime ?? null,
         printedDescription: p.printedDescription ?? null,
+        // ✅ Per-project task/equipment overrides (from API; fall back to package defaults for display)
+        customTasks: Array.isArray(p.customTasks) ? p.customTasks : [],
+        customEquipment: Array.isArray(p.customEquipment) ? p.customEquipment : [],
         effectivePrice: p.effectivePrice ?? null,
         totalPaid: p.totalPaid ?? null,
         balance: p.balance ?? null,
@@ -3936,22 +4996,31 @@ function ProjectDetail() {
   const p = data.project
 
   return (
-    <div>
+    <div dir="rtl" className="text-right">
+      {/* ✅ Mobile floating back button — iOS has no hardware back */}
       <button
         onClick={backToProjectCustomer}
-        className="mb-4 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="fixed bottom-4 left-4 z-40 flex items-center gap-1 rounded-full bg-primary px-4 py-2.5 text-xs font-medium text-primary-foreground shadow-lg sm:hidden"
+        aria-label="بازگشت"
+      >
+        <ChevronLeft className="h-4 w-4 rotate-180" /> بازگشت
+      </button>
+
+      <button
+        onClick={backToProjectCustomer}
+        className="mb-4 hidden items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:flex"
       >
         <ChevronLeft className="h-4 w-4 rotate-180" /> بازگشت به پروژه‌های مشتری
       </button>
 
-      {/* Header */}
-      <div className="mb-5 rounded-xl border bg-card p-5 shadow-sm">
+      {/* ✅ Sticky header — back button (sm+), project title + tabs always visible */}
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="notion-title text-xl sm:text-2xl">{p.contract.customer.name}</h1>
+              <h1 className="notion-title truncate text-xl sm:text-2xl">{p.contract.customer.name}</h1>
               {p.status === "delivered" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2 className="h-3 w-3" /> تکمیل شده
                 </span>
               )}
@@ -3964,20 +5033,22 @@ function ProjectDetail() {
               >
                 {CATEGORY_LABELS[p.servicePackage.category as keyof typeof CATEGORY_LABELS] ?? p.servicePackage.category}
               </span>
-              <span>· {p.servicePackage.title}</span>
+              <span className="truncate">· {p.servicePackage.title}</span>
             </div>
           </div>
-          <Badge
-            variant="secondary"
-            style={{ background: STATUS_COLORS[p.status as ProjectStatus] + "22", color: STATUS_COLORS[p.status as ProjectStatus] }}
-          >
-            {STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge
+              variant="secondary"
+              style={{ background: STATUS_COLORS[p.status as ProjectStatus] + "22", color: STATUS_COLORS[p.status as ProjectStatus] }}
+            >
+              {STATUS_LABELS[p.status as ProjectStatus] ?? p.status}
+            </Badge>
 
-          {/* Edit project button — admin/manager only */}
-          {data.canManage && (data.role === "admin" || data.role === "manager") && (
-            <EditProjectDialog projectId={p.id} data={data} />
-          )}
+            {/* Edit project button — admin/manager only */}
+            {data.canManage && (data.role === "admin" || data.role === "manager") && (
+              <EditProjectDialog projectId={p.id} data={data} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -3985,8 +5056,7 @@ function ProjectDetail() {
         <TabsList className="mb-4" dir="rtl">
           <TabsTrigger value="overview">نمای کلی</TabsTrigger>
           <TabsTrigger value="workflow">گردش کار</TabsTrigger>
-          <TabsTrigger value="financials">مالی</TabsTrigger>
-          <TabsTrigger value="team">تیم</TabsTrigger>
+          <TabsTrigger value="team">تیم، زمان و مکان</TabsTrigger>
           <TabsTrigger value="sms">پیامک</TabsTrigger>
         </TabsList>
 
@@ -3995,9 +5065,6 @@ function ProjectDetail() {
         </TabsContent>
         <TabsContent value="workflow">
           <WorkflowTab projectId={data.project.id} category={data.project.servicePackage.category} />
-        </TabsContent>
-        <TabsContent value="financials">
-          <FinancialsTab data={data} />
         </TabsContent>
         <TabsContent value="team">
           <TeamTab data={data} />
@@ -4021,16 +5088,24 @@ interface ProjectDetailData {
     calculatedPrice: number | null
     lockedPrice: number | null
     discountAmount: number
+    // ✅ فیلدهای جدید: اصلاح قیمت، سود معرف override، آدرس و مکان اجرا
+    priceAdjustment?: number
+    referralRewardOverride?: number | null
+    projectAddress?: string | null
+    projectLocationId?: string | null
     startDatetime: string | null
     endDatetime: string | null
     deliveryDeadline: string | null
-    actualStartDatetime: string | null
-    actualEndDatetime: string | null
     printedDescription: string | null
+    // ✅ Per-project task/equipment overrides (parsed from JSON in API response)
+    customTasks?: Array<{ name: string; price: number }>
+    customEquipment?: Array<{ name: string; price: number }>
     effectivePrice: number | null
     totalPaid: number | null
     balance: number | null
     printPhotoTotal?: number | null
+    printPhotoPaid?: number | null
+    printPhotoBalance?: number | null
     contract: { contractNumber: string; customer: { id: string; name: string } }
     servicePackage: {
       id: string
@@ -4040,16 +5115,17 @@ interface ProjectDetailData {
       basePrice: number | null
       pricingStrategy: string
       defaultDescription: string | null
-      defaultTasks: string[]
-      defaultEquipment: string[]
+      defaultTasks: any[]
+      defaultEquipment: any[]
     }
     fieldTeam: { id: string; firstName: string; lastName: string; role: string }[]
-    studioTeam: { id: string; firstName: string; lastName: string; role: string }[][]
+    studioTeam: { id: string; firstName: string; lastName: string; role: string }[]
     payments: {
       id: string
       amount: number
       paymentType: string
       method: string
+      paymentFor?: string
       datePaid: string
       note: string | null
       isConfirmed: boolean
@@ -4081,8 +5157,90 @@ interface ProjectDetailData {
   role: Role
 }
 
+/** Prominent freeze-price buttons — toggles isPriceFrozen on the project and
+ *  exemptFromPhotoPriceUpdate for print photos. Used in both OverviewTab and
+ *  WorkflowTab to give admins/managers a clear, visible control. */
+function FreezeButtons({
+  projectId,
+  isPriceFrozen,
+  isPhotoExempt,
+  showPhotoFreeze = true,
+}: {
+  projectId: string
+  isPriceFrozen: boolean
+  isPhotoExempt: boolean
+  showPhotoFreeze?: boolean
+}) {
+  const api = useApi()
+  const qc = useQueryClient()
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["project", projectId] })
+    qc.invalidateQueries({ queryKey: ["project-workflow", projectId] })
+    qc.invalidateQueries({ queryKey: ["project-print-photos", projectId] })
+    qc.invalidateQueries({ queryKey: ["customer-projects"] })
+  }
+
+  const projectFreezeMut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch(`/api/projects/${projectId}`, { isPriceFrozen: next }),
+    onSuccess: (_d, next) => {
+      toast.success(next ? "قیمت پروژه فریز شد" : "فریز قیمت پروژه لغو شد")
+      invalidateAll()
+    },
+    onError: () => toast.error("عملیات ناموفق بود"),
+  })
+
+  const photoExemptMut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch(`/api/projects/${projectId}`, { exemptFromPhotoPriceUpdate: next }),
+    onSuccess: (_d, next) => {
+      toast.success(next ? "قیمت عکس‌های چاپی فریز شد" : "فریز قیمت عکس‌های چاپی لغو شد")
+      invalidateAll()
+    },
+    onError: () => toast.error("عملیات ناموفق بود"),
+  })
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <button
+        type="button"
+        disabled={projectFreezeMut.isPending}
+        onClick={() => projectFreezeMut.mutate(!isPriceFrozen)}
+        className={cn(
+          "flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+          isPriceFrozen
+            ? "border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+            : "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300"
+        )}
+      >
+        {isPriceFrozen ? <Lock className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
+        <span>{isPriceFrozen ? "🔒 فریز قیمت پروژه — فعال" : "🔒 فریز قیمت پروژه"}</span>
+      </button>
+
+      {showPhotoFreeze && (
+        <button
+          type="button"
+          disabled={photoExemptMut.isPending}
+          onClick={() => photoExemptMut.mutate(!isPhotoExempt)}
+          className={cn(
+            "flex items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            isPhotoExempt
+              ? "border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+              : "border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300"
+          )}
+        >
+          {isPhotoExempt ? <Lock className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
+          <span>{isPhotoExempt ? "🔒 فریز قیمت عکس‌های چاپی — فعال" : "🔒 فریز قیمت عکس‌های چاپی"}</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 function OverviewTab({ data }: { data: ProjectDetailData }) {
   const p = data.project
+  const api = useApi()
   const seeBalance = data.seeBalance
   const effectivePrice = p.effectivePrice ?? 0
   const totalPaid = p.totalPaid ?? 0
@@ -4091,9 +5249,32 @@ function OverviewTab({ data }: { data: ProjectDetailData }) {
   const calculatedPrice = p.calculatedPrice ?? 0
   const paymentProgress = effectivePrice > 0 ? Math.min(100, Math.round((totalPaid / effectivePrice) * 100)) : 0
   const isFullyPaid = balance <= 0 && totalPaid > 0
+  const hasPhotoTrack = p.servicePackage.category === "photo" || p.servicePackage.category === "mix"
+
+  // ✅ Fetch the project's additional schedules (multi-location/multi-time entries).
+  const { data: schedulesData, isLoading: schedulesLoading } = useQuery<{ items: ProjectScheduleItem[] }>({
+    queryKey: ["project-schedules-overview", p.id],
+    queryFn: () => api.get<{ items: ProjectScheduleItem[] }>(`/api/projects/${p.id}/schedules`),
+  })
+  const schedules = schedulesData?.items ?? []
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-right" dir="rtl">
+      {/* 0. مدیریت قیمت — فریز قیمت پروژه و عکس‌های چاپی */}
+      {data.canManage && (
+        <SectionCard
+          title="مدیریت قیمت"
+          description="قیمت پروژه یا عکس‌های چاپی را در برابر تغییرات قفل کنید."
+        >
+          <FreezeButtons
+            projectId={p.id}
+            isPriceFrozen={p.isPriceFrozen}
+            isPhotoExempt={p.exemptFromPhotoPriceUpdate}
+            showPhotoFreeze={hasPhotoTrack}
+          />
+        </SectionCard>
+      )}
+
       {/* 1. توضیحات کامل پکیج */}
       <SectionCard title="توضیحات کامل پکیج">
         {p.servicePackage.defaultDescription ? (
@@ -4103,536 +5284,656 @@ function OverviewTab({ data }: { data: ProjectDetailData }) {
         )}
       </SectionCard>
 
-      {/* 2. کارهای پیش‌فرض پکیج */}
-      <SectionCard title="کارهای پیش‌فرض پکیج">
-        {p.servicePackage.defaultTasks.length > 0 ? (
-          <ul className="list-inside list-disc space-y-1 text-sm leading-relaxed">
-            {p.servicePackage.defaultTasks.map((t, i) => (
-              <li key={i}>{t}</li>
-            ))}
-          </ul>
+      {/* 2. کارهای این پروژه — per-project override (customTasks) if present, else package defaults */}
+      <SectionCard
+        title="کارهای این پروژه"
+        description={
+          (p.customTasks?.length ?? 0) > 0
+            ? "فهرست سفارشی‌شده برای این پروژه"
+            : "فهرست پیش‌فرض پکیج (با دکمه «ویرایش پروژه» قابل سفارشی‌سازی)"
+        }
+      >
+        {(() => {
+          const tasks = (p.customTasks && p.customTasks.length > 0) ? p.customTasks : p.servicePackage.defaultTasks
+          const items = (tasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t).filter((t: any) => t && t.name)
+          if (items.length === 0) {
+            return <p className="text-sm text-muted-foreground">کاری برای این پروژه ثبت نشده است.</p>
+          }
+          return (
+            <ul className="list-inside list-disc space-y-1 text-sm leading-relaxed">
+              {items.map((item: any, i: number) => (
+                <li key={i}>
+                  {item.name}
+                  {item.price > 0 && (
+                    <span className="text-muted-foreground"> — {toPersianDigits(item.price.toLocaleString("en-US"))} تومان</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )
+        })()}
+      </SectionCard>
+
+      {/* 3. تجهیزات این پروژه — per-project override (customEquipment) if present, else package defaults */}
+      <SectionCard
+        title="تجهیزات این پروژه"
+        description={
+          (p.customEquipment?.length ?? 0) > 0
+            ? "تجهیزات سفارشی‌شده برای این پروژه"
+            : "تجهیزات پیش‌فرض پکیج"
+        }
+      >
+        {(() => {
+          const equip = (p.customEquipment && p.customEquipment.length > 0) ? p.customEquipment : p.servicePackage.defaultEquipment
+          const items = (equip || []).map((e: any) => typeof e === "string" ? { name: e, price: 0 } : e).filter((e: any) => e && e.name)
+          if (items.length === 0) {
+            return <p className="text-sm text-muted-foreground">تجهیزی برای این پروژه ثبت نشده است.</p>
+          }
+          return (
+            <div className="flex flex-wrap gap-1.5">
+              {items.map((item: any, i: number) => (
+                <span key={i} className="rounded-full bg-muted px-2.5 py-1 text-xs">
+                  {item.name}
+                  {item.price > 0 && ` — ${toPersianDigits(item.price.toLocaleString("en-US"))} ت`}
+                </span>
+              ))}
+            </div>
+          )
+        })()}
+      </SectionCard>
+
+      {/* 4. زمان‌بندی‌ها — main + additional schedules (timeline view) */}
+      <SectionCard
+        title="📅 زمان‌بندی اجرا"
+        description="تاریخ شروع/پایان اصلی پروژه و زمان‌بندی‌های اضافی برای مکان‌های مختلف"
+      >
+        {schedulesLoading ? (
+          <p className="text-xs text-muted-foreground">در حال بارگذاری...</p>
         ) : (
-          <p className="text-sm text-muted-foreground">کاری برای این پکیج تعریف نشده است.</p>
+          <div className="space-y-3">
+            {/* Main schedule (from project's start/end/deadline) */}
+            <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold">
+                <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+                زمان‌بندی اصلی
+              </div>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <div>
+                  <span className="text-muted-foreground">شروع اجرا: </span>
+                  <span className="font-medium">{p.startDatetime ? formatDateTime(p.startDatetime) : "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">پایان اجرا: </span>
+                  <span className="font-medium">{p.endDatetime ? formatDateTime(p.endDatetime) : "—"}</span>
+                </div>
+                {p.deliveryDeadline && (
+                  <div>
+                    <span className="text-muted-foreground">مهلت تحویل: </span>
+                    <span className="font-medium">{formatDate(p.deliveryDeadline)}</span>
+                  </div>
+                )}
+                {p.projectAddress && (
+                  <div className="sm:col-span-2">
+                    <span className="text-muted-foreground">آدرس: </span>
+                    <span className="font-medium">{p.projectAddress}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Additional schedules (ProjectSchedule rows) */}
+            {schedules.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold text-muted-foreground">
+                  زمان‌بندی‌های اضافی ({toPersianDigits(schedules.length)} مورد)
+                </div>
+                <div className="relative space-y-2 border-r-2 border-dashed border-muted pr-3">
+                  {schedules.map((s, idx) => (
+                    <div key={s.id} className="relative">
+                      <span
+                        className="absolute -right-[19px] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-background bg-primary"
+                        aria-hidden
+                      />
+                      <div className="rounded-md border bg-card p-2.5">
+                        <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                          <Badge variant="outline" className="text-[9px]">#{toPersianDigits(idx + 1)}</Badge>
+                          <span className="text-xs font-semibold">
+                            {s.location?.name ?? "مکان دستی"}
+                          </span>
+                          {s.location?.city && (
+                            <Badge variant="secondary" className="text-[9px]">{s.location.city}</Badge>
+                          )}
+                        </div>
+                        <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                          {(s.location?.address || s.address) && (
+                            <div className="flex items-start gap-1">
+                              <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span>{s.location?.address ?? s.address}</span>
+                            </div>
+                          )}
+                          {(s.startDatetime || s.endDatetime) && (
+                            <div className="flex items-start gap-1">
+                              <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span>
+                                {s.startDatetime ? formatDateTime(s.startDatetime) : "—"}
+                                {" تا "}
+                                {s.endDatetime ? formatDateTime(s.endDatetime) : "—"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {schedules.length === 0 && !p.startDatetime && !p.endDatetime && !p.deliveryDeadline && !p.projectAddress && (
+              <p className="text-xs text-muted-foreground">
+                هیچ زمان‌بندی برای این پروژه ثبت نشده است. به تب «تیم، زمان و مکان» بروید.
+              </p>
+            )}
+          </div>
         )}
       </SectionCard>
 
-      {/* 3. تجهیزات پیش‌فرض پکیج */}
-      <SectionCard title="تجهیزات پیش‌فرض پکیج">
-        {p.servicePackage.defaultEquipment.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {p.servicePackage.defaultEquipment.map((e, i) => (
-              <span
-                key={i}
-                className="rounded-full bg-muted px-2.5 py-1 text-xs"
-              >
-                {e}
-              </span>
+      {/* 4b. توضیحات مکان و زمان اجرا — combined notes from all schedule entries */}
+      <SectionCard
+        title="📝 توضیحات مکان و زمان اجرا"
+        description="یادداشت‌های ثبت‌شده برای زمان‌بندی‌های اجرا (ترکیب از همه مکان‌ها)"
+      >
+        {(() => {
+          // ✅ Combine all schedule notes into a single block. Dedupe identical notes so
+          // we don't repeat the same text N times (the wizard saves the same note per schedule).
+          const notes = schedules
+            .map((s) => (s.note ?? "").trim())
+            .filter((n) => n.length > 0)
+          const unique = Array.from(new Set(notes))
+          if (unique.length === 0) {
+            return <p className="text-sm text-muted-foreground">توضیحاتی برای زمان‌بندی اجرا ثبت نشده است.</p>
+          }
+          return (
+            <div className="space-y-2">
+              {unique.map((n, i) => (
+                <div key={i} className="rounded-md border bg-muted/30 p-2.5">
+                  <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground">
+                    <StickyNote className="h-3 w-3" />
+                    یادداشت {toPersianDigits(i + 1)}
+                  </div>
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed">{n}</p>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
+      </SectionCard>
+
+      {/* 5. یادداشت‌های پروژه — p.notes with author, type, date, attachments */}
+      <SectionCard
+        title="💬 یادداشت‌ها و فایل‌ها"
+        description={`یادداشت‌های ثبت‌شده برای این پروژه (${toPersianDigits(p.notes?.length ?? 0)})`}
+      >
+        {p.notes && p.notes.length > 0 ? (
+          <div className="space-y-2">
+            {p.notes.map((n) => (
+              <div key={n.id} className="rounded-md border bg-card p-2.5">
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-[9px]">
+                        {(n.author?.firstName?.[0] ?? "") + (n.author?.lastName?.[0] ?? "")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-medium">
+                      {n.author ? `${n.author.firstName} ${n.author.lastName}` : "نامشخص"}
+                    </span>
+                    <Badge variant="outline" className="text-[9px]">
+                      {n.noteType === "text" ? "متن" : n.noteType === "voice" ? "صوتی" : n.noteType === "image" ? "تصویر" : n.noteType === "file" ? "فایل" : n.noteType}
+                    </Badge>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {timeAgo(n.createdAt)}
+                  </span>
+                </div>
+                {n.content && (
+                  <p className="whitespace-pre-wrap text-xs leading-relaxed">{n.content}</p>
+                )}
+                {/* Attachments — shown when noteType is not text and attachmentUrl is a data URL or remote URL */}
+                {n.noteType !== "text" && (n as any).attachmentUrl && (
+                  <div className="mt-2">
+                    {n.noteType === "image" && (n as any).previewUrl ? (
+                      <img
+                        src={(n as any).previewUrl}
+                        alt={n.content || "attachment"}
+                        className="max-h-48 rounded-md border"
+                      />
+                    ) : (
+                      <a
+                        href={(n as any).attachmentUrl}
+                        download={(n as any).attachmentUrl?.split("/").pop() || "attachment"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md border bg-muted px-2.5 py-1.5 text-xs hover:bg-muted/80"
+                      >
+                        <Paperclip className="h-3 w-3" />
+                        دانلود پیوست
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">تجهیزی برای این پکیج تعریف نشده است.</p>
+          <p className="text-sm text-muted-foreground">یادداشتی برای این پروژه ثبت نشده است.</p>
         )}
       </SectionCard>
-
-      {/* 4. زمان‌بندی */}
-      <SectionCard title="زمان‌بندی">
-        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-          <Row label="شروع اجرا" value={formatDateTime(p.startDatetime)} />
-          <Row label="پایان اجرا" value={formatDateTime(p.endDatetime)} />
-          <Row label="مهلت تحویل" value={formatDate(p.deliveryDeadline)} />
-          <Row label="شروع واقعی" value={formatDateTime(p.actualStartDatetime)} />
-          <Row label="پایان واقعی" value={formatDateTime(p.actualEndDatetime)} />
-        </dl>
-      </SectionCard>
-
-      {/* 5. ساعت‌های واقعی اجرا */}
-      <ActualTimesEditor projectId={p.id} data={data} />
     </div>
   )
 }
 
-/** Pricing card with editable discount (admin/manager only).
- *  Shows: قیمت پایه / تخفیف (editable) / قیمت نهایی. */
-function PricingCard({ data }: { data: ProjectDetailData }) {
-  const api = useApi()
-  const qc = useQueryClient()
-  const p = data.project
-  const canEditDiscount = data.canManage && (data.role === "admin" || data.role === "manager") && data.seeFinance
-  const [discountOpen, setDiscountOpen] = React.useState(false)
-  const [discountToman, setDiscountToman] = React.useState(0)
-
-  const basePrice = p.servicePackage.currentPrice ?? p.servicePackage.basePrice ?? null
-  const discountRials = p.discountAmount ?? 0
-  const finalPrice = p.calculatedPrice ?? (basePrice != null ? Math.max(0, basePrice - discountRials) : null)
-
-  React.useEffect(() => {
-    if (discountOpen) {
-      setDiscountToman(Math.round(discountRials / 10))
-    }
-  }, [discountOpen, discountRials])
-
-  const saveDiscountMut = useMutation({
-    mutationFn: async () => {
-      return api.patch(`/api/projects/${p.id}`, {
-        discountAmount: Math.max(0, Number(discountToman || 0)),
-      })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["project", p.id] })
-      qc.invalidateQueries({ queryKey: ["customer-projects"] })
-      toast.success("تخفیف به‌روزرسانی شد و قیمت نهایی محاسبه شد")
-      setDiscountOpen(false)
-    },
-    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
-  })
-
-  return (
-    <SectionCard title="قیمت‌گذاری">
-      {data.seeFinance || data.seeBalance ? (
-        <dl className="space-y-2 text-sm">
-          {data.seeFinance && basePrice != null && (
-            <Row label="قیمت پایه" value={`${formatRials(basePrice)} تومان`} />
-          )}
-          {data.seeFinance && (
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-xs text-muted-foreground">تخفیف</dt>
-              <div className="flex items-center gap-2">
-                <dd className={cn("text-sm font-medium", discountRials > 0 && "text-amber-600")}>
-                  {discountRials > 0 ? `− ${formatRials(discountRials)} تومان` : "—"}
-                </dd>
-                {canEditDiscount && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-[11px]"
-                    onClick={() => setDiscountOpen(true)}
-                  >
-                    <Pencil className="ml-1 h-3 w-3" /> ویرایش تخفیف
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-          {data.seeFinance && finalPrice != null && (
-            <div className="flex items-center justify-between gap-2 border-t pt-2">
-              <dt className="text-xs font-semibold">قیمت نهایی</dt>
-              <dd className="text-sm font-bold text-emerald-600">
-                {formatRials(finalPrice)} تومان
-              </dd>
-            </div>
-          )}
-          {data.seeFinance && p.lockedPrice != null && (
-            <Row
-              label={
-                <span className="flex items-center gap-1">
-                  <Lock className="h-3 w-3" /> قیمت قفل‌شده
-                </span>
-              }
-              value={`${formatRials(p.lockedPrice)} تومان`}
-            />
-          )}
-          {p.isPriceFrozen && (
-            <Row
-              label={
-                <span className="flex items-center gap-1">
-                  <Snowflake className="h-3 w-3" /> فریز قیمت
-                </span>
-              }
-              value="فعال"
-            />
-          )}
-          <Row label="استراتژی" value={PRICING_STRATEGY_LABELS[p.pricingStrategy as keyof typeof PRICING_STRATEGY_LABELS] ?? p.pricingStrategy} />
-          {data.seeBalance && p.effectivePrice != null && (
-            <Row label="قیمت مؤثر" value={`${formatRials(p.effectivePrice)} تومان`} highlight />
-          )}
-          {data.seeBalance && (
-            <Row label="پرداخت‌شده" value={`${formatRials(p.totalPaid ?? 0)} تومان`} />
-          )}
-          {data.seeBalance && (
-            <Row label="مانده" value={`${formatRials(p.balance ?? 0)} تومان`} highlight={(p.balance ?? 0) > 0} />
-          )}
-        </dl>
-      ) : (
-        <p className="text-xs text-muted-foreground">اطلاعات مالی برای نقش شما قابل مشاهده نیست.</p>
-      )}
-
-      {/* Discount edit dialog */}
-      <Dialog open={discountOpen} onOpenChange={setDiscountOpen}>
-        <DialogContent className="max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>ویرایش تخفیف</DialogTitle>
-            <DialogDescription>
-              مبلغ تخفیف را به تومان وارد کنید. قیمت نهایی به‌صورت خودکار محاسبه می‌شود.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="mb-1.5 block text-xs">مبلغ تخفیف (تومان)</Label>
-              <TomanInput
-                value={discountToman}
-                onValueChange={setDiscountToman}
-                placeholder="مبلغ تخفیف به تومان"
-              />
-            </div>
-            {basePrice != null && (
-              <div className="rounded-lg border bg-muted/30 p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">قیمت پایه</span>
-                  <span className="font-medium">{formatRials(basePrice)} تومان</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="text-muted-foreground">تخفیف</span>
-                  <span className="font-medium text-amber-600">− {formatRials(Math.max(0, discountToman) * 10)} تومان</span>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between border-t pt-1.5">
-                  <span className="font-semibold">قیمت نهایی پس از تغییر</span>
-                  <span className="font-bold text-emerald-600">
-                    {formatRials(Math.max(0, basePrice - Math.max(0, discountToman) * 10))} تومان
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setDiscountOpen(false)}>انصراف</Button>
-            <Button size="sm" disabled={saveDiscountMut.isPending} onClick={() => saveDiscountMut.mutate()}>
-              <Save className="ml-1 h-3 w-3" /> {saveDiscountMut.isPending ? "در حال ذخیره…" : "ذخیره تخفیف"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </SectionCard>
-  )
+// ============================================================
+// Project Schedules — additional time/location slots beyond the
+// project's main startDatetime/endDatetime/deliveryDeadline.
+// ============================================================
+interface ProjectScheduleItem {
+  id: string
+  projectId: string
+  locationId: string | null
+  location: { id: string; name: string; address: string | null; city: string | null; phone: string | null } | null
+  address: string | null
+  startDatetime: string | null
+  endDatetime: string | null
+  note: string | null
+  order: number
+  createdAt: string
+  updatedAt: string
 }
 
-/** Editor for actualStartDatetime / actualEndDatetime (admin/manager only).
- *  TIME-ONLY editor: the date stays the same as the scheduled project date
- *  (startDatetime / endDatetime); only the time portion is editable.
- *  Sends a PATCH to /api/projects/[id] with the combined ISO datetime. */
-function ActualTimesEditor({ projectId, data }: { projectId: string; data: ProjectDetailData }) {
+function ProjectSchedulesSection({
+  projectId,
+  canManage,
+}: {
+  projectId: string
+  canManage: boolean
+}) {
   const api = useApi()
   const qc = useQueryClient()
-  const canEdit = data.canManage && (data.role === "admin" || data.role === "manager")
-  const [editing, setEditing] = React.useState(false)
-  const [startTime, setStartTime] = React.useState("")
-  const [endTime, setEndTime] = React.useState("")
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<ProjectScheduleItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<ProjectScheduleItem | null>(null)
 
-  const scheduledStart = data.project.startDatetime
-  const scheduledEnd = data.project.endDatetime
+  const { data, isLoading } = useQuery<{ items: ProjectScheduleItem[] }>({
+    queryKey: ["project-schedules", projectId],
+    queryFn: () => api.get(`/api/projects/${projectId}/schedules`),
+  })
+  const schedules = data?.items ?? []
 
-  // Initialize time strings when entering edit mode or when data changes.
-  React.useEffect(() => {
-    if (!editing) return
-    const s = data.project.actualStartDatetime
-      ? new Date(data.project.actualStartDatetime)
-      : scheduledStart
-        ? new Date(scheduledStart)
-        : null
-    const e = data.project.actualEndDatetime
-      ? new Date(data.project.actualEndDatetime)
-      : scheduledEnd
-        ? new Date(scheduledEnd)
-        : null
-    setStartTime(s ? `${String(s.getHours()).padStart(2, "0")}:${String(s.getMinutes()).padStart(2, "0")}` : "")
-    setEndTime(e ? `${String(e.getHours()).padStart(2, "0")}:${String(e.getMinutes()).padStart(2, "0")}` : "")
-  }, [editing, data.project.actualStartDatetime, data.project.actualEndDatetime, scheduledStart, scheduledEnd])
-
-  /** Combine an existing scheduled-date ISO with an "HH:MM" time string,
-   *  preserving the scheduled date and replacing only the time portion. */
-  function combineScheduledDateWithTime(scheduledIso: string | null, time: string): string | null {
-    if (!scheduledIso) return null
-    const d = new Date(scheduledIso)
-    if (Number.isNaN(d.getTime())) return null
-    if (time && /^\d{1,2}:\d{2}$/.test(time)) {
-      const [h, m] = time.split(":").map(Number)
-      d.setHours(h || 0, m || 0, 0, 0)
-    }
-    return d.toISOString()
-  }
-
-  const saveMut = useMutation({
-    mutationFn: async () => {
-      const startCombined = combineScheduledDateWithTime(scheduledStart, startTime)
-      const endCombined = combineScheduledDateWithTime(scheduledEnd, endTime)
-      return api.patch(`/api/projects/${projectId}`, {
-        actualStartDatetime: startCombined,
-        actualEndDatetime: endCombined,
-      })
-    },
+  const deleteMut = useMutation({
+    mutationFn: (scheduleId: string) => api.del(`/api/projects/${projectId}/schedules/${scheduleId}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["project", projectId] })
-      qc.invalidateQueries({ queryKey: ["customer-projects"] })
-      toast.success("ساعت‌های واقعی اجرا ذخیره شد")
-      setEditing(false)
+      toast.success("زمان‌بندی حذف شد")
+      qc.invalidateQueries({ queryKey: ["project-schedules", projectId] })
+      setDeleteTarget(null)
     },
-    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+    onError: (e: Error) => toast.error(e.message || "حذف ناموفق بود"),
   })
 
   return (
     <SectionCard
-      title="ساعت‌های واقعی اجرا"
-      description="تاریخ از زمان‌بندی پروژه استفاده می‌شود — فقط ساعت را تغییر دهید."
+      title="📅 زمان‌بندی‌های اضافی"
+      description="بخش‌های اضافی پروژه با مکان/زمان جداگانه — برای پروژه‌هایی که در چند مرحله یا چند مکان اجرا می‌شوند."
+      actions={
+        canManage ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => { setEditing(null); setAddOpen(true) }}
+          >
+            <Plus className="h-3.5 w-3.5" /> افزودن زمان‌بندی
+          </Button>
+        ) : undefined
+      }
     >
-      {!editing ? (
-        <dl className="space-y-2 text-sm">
-          <Row label="ساعت شروع واقعی" value={formatDateTime(data.project.actualStartDatetime)} />
-          <Row label="ساعت پایان واقعی" value={formatDateTime(data.project.actualEndDatetime)} />
-          <div className="pt-1 text-[10px] text-muted-foreground">
-            شروع زمان‌بندی‌شده: {formatDateTime(scheduledStart)} · پایان زمان‌بندی‌شده: {formatDateTime(scheduledEnd)}
-          </div>
-          {canEdit && (
-            <div className="pt-2">
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                <Pencil className="ml-1 h-3 w-3" /> ویرایش ساعت
-              </Button>
-            </div>
-          )}
-        </dl>
+      {isLoading ? (
+        <p className="text-xs text-muted-foreground">در حال بارگذاری...</p>
+      ) : schedules.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          زمان‌بندی اضافی ثبت نشده. زمان‌بندی اصلی پروژه (شروع/پایان اجرا و مهلت تحویل) در بخش بالا قابل ویرایش است.
+        </p>
       ) : (
-        <div className="space-y-3">
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-400">
-            تاریخ از زمان‌بندی پروژه استفاده می‌شود — فقط ساعت را تغییر دهید.
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="mb-1.5 block text-xs">ساعت شروع واقعی</Label>
-              <TimeWheelPicker
-                value={startTime || undefined}
-                onChange={setStartTime}
-              />
-              {startTime && (
-                <div className="mt-1 text-center text-[10px] text-muted-foreground">
-                  {formatTime12h(startTime)}
+        <div className="space-y-2">
+          {schedules.map((s, idx) => (
+            <div
+              key={s.id}
+              className="rounded-lg border bg-muted/20 p-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">
+                      #{toPersianDigits(idx + 1)}
+                    </Badge>
+                    <span className="text-sm font-semibold">
+                      {s.location?.name ?? "مکان دستی"}
+                    </span>
+                  </div>
+                  <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                    {s.location ? (
+                      <div className="flex items-start gap-1">
+                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>
+                          {[s.location.address, s.location.city, s.location.phone]
+                            .filter(Boolean)
+                            .join(" · ") || s.location.name}
+                        </span>
+                      </div>
+                    ) : s.address ? (
+                      <div className="flex items-start gap-1">
+                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>{s.address}</span>
+                      </div>
+                    ) : null}
+                    {(s.startDatetime || s.endDatetime) && (
+                      <div className="flex items-start gap-1">
+                        <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>
+                          {s.startDatetime ? formatDateTime(s.startDatetime) : "—"}
+                          {" تا "}
+                          {s.endDatetime ? formatDateTime(s.endDatetime) : "—"}
+                        </span>
+                      </div>
+                    )}
+                    {s.note && (
+                      <div className="flex items-start gap-1">
+                        <StickyNote className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span className="whitespace-pre-wrap">{s.note}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="mt-1 text-[10px] text-muted-foreground">
-                تاریخ: {formatDate(scheduledStart)}
+                {canManage && (
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => { setEditing(s); setAddOpen(true) }}
+                    >
+                      <Pencil className="ml-1 h-3 w-3" /> ویرایش
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-[11px] text-rose-600 hover:text-rose-700"
+                      onClick={() => setDeleteTarget(s)}
+                    >
+                      <Trash2 className="ml-1 h-3 w-3" /> حذف
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
-            <div>
-              <Label className="mb-1.5 block text-xs">ساعت پایان واقعی</Label>
-              <TimeWheelPicker
-                value={endTime || undefined}
-                onChange={setEndTime}
-              />
-              {endTime && (
-                <div className="mt-1 text-center text-[10px] text-muted-foreground">
-                  {formatTime12h(endTime)}
-                </div>
-              )}
-              <div className="mt-1 text-[10px] text-muted-foreground">
-                تاریخ: {formatDate(scheduledEnd)}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>انصراف</Button>
-            <Button size="sm" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
-              <Save className="ml-1 h-3 w-3" /> {saveMut.isPending ? "در حال ذخیره…" : "ذخیره"}
-            </Button>
-          </div>
+          ))}
         </div>
       )}
+
+      {addOpen && (
+        <ProjectScheduleDialog
+          open={addOpen}
+          onOpenChange={(v) => { if (!v) { setAddOpen(false); setEditing(null) } }}
+          projectId={projectId}
+          schedule={editing}
+        />
+      )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => !v && setDeleteTarget(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف زمان‌بندی؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              آیا از حذف این زمان‌بندی اضافی مطمئن هستید؟ این عمل قابل بازگشت نیست.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-rose-600 text-white hover:bg-rose-700"
+              disabled={deleteMut.isPending}
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            >
+              {deleteMut.isPending ? "در حال حذف…" : "حذف"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SectionCard>
   )
 }
 
-// Quick "record payment" button with inline dialog for the FinancialsTab
-function RecordPaymentButton({ projectId }: { projectId: string }) {
+function ProjectScheduleDialog({
+  open,
+  onOpenChange,
+  projectId,
+  schedule,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  projectId: string
+  schedule: ProjectScheduleItem | null
+}) {
   const api = useApi()
   const qc = useQueryClient()
-  const [open, setOpen] = React.useState(false)
-  const [amount, setAmount] = React.useState("")
-  const [paymentType, setPaymentType] = React.useState("installment")
-  const [method, setMethod] = React.useState("card")
-  const [note, setNote] = React.useState("")
-  const [submitting, setSubmitting] = React.useState(false)
+  const role = useWorkspace((s) => s.role)
+  const isEdit = !!schedule
 
-  // Format number with thousand separators
-  const formatNum = (val: string) => {
-    const raw = val.replace(/[^0-9]/g, "")
-    if (!raw) return ""
-    return Number(raw).toLocaleString("en-US")
-  }
+  const [locationId, setLocationId] = React.useState<string | null>(schedule?.locationId ?? null)
+  const [address, setAddress] = React.useState<string>(schedule?.address ?? "")
+  const [startDate, setStartDate] = React.useState<string | null>(schedule?.startDatetime ?? null)
+  const [startTime, setStartTime] = React.useState(
+    schedule?.startDatetime ? new Date(schedule.startDatetime).toTimeString().slice(0, 5) : ""
+  )
+  const [endDate, setEndDate] = React.useState<string | null>(schedule?.endDatetime ?? null)
+  const [endTime, setEndTime] = React.useState(
+    schedule?.endDatetime ? new Date(schedule.endDatetime).toTimeString().slice(0, 5) : ""
+  )
+  const [note, setNote] = React.useState<string>(schedule?.note ?? "")
 
-  const submit = async () => {
-    const toman = Number(amount.replace(/,/g, ""))
-    if (!toman || toman <= 0) { toast.error("مبلغ معتبر وارد کنید"); return }
-    if (!note.trim()) { toast.error("یادداشت الزامی است"); return }
-    setSubmitting(true)
-    try {
-      await api.post(`/api/projects/${projectId}/payments`, {
-        amount: Math.round(toman * 10),
-        paymentType,
-        method,
-        note: note.trim(),
-        isConfirmed: true,
+  // Reset state when dialog opens with a different schedule
+  React.useEffect(() => {
+    if (!open) return
+    setLocationId(schedule?.locationId ?? null)
+    setAddress(schedule?.address ?? "")
+    setStartDate(schedule?.startDatetime ?? null)
+    setStartTime(schedule?.startDatetime ? new Date(schedule.startDatetime).toTimeString().slice(0, 5) : "")
+    setEndDate(schedule?.endDatetime ?? null)
+    setEndTime(schedule?.endDatetime ? new Date(schedule.endDatetime).toTimeString().slice(0, 5) : "")
+    setNote(schedule?.note ?? "")
+  }, [open, schedule])
+
+  // Project locations — searchable combobox
+  const [locSearch, setLocSearch] = React.useState("")
+  const [locPopoverOpen, setLocPopoverOpen] = React.useState(false)
+  const { data: locationsData } = useQuery<{ items: ProjectLocationItem[] }>({
+    queryKey: ["project-locations", locSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (locSearch) params.set("search", locSearch)
+      const res = await fetch(`/api/project-locations?${params.toString()}`, {
+        credentials: "include",
+        headers: { "x-demo-role": role },
       })
-      toast.success("پرداخت ثبت شد")
-      qc.invalidateQueries({ queryKey: ["project", projectId] })
-      setOpen(false)
-      setAmount("")
-      setNote("")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "ثبت ناموفق بود")
-    } finally {
-      setSubmitting(false)
-    }
-  }
+      if (!res.ok) return { items: [] }
+      const d = await res.json()
+      return { items: Array.isArray(d) ? d : (d.items || []) }
+    },
+    staleTime: 30_000,
+  })
+  const locations = locationsData?.items ?? []
+  const selectedLocation = locations.find((l) => l.id === locationId) ?? null
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        locationId: locationId || null,
+        address: address.trim() || null,
+        startDatetime: combineDateAndTime(startDate, startTime),
+        endDatetime: combineDateAndTime(endDate, endTime),
+        note: note.trim() || null,
+      }
+      if (isEdit && schedule) {
+        return api.patch(`/api/projects/${projectId}/schedules/${schedule.id}`, payload)
+      }
+      return api.post(`/api/projects/${projectId}/schedules`, payload)
+    },
+    onSuccess: () => {
+      toast.success(isEdit ? "زمان‌بندی به‌روزرسانی شد" : "زمان‌بندی جدید ثبت شد")
+      qc.invalidateQueries({ queryKey: ["project-schedules", projectId] })
+      onOpenChange(false)
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
 
   return (
-    <>
-      <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Plus className="h-3.5 w-3.5" /> ثبت پرداخت
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>ثبت پرداخت</DialogTitle>
-            <DialogDescription>مبلغ به تومان وارد می‌شود.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1.5">
-              <Label>مبلغ (تومان) <span className="text-rose-500">*</span></Label>
-              <Input
-                dir="ltr"
-                value={formatNum(amount)}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="5,000,000"
-                className="text-left font-mono"
-              />
-              {amount && Number(amount.replace(/,/g, "")) > 0 && (
-                <p className="text-[10px] text-muted-foreground">
-                  {toPersianDigits(Number(amount.replace(/,/g, "")).toLocaleString("fa-IR"))} تومان
-                </p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl" className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "ویرایش زمان‌بندی" : "افزودن زمان‌بندی جدید"}</DialogTitle>
+          <DialogDescription>
+            یک زمان‌بندی اضافی برای این پروژه ثبت کنید — مکان، زمان و یادداشت جداگانه.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          {/* Location picker */}
+          <div>
+            <Label className="mb-1.5 block text-xs">مکان از پیش ثبت‌شده (اختیاری)</Label>
+            <div className="flex items-center gap-2">
+              <Popover open={locPopoverOpen} onOpenChange={setLocPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    className="flex-1 justify-between"
+                  >
+                    {selectedLocation ? (
+                      <span className="truncate">
+                        {selectedLocation.name}
+                        {selectedLocation.city ? ` — ${selectedLocation.city}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">انتخاب مکان...</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="جستجوی مکان..."
+                      value={locSearch}
+                      onValueChange={setLocSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>مکانی یافت نشد.</CommandEmpty>
+                      <CommandGroup>
+                        {locations.map((l) => (
+                          <CommandItem
+                            key={l.id}
+                            value={`${l.name} ${l.city ?? ""} ${l.address ?? ""}`}
+                            onSelect={() => {
+                              setLocationId(l.id)
+                              if (l.address) setAddress(l.address)
+                              setLocPopoverOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "ml-1 h-3.5 w-3.5",
+                                locationId === l.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{l.name}</div>
+                              {(l.city || l.address) && (
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {[l.city, l.address].filter(Boolean).join(" — ")}
+                                </div>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {locationId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-rose-600"
+                  onClick={() => setLocationId(null)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label>نوع</Label>
-                <Select value={paymentType} onValueChange={setPaymentType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="deposit">پیش‌پرداخت</SelectItem>
-                    <SelectItem value="installment">قسط</SelectItem>
-                    <SelectItem value="settlement">تسویه</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>روش</Label>
-                <Select value={method} onValueChange={setMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">نقدی</SelectItem>
-                    <SelectItem value="card">کارت به کارت</SelectItem>
-                    <SelectItem value="pos">پوز</SelectItem>
-                    <SelectItem value="cheque">چک</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>یادداشت <span className="text-rose-500">*</span></Label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثلاً: پرداخت قسط دوم" />
-            </div>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>انصراف</Button>
-            <Button onClick={submit} disabled={submitting || !amount || !note.trim()}>
-              {submitting ? "در حال ذخیره..." : "ثبت"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
 
-function FinancialsTab({ data }: { data: ProjectDetailData }) {
-  const p = data.project
-  if (!data.seeFinance && !data.seeBalance) {
-    return <EmptyState icon="🔒" title="دسترسی محدود" description="اطلاعات مالی فقط برای مدیران و مدیران سیستم قابل مشاهده است." />
-  }
-  return (
-    <div className="space-y-4">
-      {/* Pricing card (moved from Overview) */}
-      <PricingCard data={data} />
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {data.seeBalance && p.effectivePrice != null && (
-          <StatCard label="قیمت مؤثر" value={`${formatRialsShort(p.effectivePrice)} تومان`} accent="#0ea5e9" />
-        )}
-        {data.seeBalance && (
-          <StatCard label="پرداخت‌شده" value={`${formatRialsShort(p.totalPaid ?? 0)} تومان`} accent="#10b981" />
-        )}
-        {data.seeBalance && (
-          <StatCard label="مانده" value={`${formatRialsShort(p.balance ?? 0)} تومان`} accent="#f59e0b" />
-        )}
-        {data.seeFinance && p.discountAmount > 0 && (
-          <StatCard label="تخفیف" value={`− ${formatRialsShort(p.discountAmount)} تومان`} accent="#a855f7" />
-        )}
-      </div>
-
-      <SectionCard
-        title="پرداخت‌ها"
-        description="لیست پرداخت‌های ثبت‌شده برای این پروژه"
-      
-        actions={
-          data.seeBalance && data.canManage ? (
-            <RecordPaymentButton projectId={p.id} />
-          ) : undefined
-        }
-      >
-        {p.payments.length === 0 ? (
-          <EmptyState icon="💰" title="پرداختی ثبت نشده" />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-right text-[11px] text-muted-foreground">
-                  <th className="py-2 font-medium">تاریخ</th>
-                  <th className="py-2 font-medium">نوع</th>
-                  <th className="py-2 font-medium">روش</th>
-                  <th className="py-2 font-medium">مبلغ</th>
-                  <th className="py-2 font-medium">وضعیت</th>
-                  <th className="py-2 font-medium">ثبت توسط</th>
-                  <th className="py-2 font-medium">یادداشت</th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.payments.map((pay) => (
-                  <tr key={pay.id} className="border-b last:border-0">
-                    <td className="py-2">{formatDate(pay.datePaid)}</td>
-                    <td className="py-2">{PAYMENT_TYPE_LABELS[pay.paymentType as keyof typeof PAYMENT_TYPE_LABELS] ?? pay.paymentType}</td>
-                    <td className="py-2">{PAYMENT_METHOD_LABELS[pay.method as keyof typeof PAYMENT_METHOD_LABELS] ?? pay.method}</td>
-                    <td className="py-2 font-medium">{formatRials(pay.amount)} تومان</td>
-                    <td className="py-2">
-                      {pay.isConfirmed ? (
-                        <span className="text-[10px] text-emerald-600">تأیید شده</span>
-                      ) : (
-                        <span className="text-[10px] text-amber-600">در انتظار تأیید</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-xs">
-                      {pay.recordedBy?.fullName ? (
-                        <span className="inline-flex items-center gap-1">
-                          <UserIcon className="h-3 w-3 text-muted-foreground" />
-                          {pay.recordedBy.fullName}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-xs text-muted-foreground">{pay.note ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Address input */}
+          <div>
+            <Label className="mb-1.5 block text-xs">آدرس (اگه مکان انتخاب نشد)</Label>
+            <Textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="آدرس کامل محل اجرا..."
+              rows={2}
+              className="resize-none text-sm"
+            />
           </div>
-        )}
-      </SectionCard>
-    </div>
+
+          {/* Start + End datetime */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ScheduleField
+              label="شروع"
+              date={startDate}
+              onDateChange={setStartDate}
+              time={startTime}
+              onTimeChange={setStartTime}
+            />
+            <ScheduleField
+              label="پایان"
+              date={endDate}
+              onDateChange={setEndDate}
+              time={endTime}
+              onTimeChange={setEndTime}
+            />
+          </div>
+
+          {/* Note */}
+          <div>
+            <Label className="mb-1.5 block text-xs">یادداشت (اختیاری)</Label>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="مثلاً: مراسم عقد، مراسم عروسی، جلسه عکس‌برداری استودیو"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>انصراف</Button>
+          <Button disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+            {saveMut.isPending ? "در حال ذخیره…" : isEdit ? "ذخیره تغییرات" : "افزودن"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -4656,7 +5957,16 @@ function TeamTab({ data }: { data: ProjectDetailData }) {
 
   const assignMut = useMutation({
     mutationFn: async (body: { teamType: "fieldTeam" | "studioTeam"; userIds: string[] }) => {
-      return api.patch(`/api/projects/${p.id}`, { [body.teamType]: body.userIds })
+      // ✅ API expects fieldTeamIds / studioTeamIds (not fieldTeam / studioTeam)
+      const key = body.teamType === "fieldTeam" ? "fieldTeamIds" : "studioTeamIds"
+      const patchBody: Record<string, unknown> = { [key]: body.userIds }
+      // ✅ Studio team UI was removed from TeamTab. Whenever the field team is
+      // saved, also clear any stale studio-team assignments so the project
+      // doesn't keep editors/film-editors that can no longer be managed here.
+      if (body.teamType === "fieldTeam") {
+        patchBody.studioTeamIds = []
+      }
+      return api.patch(`/api/projects/${p.id}`, patchBody)
     },
     onSuccess: () => {
       toast.success("تیم به‌روزرسانی شد")
@@ -4665,70 +5975,644 @@ function TeamTab({ data }: { data: ProjectDetailData }) {
     onError: (e: Error) => toast.error(e.message || "به‌روزرسانی ناموفق بود"),
   })
 
+  // ===== Schedule (single date + start/end time) + multi-location + notes =====
+  // ✅ deliveryDeadline removed — single date applies to both start and end.
+  const initialDate = p.startDatetime ?? p.endDatetime ?? null
+  const [executionDate, setExecutionDate] = React.useState<string | null>(initialDate)
+  const [startTime, setStartTime] = React.useState(
+    p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : ""
+  )
+  const [endTime, setEndTime] = React.useState(
+    p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : ""
+  )
+  const [projectAddress, setProjectAddress] = React.useState<string>(p.projectAddress ?? "")
+  const [scheduleNotes, setScheduleNotes] = React.useState<string>("")
+  const [selectedLocationIds, setSelectedLocationIds] = React.useState<string[]>(
+    p.projectLocationId ? [p.projectLocationId] : []
+  )
+  const [scheduleDirty, setScheduleDirty] = React.useState(false)
+
+  // Fetch existing ProjectSchedules to pre-fill the multi-location picker + notes.
+  const { data: existingSchedulesData } = useQuery<{ items: ProjectScheduleItem[] }>({
+    queryKey: ["project-schedules-teamtab", p.id],
+    queryFn: () => api.get<{ items: ProjectScheduleItem[] }>(`/api/projects/${p.id}/schedules`),
+  })
+
+  // ✅ Initialize state from existing schedules once they're loaded.
+  const teamInitRef = React.useRef<string>("")
+  React.useEffect(() => {
+    if (!existingSchedulesData) return
+    const sig = `${p.id}:${existingSchedulesData.items?.length ?? 0}`
+    if (teamInitRef.current === sig) return
+    teamInitRef.current = sig
+    const items = existingSchedulesData.items ?? []
+    if (items.length > 0) {
+      const locIds = items
+        .map((s) => s.locationId)
+        .filter((id): id is string => !!id)
+      // Merge with the legacy single projectLocationId (if any)
+      const merged = Array.from(new Set([...locIds, ...(p.projectLocationId ? [p.projectLocationId] : [])]))
+      setSelectedLocationIds(merged)
+      // Combine unique notes from all schedules
+      const notes = Array.from(
+        new Set(items.map((s) => (s.note ?? "").trim()).filter((n) => n.length > 0))
+      )
+      setScheduleNotes(notes.join("\n\n"))
+    }
+  }, [existingSchedulesData, p.id, p.projectLocationId])
+
+  // Re-sync the date/time when project data changes (e.g. after PATCH or workspace refresh)
+  React.useEffect(() => {
+    setExecutionDate(p.startDatetime ?? p.endDatetime ?? null)
+    setStartTime(p.startDatetime ? new Date(p.startDatetime).toTimeString().slice(0, 5) : "")
+    setEndTime(p.endDatetime ? new Date(p.endDatetime).toTimeString().slice(0, 5) : "")
+    setProjectAddress(p.projectAddress ?? "")
+    setScheduleDirty(false)
+  }, [p.id, p.startDatetime, p.endDatetime, p.projectAddress])
+
+  const saveScheduleMut = useMutation({
+    mutationFn: async () => {
+      // ✅ startDatetime = date + startTime; endDatetime = date + endTime
+      const startIso = combineDateAndTime(executionDate, startTime)
+      const endIso = combineDateAndTime(executionDate, endTime)
+
+      // 1. PATCH the project's main schedule + address (no deliveryDeadline).
+      await api.patch(`/api/projects/${p.id}`, {
+        startDatetime: startIso || null,
+        endDatetime: endIso || null,
+        projectAddress: projectAddress.trim() || null,
+        // ✅ Set projectLocationId to the first selected location for legacy display.
+        projectLocationId: selectedLocationIds[0] ?? null,
+      })
+
+      // 2. Replace ProjectSchedule entries: delete all existing, then create new ones
+      //    (one per selected location, all sharing the same date/time/notes).
+      const existing = await api.get<{ items: ProjectScheduleItem[] }>(`/api/projects/${p.id}/schedules`)
+      await Promise.all(
+        (existing.items ?? []).map((s) => api.del(`/api/projects/${p.id}/schedules/${s.id}`))
+      )
+      const trimmedNotes = scheduleNotes.trim()
+      if (selectedLocationIds.length > 0) {
+        await Promise.all(
+          selectedLocationIds.map((locId) =>
+            api.post(`/api/projects/${p.id}/schedules`, {
+              locationId: locId,
+              startDatetime: startIso,
+              endDatetime: endIso,
+              note: trimmedNotes || undefined,
+            })
+          )
+        )
+      }
+    },
+    onSuccess: () => {
+      toast.success("زمان‌بندی و مکان اجرا ذخیره شد")
+      setScheduleDirty(false)
+      teamInitRef.current = "" // force re-init from server
+      qc.invalidateQueries({ queryKey: ["project", p.id] })
+      qc.invalidateQueries({ queryKey: ["project-schedules-teamtab", p.id] })
+      qc.invalidateQueries({ queryKey: ["project-schedules", p.id] })
+      qc.invalidateQueries({ queryKey: ["project-schedules-overview", p.id] })
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
+
+  // ✅ Only the field (execution) team is editable from TeamTab now. The studio
+  // team (editor/film_editor) is no longer managed here — the API still accepts
+  // `studioTeamIds: []` to clear existing studio team if needed from elsewhere.
   const groups = [
-    { label: "تیم میدانی", team: p.fieldTeam, icon: "📸", key: "fieldTeam" as const },
-    { label: "تیم استودیو", team: p.studioTeam, icon: "🎨", key: "studioTeam" as const },
-    
+    { label: "تیم اجرایی (عکاس/تصویربردار)", team: p.fieldTeam, icon: "📸", key: "fieldTeam" as const },
   ]
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
-      {groups.map((g) => (
-        <SectionCard key={g.label} title={`${g.icon} ${g.label}`}>
-          {g.team.length === 0 ? (
-            <p className="text-xs text-muted-foreground">عضوی اختصاص نیافته است.</p>
-          ) : (
-            <div className="space-y-2">
-              {g.team.map((u) => (
-                <div key={u.id} className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-[10px]">
-                      {(u.firstName[0] ?? "") + (u.lastName[0] ?? "")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">
-                      {u.firstName} {u.lastName}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {ROLE_LABELS[migrateRole(u.role) as Role] ?? u.role}
-                    </div>
-                  </div>
-                </div>
-              ))}
+    <div className="space-y-4 text-right" dir="rtl">
+      {/* ===== Schedule + multi-location + notes + map (wizard-style simple picker) ===== */}
+      <SectionCard
+        title="📅 زمان و مکان اجرا"
+        description="یک تاریخ + ساعت شروع/پایان + مکان‌های اجرا + توضیحات"
+      >
+        <div className="space-y-4">
+          {/* Date + start/end time (single date applies to both) */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label className="mb-1.5 block text-xs">تاریخ اجرا</Label>
+              <JalaliDatePicker
+                value={executionDate}
+                onChange={(v) => { setExecutionDate(v); setScheduleDirty(true) }}
+                placeholder="انتخاب تاریخ"
+              />
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">ساعت شروع</Label>
+              <TimeWheelPicker
+                value={startTime || undefined}
+                onChange={(v) => { setStartTime(v); setScheduleDirty(true) }}
+              />
+              {startTime && (
+                <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(startTime)}</div>
+              )}
+            </div>
+            <div>
+              <Label className="mb-1.5 block text-xs">ساعت پایان</Label>
+              <TimeWheelPicker
+                value={endTime || undefined}
+                onChange={(v) => { setEndTime(v); setScheduleDirty(true) }}
+              />
+              {endTime && (
+                <div className="text-center text-[10px] text-muted-foreground">{formatTime12h(endTime)}</div>
+              )}
+            </div>
+          </div>
+
+          {/* ✅ Multi-location picker — same component as the wizard */}
+          <WizardMultiLocationPicker
+            selectedLocationIds={selectedLocationIds}
+            onChange={(ids) => { setSelectedLocationIds(ids); setScheduleDirty(true) }}
+          />
+
+          {/* Address */}
+          <div>
+            <Label className="mb-1.5 block text-xs">آدرس محل اجرا</Label>
+            <Textarea
+              value={projectAddress}
+              onChange={(e) => { setProjectAddress(e.target.value); setScheduleDirty(true) }}
+              placeholder="مثلاً: هتل اسپیناس، تالار پارسیان، طبقه ۳"
+              rows={2}
+              className="resize-none text-sm"
+              disabled={!canManage}
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <Label className="mb-1.5 block text-xs">توضیحات مکان و زمان اجرا</Label>
+            <Textarea
+              value={scheduleNotes}
+              onChange={(e) => { setScheduleNotes(e.target.value); setScheduleDirty(true) }}
+              placeholder="مثلاً: مراسم عقد در هتل اسپیناس ساعت ۱۸، عکس‌برداری استودیویی قبل از مراسم…"
+              rows={3}
+              className="resize-none text-sm"
+              disabled={!canManage}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              این یادداشت روی همه زمان‌بندی‌های این پروژه ذخیره می‌شود.
+            </p>
+          </div>
+
+          {/* Google Maps embed */}
+          <WizardGoogleMapsEmbed selectedLocationIds={selectedLocationIds} />
+
+          {canManage && (
+            <div className="flex justify-end">
+              <Button
+                onClick={() => saveScheduleMut.mutate()}
+                disabled={saveScheduleMut.isPending || !scheduleDirty}
+              >
+                <Save className="ml-1.5 h-4 w-4" />
+                {saveScheduleMut.isPending ? "در حال ذخیره…" : "ذخیره زمان‌بندی و مکان"}
+              </Button>
             </div>
           )}
-          {canManage && (
-            <div className="mt-3 border-t pt-2">
-              <Select
-                value=""
-                onValueChange={(userId) => {
-                  if (!userId) return
-                  assignMut.mutate({
-                    teamType: g.key,
-                    userIds: [...g.team.map((t) => t.id), userId],
-                  })
-                }}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="+ افزودن عضو" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allUsers
-                    .filter((u) => !g.team.some((t) => t.id === u.id))
-                    .map((u) => (
+        </div>
+      </SectionCard>
+
+      {/* ===== Teams ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {groups.map((g) => (
+          <SectionCard key={g.label} title={`${g.icon} ${g.label}`}>
+            {g.team.length === 0 ? (
+              <p className="text-xs text-muted-foreground">عضوی اختصاص نیافته است.</p>
+            ) : (
+              <div className="space-y-2">
+                {g.team.map((u) => (
+                  <div key={u.id} className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-[10px]">
+                        {(u.firstName[0] ?? "") + (u.lastName[0] ?? "")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">
+                        {u.firstName} {u.lastName}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {ROLE_LABELS[migrateRole(u.role) as Role] ?? u.role}
+                      </div>
+                    </div>
+                    {canManage && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 mr-auto text-rose-500 hover:text-rose-600"
+                        onClick={() =>
+                          assignMut.mutate({
+                            teamType: g.key,
+                            userIds: g.team.filter((t) => t.id !== u.id).map((t) => t.id),
+                          })
+                        }
+                        aria-label="حذف عضو"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {canManage && (
+              <div className="mt-3 border-t pt-2">
+                <Select
+                  value=""
+                  onValueChange={(userId) => {
+                    if (!userId) return
+                    assignMut.mutate({
+                      teamType: g.key,
+                      userIds: [...g.team.map((t) => t.id), userId],
+                    })
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="+ افزودن عضو" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allUsers
+                      .filter((u) => !g.team.some((t) => t.id === u.id))
+                      .map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName} ({ROLE_LABELS[u.role as Role] ?? u.role})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </SectionCard>
+        ))}
+      </div>
+
+      {/* ===== Per-project salaries ===== */}
+      <ProjectSalarySection projectId={p.id} canManage={canManage} allUsers={allUsers} />
+    </div>
+  )
+}
+
+// ============================================================
+// Project Salary Section — per-project salaries for the Team tab.
+// Manager can add salary entries for any employee (team member or not),
+// with amount (Toman), description, and customizable tags.
+// Settled entries show a green checkmark.
+// ============================================================
+interface ProjectSalaryRow {
+  id: string
+  projectId: string
+  userId: string
+  user: { id: string; firstName: string; lastName: string; role: string; name: string }
+  amount: number // Rials
+  description: string | null
+  tags: string[]
+  isSettled: boolean
+  settledAt: string | null
+  settledBy: { id: string; name: string } | null
+  createdAt: string
+  updatedAt: string
+}
+
+function ProjectSalarySection({
+  projectId,
+  canManage,
+  allUsers,
+}: {
+  projectId: string
+  canManage: boolean
+  allUsers: { id: string; firstName: string; lastName: string; role: string }[]
+}) {
+  const api = useApi()
+  const qc = useQueryClient()
+
+  // ===== Form state =====
+  const [selUserId, setSelUserId] = React.useState<string>("")
+  const [amountToman, setAmountToman] = React.useState<number>(0)
+  const [description, setDescription] = React.useState<string>("")
+  const [tags, setTags] = React.useState<string[]>([])
+  const [tagInput, setTagInput] = React.useState<string>("")
+  const [submitting, setSubmitting] = React.useState(false)
+
+  // ===== Fetch existing ProjectSalary entries for this project =====
+  const { data, isLoading } = useQuery<{ items: ProjectSalaryRow[] }>({
+    queryKey: ["project-salaries", projectId],
+    queryFn: () => api.get(`/api/projects/${projectId}/salaries`),
+  })
+  const rows = data?.items ?? []
+
+  // Existing tag suggestions (deduped from existing rows) for the tag picker.
+  const existingTags = React.useMemo(() => {
+    const set = new Set<string>()
+    for (const r of rows) for (const t of r.tags) set.add(t)
+    return Array.from(set).sort()
+  }, [rows])
+
+  const addTag = (raw: string) => {
+    const t = raw.trim()
+    if (!t) return
+    if (tags.includes(t)) return
+    setTags([...tags, t])
+    setTagInput("")
+  }
+
+  const removeTag = (t: string) => {
+    setTags(tags.filter((x) => x !== t))
+  }
+
+  const submit = async () => {
+    if (!selUserId) {
+      toast.error("یک کارمند انتخاب کنید")
+      return
+    }
+    if (!amountToman || amountToman <= 0) {
+      toast.error("مبلغ باید بزرگتر از ۰ باشد")
+      return
+    }
+    setSubmitting(true)
+    try {
+      const amountRials = Math.round(amountToman * 10)
+      await api.post(`/api/projects/${projectId}/salaries`, {
+        userId: selUserId,
+        amount: amountRials,
+        description: description.trim() || undefined,
+        tags,
+      })
+      toast.success("حقوق پروژه ثبت شد")
+      qc.invalidateQueries({ queryKey: ["project-salaries", projectId] })
+      // Reset form
+      setSelUserId("")
+      setAmountToman(0)
+      setDescription("")
+      setTags([])
+      setTagInput("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "ثبت ناموفق بود")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const toggleSettledMut = useMutation({
+    mutationFn: async (row: ProjectSalaryRow) => {
+      return api.patch(`/api/projects/${projectId}/salaries/${row.id}`, {
+        isSettled: !row.isSettled,
+      })
+    },
+    onSuccess: () => {
+      toast.success("وضعیت تسویه به‌روزرسانی شد")
+      qc.invalidateQueries({ queryKey: ["project-salaries", projectId] })
+    },
+    onError: (e: Error) => toast.error(e.message || "به‌روزرسانی ناموفق بود"),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => api.del(`/api/projects/${projectId}/salaries/${id}`),
+    onSuccess: () => {
+      toast.success("ردیف حقوق حذف شد")
+      qc.invalidateQueries({ queryKey: ["project-salaries", projectId] })
+    },
+    onError: (e: Error) => toast.error(e.message || "حذف ناموفق بود"),
+  })
+
+  return (
+    <SectionCard
+      title="💵 حقوق پروژه"
+      description="مدیر می‌تواند برای هر کارمند (عضو تیم یا غیر آن) حقوق جداگانه تعریف کند. تسویه‌شده‌ها با تیک سبز نمایش داده می‌شوند."
+    >
+      <div className="space-y-4">
+        {/* Existing entries */}
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">هنوز حقوقی برای این پروژه ثبت نشده است.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table dir="rtl">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">کارمند</TableHead>
+                  <TableHead className="text-right">مبلغ</TableHead>
+                  <TableHead className="text-right">توضیحات</TableHead>
+                  <TableHead className="text-right">تگ‌ها</TableHead>
+                  <TableHead className="text-right">تاریخ</TableHead>
+                  <TableHead className="text-right">وضعیت</TableHead>
+                  {canManage && <TableHead className="text-right">عملیات</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.id} className={cn(r.isSettled && "opacity-50")}>
+                    <TableCell className="text-right text-sm">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="text-[9px]">
+                            {(r.user.firstName[0] ?? "") + (r.user.lastName[0] ?? "")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{r.user.firstName} {r.user.lastName}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {ROLE_LABELS[migrateRole(r.user.role) as Role] ?? r.user.role}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                      {formatRials(r.amount)} <span className="text-muted-foreground">تومان</span>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground max-w-[220px] truncate">
+                      {r.description || "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {r.tags.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          r.tags.map((t, i) => (
+                            <Badge key={i} variant="secondary" className="text-[9px]">{t}</Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDate(r.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {r.isSettled ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> تسویه شده
+                        </span>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">باز</Badge>
+                      )}
+                    </TableCell>
+                    {canManage && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700"
+                            disabled={toggleSettledMut.isPending}
+                            onClick={() => toggleSettledMut.mutate(r)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {r.isSettled ? "برداشتن تسویه" : "تسویه"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700"
+                            disabled={deleteMut.isPending}
+                            onClick={() => deleteMut.mutate(r.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Add new entry */}
+        {canManage && (
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="mb-3 text-sm font-medium">افزودن ردیف حقوق جدید</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">کارمند <span className="text-rose-500">*</span></Label>
+                <Select value={selUserId} onValueChange={setSelUserId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="انتخاب کارمند" /></SelectTrigger>
+                  <SelectContent>
+                    {allUsers.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.firstName} {u.lastName} ({ROLE_LABELS[u.role as Role] ?? u.role})
                       </SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">مبلغ (تومان) <span className="text-rose-500">*</span></Label>
+                <TomanInput
+                  value={amountToman}
+                  onValueChange={setAmountToman}
+                  placeholder="مثلاً ۲٬۰۰۰٬۰۰۰"
+                />
+              </div>
             </div>
-          )}
-        </SectionCard>
-      ))}
-    </div>
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs">توضیحات (اختیاری)</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="مثلاً: حقوق روز عروسی"
+                className="text-xs"
+              />
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-xs">تگ‌ها (اختیاری)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault()
+                      addTag(tagInput)
+                    }
+                  }}
+                  placeholder="یک تگ بنویسید و Enter بزنید…"
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-9"
+                  onClick={() => addTag(tagInput)}
+                  disabled={!tagInput.trim()}
+                >
+                  افزودن تگ
+                </Button>
+              </div>
+              {/* Existing tag suggestions */}
+              {existingTags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  <span className="text-[10px] text-muted-foreground ml-1">تگ‌های موجود:</span>
+                  {existingTags.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => addTag(t)}
+                      disabled={tags.includes(t)}
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded border",
+                        tags.includes(t)
+                          ? "opacity-40 cursor-not-allowed border-muted"
+                          : "hover:bg-accent border-input cursor-pointer"
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Selected tags */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {tags.map((t) => (
+                    <Badge key={t} variant="secondary" className="text-[10px] gap-1 pr-1">
+                      {t}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(t)}
+                        className="text-muted-foreground hover:text-rose-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button
+                onClick={submit}
+                disabled={submitting || !selUserId || !amountToman}
+                size="sm"
+              >
+                <Plus className="ml-1.5 h-3.5 w-3.5" />
+                {submitting ? "در حال ذخیره…" : "ثبت حقوق"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </SectionCard>
   )
+}
+
+interface ProjectLocationItem {
+  id: string
+  name: string
+  address: string | null
+  city: string | null
+  phone: string | null
+  notes: string | null
+  isActive: boolean
 }
 
 function SmsTab({ data }: { data: ProjectDetailData }) {
@@ -4777,7 +6661,7 @@ function SmsTab({ data }: { data: ProjectDetailData }) {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-right" dir="rtl">
       <SectionCard
         title="اتوماسیون‌های پیامک"
         description="مدیریت پیامک‌های خودکار این پروژه"
@@ -4845,9 +6729,9 @@ function SmsTab({ data }: { data: ProjectDetailData }) {
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <div className="text-left text-[11px]">
+                    <div className="text-right text-[11px]" dir="rtl">
                       <div className="text-muted-foreground">فاصله از رویداد</div>
-                      <div className="font-medium">
+                      <div className="font-medium" dir="ltr">
                         {toPersianDigits(String(a.effectiveOffsetDays))} روز
                       </div>
                     </div>
@@ -4956,7 +6840,7 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
   })
 
   // Print photos
-  const { data: printPricesData } = useQuery<{ items: { id: string; size: string; paperType: string; laminateType: string; photoLocation: string; price: number; isActive: boolean }[] }>({
+  const { data: printPricesData } = useQuery<{ items: { id: string; size: string; paperType: string; laminateType: string; photoLocation: string; price: number; isActive: boolean; priority?: string }[] }>({
     queryKey: ["print-photo-prices"],
     queryFn: async () => {
       const res = await fetch("/api/print-photo-prices", { credentials: "include", headers: { "x-demo-role": role, ...((typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null) ? { Authorization: `Bearer ${localStorage.getItem("nasim-session-token")}` } : {}) } })
@@ -4991,15 +6875,6 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
     },
   })
 
-  const exemptMut = useMutation({
-    mutationFn: (exempt: boolean) => api.patch(`/api/projects/${projectId}`, { exemptFromPhotoPriceUpdate: exempt }),
-    onSuccess: () => {
-      toast.success(exemptMut.data ? "پروژه از تغییر قیمت مستثنی شد" : "تغییر قیمت فعال شد")
-      qc.invalidateQueries({ queryKey: ["project", projectId] })
-      qc.invalidateQueries({ queryKey: ["project-print-photos", projectId] })
-    },
-  })
-
   if (isLoading || !data) {
     return <div className="flex h-48 items-center justify-center text-muted-foreground">در حال بارگذاری...</div>
   }
@@ -5009,9 +6884,10 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
   const printPhotos = projectPrintPhotos?.items ?? []
   const printPhotoTotal = printPhotos.reduce((s, p) => s + p.total, 0)
   const isExempt = (data.project?.exemptFromPhotoPriceUpdate) ?? false
+  void isExempt // (kept for potential future use; freeze buttons moved to OverviewTab)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-right" dir="rtl">
       <div className="rounded-xl border bg-card p-4">
         <h3 className="mb-1 text-sm font-semibold">گردش کار پروژه</h3>
         <p className="text-xs text-muted-foreground">
@@ -5037,45 +6913,7 @@ function WorkflowTab({ projectId, category }: { projectId: string; category: str
         ))}
       </div>
 
-      {/* Price freeze controls — both project + print photos, side by side */}
-      {canManage && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* Freeze project price */}
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
-            <Checkbox
-              checked={data.project?.isPriceFrozen ?? false}
-              onCheckedChange={(v) => {
-                api.patch(`/api/projects/${projectId}`, { isPriceFrozen: Boolean(v) })
-                  .then(() => {
-                    toast.success(Boolean(v) ? "قیمت پروژه فریز شد" : "فریز قیمت پروژه لغو شد")
-                    qc.invalidateQueries({ queryKey: ["project-workflow", projectId] })
-                    qc.invalidateQueries({ queryKey: ["project", projectId] })
-                  })
-                  .catch(() => toast.error("عملیات ناموفق بود"))
-              }}
-            />
-            <span className="flex items-center gap-1.5 text-xs">
-              <Snowflake className="h-3.5 w-3.5 text-sky-500" />
-              فریز قیمت پروژه
-            </span>
-          </label>
-
-          {/* Freeze print photo price (only for photo projects) */}
-          {hasPhotoTrack && (
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border bg-muted/30 p-3">
-              <Checkbox
-                checked={isExempt}
-                onCheckedChange={(v) => exemptMut.mutate(Boolean(v))}
-                disabled={exemptMut.isPending}
-              />
-              <span className="flex items-center gap-1.5 text-xs">
-                <Snowflake className="h-3.5 w-3.5 text-sky-500" />
-                فریز قیمت عکس‌های چاپی
-              </span>
-            </label>
-          )}
-        </div>
-      )}
+      {/* Price freeze controls live only in OverviewTab now. */}
 
       {/* Print photo total summary */}
       {hasPhotoTrack && printPhotos.length > 0 && (
@@ -5137,138 +6975,369 @@ function PrintPhotoSection({
   isAdding,
 }: {
   printPhotos: PrintPhotoSelection[]
-  printPrices: { id: string; size: string; paperType: string; laminateType: string; photoLocation: string; price: number; isActive: boolean }[]
+  printPrices: { id: string; size: string; paperType: string; laminateType: string; photoLocation: string; price: number; isActive: boolean; priority?: string }[]
   total: number
   canManage: boolean
   onAdd: (printPhotoPriceId: string, quantity: number) => void
   onDelete: (pppId: string) => void
   isAdding: boolean
 }) {
-  const [addOpen, setAddOpen] = React.useState(false)
-  const [selectedPriceId, setSelectedPriceId] = React.useState<string>("")
-  const [quantity, setQuantity] = React.useState<string>("1")
+  // ✅ Local quantity state per available price (used as the "draft" quantity in
+  // the number input before the user clicks "افزودن").
+  const [quantities, setQuantities] = React.useState<Record<string, number>>({})
+  // ✅ Search + filters
+  const [search, setSearch] = React.useState("")
+  const [paperFilter, setPaperFilter] = React.useState<string>("__all")
+  const [laminateFilter, setLaminateFilter] = React.useState<string>("__all")
+  const [locationFilter, setLocationFilter] = React.useState<string>("__all")
+  const [priorityFilter, setPriorityFilter] = React.useState<string>("__all")
 
   const activePrices = printPrices.filter((p) => p.isActive)
 
-  function handleAdd() {
-    if (!selectedPriceId) {
-      toast.error("یک عکس چاپی انتخاب کنید")
-      return
+  // Build distinct filter option lists from the data
+  const paperOptions = Array.from(new Set(activePrices.map((p) => p.paperType).filter(Boolean)))
+  const laminateOptions = Array.from(new Set(activePrices.map((p) => p.laminateType).filter(Boolean)))
+  const locationOptions = Array.from(new Set(activePrices.map((p) => p.photoLocation).filter(Boolean)))
+  const priorityOptions = Array.from(new Set(activePrices.map((p) => p.priority ?? "normal").filter(Boolean)))
+
+  const PHOTO_LOCATION_LABELS: Record<string, string> = {
+    studio: "استودیو",
+    outdoor: "بیرون",
+    customer: "مشتری",
+  }
+  const PRIORITY_LABELS: Record<string, string> = {
+    normal: "معمولی",
+    formal: "سرمجلسی",
+  }
+
+  // ✅ Merge printPhotos by `printPhotoPriceId` so each unique price shows up as
+  // a single row in the "انتخاب‌شده" section (with summed qty + total).
+  // `ids` keeps every ProjectPrintPhoto row id so we can decrement by deleting
+  // the first one when the user clicks "−".
+  const selectedByPrice = React.useMemo(() => {
+    const m = new Map<string, {
+      priceId: string
+      ids: string[]
+      qty: number
+      unitPrice: number
+      lineTotal: number
+      size: string
+      paperType: string
+      laminateType: string
+      photoLocation: string
+    }>()
+    for (const sel of printPhotos) {
+      const key = sel.printPhotoPriceId
+      if (!m.has(key)) {
+        m.set(key, {
+          priceId: sel.printPhotoPriceId,
+          ids: [],
+          qty: 0,
+          unitPrice: sel.unitPrice,
+          lineTotal: 0,
+          size: sel.price.size,
+          paperType: sel.price.paperType,
+          laminateType: sel.price.laminateType,
+          photoLocation: sel.price.photoLocation,
+        })
+      }
+      const entry = m.get(key)!
+      entry.ids.push(sel.id)
+      entry.qty += sel.quantity
+      entry.lineTotal += sel.total
     }
-    const qty = parseInt(quantity) || 1
-    if (qty < 1) {
-      toast.error("تعداد باید حداقل ۱ باشد")
-      return
+    return Array.from(m.values())
+  }, [printPhotos])
+
+  // Reverse lookup: priceId → selected entry (for highlighting rows in the available list).
+  const selectedMap = React.useMemo(() => {
+    const m = new Map<string, { ids: string[]; qty: number }>()
+    for (const s of selectedByPrice) m.set(s.priceId, { ids: s.ids, qty: s.qty })
+    return m
+  }, [selectedByPrice])
+
+  const filteredPrices = activePrices.filter((p) => {
+    if (paperFilter !== "__all" && p.paperType !== paperFilter) return false
+    if (laminateFilter !== "__all" && p.laminateType !== laminateFilter) return false
+    if (locationFilter !== "__all" && p.photoLocation !== locationFilter) return false
+    const pr = p.priority ?? "normal"
+    if (priorityFilter !== "__all" && pr !== priorityFilter) return false
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      const hay = `${p.size} ${p.paperType} ${p.laminateType} ${p.photoLocation} ${pr}`.toLowerCase()
+      if (!hay.includes(q)) return false
     }
-    onAdd(selectedPriceId, qty)
-    setAddOpen(false)
-    setSelectedPriceId("")
-    setQuantity("1")
+    return true
+  })
+
+  function bumpQty(priceId: string, delta: number) {
+    setQuantities((prev) => {
+      const cur = prev[priceId] ?? 1
+      return { ...prev, [priceId]: Math.max(1, cur + delta) }
+    })
+  }
+  function setQty(priceId: string, n: number) {
+    setQuantities((prev) => ({ ...prev, [priceId]: Math.max(1, Math.floor(n)) || 1 }))
+  }
+  function handleAddRow(priceId: string) {
+    const qty = quantities[priceId] ?? 1
+    onAdd(priceId, qty)
+    // reset draft
+    setQuantities((prev) => ({ ...prev, [priceId]: 1 }))
+  }
+  function handleIncSelected(priceId: string) {
+    // Add one more of this price.
+    onAdd(priceId, 1)
+  }
+  function handleDecSelected(priceId: string) {
+    const entry = selectedMap.get(priceId)
+    if (!entry || entry.ids.length === 0) return
+    // Remove the first linked ProjectPrintPhoto row for this price.
+    onDelete(entry.ids[0])
+  }
+  function handleDeleteSelected(priceId: string) {
+    // Delete every ProjectPrintPhoto row linked to this price.
+    const entry = selectedMap.get(priceId)
+    if (!entry) return
+    for (const id of entry.ids) onDelete(id)
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border bg-card p-4" dir="rtl">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ImageIcon className="size-4 text-sky-500" />
           <h3 className="text-sm font-semibold">عکس‌های چاپی</h3>
         </div>
-        {canManage && (
-          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setAddOpen(true)}>
-            <Plus className="size-3.5" />
-            افزودن عکس چاپی
-          </Button>
-        )}
       </div>
 
       <p className="mb-3 text-[11px] text-muted-foreground">
         قیمت عکس‌ها به صورت لحظه‌ای محاسبه می‌شود. با تغییر قیمت در تنظیمات، تمام پروژه‌های تسویه‌نشده به‌روزرسانی می‌شوند.
       </p>
 
-      {printPhotos.length === 0 ? (
-        <div className="py-6 text-center text-xs text-muted-foreground">
-          هنوز عکس چاپی برای این پروژه انتخاب نشده است.
-        </div>
-      ) : (
-        <div className="space-y-2" dir="rtl">
-          {printPhotos.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">
-                  {p.price.size} — {p.price.paperType}
-                  {p.price.laminateType !== "none" && ` — ${p.price.laminateType}`}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {p.price.photoLocationLabel} · {formatRials(p.unitPrice)} تومان × {toPersianDigits(p.quantity)}
-                </div>
-              </div>
-              <div className="shrink-0 font-bold tabular-nums">
-                {formatRials(p.total)}
-                <span className="mr-1 text-[9px] text-muted-foreground">تومان</span>
-              </div>
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(p.id)}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
-                  aria-label="حذف"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              )}
+      {/* ✅ Search + filters */}
+      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <Input
+          placeholder="جستجو (سایز، کاغذ، لمینانت…)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-8 text-xs"
+        />
+        <Select value={paperFilter} onValueChange={setPaperFilter}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="نوع کاغذ" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">همه کاغذها</SelectItem>
+            {paperOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={laminateFilter} onValueChange={setLaminateFilter}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="لمینانت" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">همه لمینانت‌ها</SelectItem>
+            {laminateOptions.map((p) => <SelectItem key={p} value={p}>{p === "none" ? "بدون لمینانت" : p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="محل عکس" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">همه مکان‌ها</SelectItem>
+            {locationOptions.map((p) => <SelectItem key={p} value={p}>{PHOTO_LOCATION_LABELS[p] ?? p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="اولویت" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">همه اولویت‌ها</SelectItem>
+            {priorityOptions.map((p) => <SelectItem key={p} value={p}>{PRIORITY_LABELS[p] ?? p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* ✅ انتخاب‌شده — selected photos at the TOP (one row per unique price). */}
+      {selectedByPrice.length > 0 && (
+        <div className="mb-3 rounded-lg border border-emerald-300/60 bg-emerald-500/5 p-2.5">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <Check className="size-3.5" />
+              انتخاب‌شده
+              <Badge variant="secondary" className="text-[9px]">{toPersianDigits(selectedByPrice.length)}</Badge>
             </div>
-          ))}
-          <div className="flex items-center justify-between border-t pt-2 text-sm font-bold">
-            <span>جمع کل عکس‌های چاپی</span>
-            <span className="tabular-nums text-sky-600">{formatRials(total)} تومان</span>
+          </div>
+          <div className="space-y-1">
+            {selectedByPrice.map((s) => (
+              <div
+                key={s.priceId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200/50 bg-background/60 px-2.5 py-1.5 text-right text-[11px]"
+                dir="rtl"
+              >
+                {/* Right side: size + paper + laminate */}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-xs font-bold">{s.size}</div>
+                  <div className="truncate text-[10px] text-muted-foreground">
+                    {s.paperType}
+                    {s.laminateType !== "none" && ` · ${s.laminateType}`}
+                    {s.photoLocation && ` · ${PHOTO_LOCATION_LABELS[s.photoLocation] ?? s.photoLocation}`}
+                  </div>
+                </div>
+                {/* Unit price */}
+                <div className="shrink-0 text-[10px] text-muted-foreground" dir="ltr">
+                  {formatRials(s.unitPrice)} ت
+                </div>
+                {/* Inline ± quantity editor */}
+                {canManage && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleDecSelected(s.priceId)}
+                      disabled={isAdding}
+                      className="flex size-6 items-center justify-center rounded border text-xs hover:bg-accent disabled:opacity-50"
+                      aria-label="کمتر"
+                      title="کم کردن یک عدد"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="text"
+                      dir="ltr"
+                      value={String(s.qty)}
+                      readOnly
+                      className="h-6 w-9 rounded border bg-muted/30 text-center text-xs tabular-nums"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleIncSelected(s.priceId)}
+                      disabled={isAdding}
+                      className="flex size-6 items-center justify-center rounded border text-xs hover:bg-accent disabled:opacity-50"
+                      aria-label="بیشتر"
+                      title="افزودن یک عدد"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                {!canManage && (
+                  <div className="shrink-0 text-xs tabular-nums">
+                    × {toPersianDigits(s.qty)}
+                  </div>
+                )}
+                {/* Line total */}
+                <div className="shrink-0 text-xs font-bold tabular-nums text-sky-600" dir="ltr">
+                  {formatRials(s.lineTotal)} ت
+                </div>
+                {/* Delete-all button */}
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSelected(s.priceId)}
+                    disabled={isAdding}
+                    className="flex size-6 shrink-0 items-center justify-center rounded border text-rose-600 hover:bg-rose-500/10 disabled:opacity-50"
+                    aria-label="حذف"
+                    title="حذف این ردیف"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {/* Total */}
+            <div className="mt-1 flex items-center justify-between border-t border-emerald-200/50 pt-1.5 text-xs font-bold">
+              <span>جمع کل</span>
+              <span className="tabular-nums text-sky-600" dir="ltr">{formatRials(total)} تومان</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Add dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>افزودن عکس چاپی</DialogTitle>
-            <DialogDescription>از لیست قیمت‌های تعریف‌شده انتخاب کنید.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label className="mb-1.5 block text-xs">عکس چاپی</Label>
-              <Select value={selectedPriceId} onValueChange={setSelectedPriceId}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="انتخاب..." /></SelectTrigger>
-                <SelectContent>
-                  {activePrices.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.size} — {p.paperType}
-                      {p.laminateType !== "none" && ` — ${p.laminateType}`}
-                      {` (${formatRials(p.price)} ت)`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 block text-xs">تعداد</Label>
-              <Input
-                type="number"
-                dir="ltr"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-                className="w-full"
-                min={1}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddOpen(false)}>انصراف</Button>
-            <Button onClick={handleAdd} disabled={isAdding || !selectedPriceId}>
-              <Plus className="ml-1 size-3.5" />
-              افزودن
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ✅ Available prices — LIST view (one compact row per price). */}
+      <div className="mb-1.5 flex items-center justify-between">
+        <div className="text-[11px] font-semibold text-muted-foreground">لیست قیمت‌ها</div>
+        <div className="text-[10px] text-muted-foreground">{toPersianDigits(filteredPrices.length)} مورد</div>
+      </div>
+      {filteredPrices.length === 0 ? (
+        <div className="py-6 text-center text-xs text-muted-foreground">
+          موردی مطابق فیلترها یافت نشد.
+        </div>
+      ) : (
+        <div className="divide-y overflow-hidden rounded-lg border">
+          {filteredPrices.map((p) => {
+            const projEntry = selectedMap.get(p.id)
+            const isSelected = !!projEntry && projEntry.qty > 0
+            const draftQty = quantities[p.id] ?? 1
+            const priority = p.priority ?? "normal"
+            return (
+              <div
+                key={p.id}
+                className={cn(
+                  "flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 text-right text-[11px] transition-colors",
+                  isSelected ? "bg-emerald-500/5" : "bg-background hover:bg-muted/40"
+                )}
+                dir="rtl"
+              >
+                {/* Right side: size (bold) + meta (paper / laminate / location / priority) */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold">{p.size}</span>
+                    {isSelected && (
+                      <Badge variant="outline" className="h-4 px-1 text-[8px] text-emerald-600 border-emerald-300">
+                        {toPersianDigits(projEntry!.qty)} انتخاب
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                    {p.paperType}
+                    {p.laminateType !== "none" && ` · ${p.laminateType}`}
+                    {` · ${PHOTO_LOCATION_LABELS[p.photoLocation] ?? p.photoLocation}`}
+                    {` · ${PRIORITY_LABELS[priority] ?? priority}`}
+                  </div>
+                </div>
+                {/* Left side: price + quantity input + افزودن button (grouped together) */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="text-xs font-bold tabular-nums text-sky-600" dir="ltr">
+                    {formatRials(p.price)} <span className="text-[9px] text-muted-foreground">ت</span>
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => bumpQty(p.id, -1)}
+                        className="flex size-6 items-center justify-center rounded border text-xs hover:bg-accent"
+                        aria-label="کمتر"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={String(draftQty)}
+                        onChange={(e) => setQty(p.id, parseInt(e.target.value.replace(/[^0-9]/g, "")) || 1)}
+                        className="h-6 w-10 rounded border text-center text-xs tabular-nums"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => bumpQty(p.id, 1)}
+                        className="flex size-6 items-center justify-center rounded border text-xs hover:bg-accent"
+                        aria-label="بیشتر"
+                      >
+                        +
+                      </button>
+                      <Button
+                        size="sm"
+                        type="button"
+                        onClick={() => handleAddRow(p.id)}
+                        disabled={isAdding}
+                        className="h-6 gap-1 px-2 text-[10px]"
+                      >
+                        <Plus className="size-3" />
+                        افزودن
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -5360,16 +7429,6 @@ function TrackColumn({
 
           return (
             <div key={stage} className="relative flex gap-3 pb-4 last:pb-0">
-              {/* Vertical connector line */}
-              {!isLast && (
-                <div
-                  className="absolute right-[15px] top-8 h-[calc(100%-1rem)] w-0.5"
-                  style={{
-                    background: isPast ? "#22c55e55" : "var(--border, #e2e8f0)",
-                  }}
-                />
-              )}
-
               {/* Stage indicator dot */}
               <div className="relative z-10 shrink-0">
                 <div

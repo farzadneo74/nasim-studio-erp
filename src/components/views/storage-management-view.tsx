@@ -28,6 +28,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatRials } from "@/lib/format"
+import { authHeaders } from "@/lib/auth-context"
 import { toPersianDigits } from "@/lib/jalali"
 import { cn } from "@/lib/utils"
 
@@ -139,7 +140,7 @@ function OverviewTab() {
   const { data: stats, isLoading } = useQuery<Stats>({
     queryKey: ["storage-stats"],
     queryFn: async () => {
-      const res = await fetch("/api/attachments/stats", { credentials: "include" })
+      const res = await fetch("/api/attachments/stats", { credentials: "include", headers: authHeaders() })
       if (!res.ok) throw new Error("خطا")
       return res.json()
     },
@@ -266,26 +267,26 @@ function FilesTab({ trash }: { trash: boolean }) {
       if (search) params.set("search", search)
       if (category !== "all") params.set("category", category)
       if (ownerType !== "all") params.set("ownerType", ownerType)
-      const res = await fetch(`/api/attachments?${params}`, { credentials: "include" })
+      const res = await fetch(`/api/attachments?${params}`, { credentials: "include", headers: authHeaders() })
       if (!res.ok) throw new Error("خطا")
       return res.json()
     },
   })
 
   const restoreMut = useMutation({
-    mutationFn: (id: string) => fetch(`/api/attachments/${id}/restore`, { method: "POST", credentials: "include" }).then(r => r.json()),
+    mutationFn: (id: string) => fetch(`/api/attachments/${id}/restore`, { method: "POST", credentials: "include", headers: authHeaders() }).then(r => r.json()),
     onSuccess: () => { toast.success("فایل بازیابی شد"); qc.invalidateQueries({ queryKey: ["attachments"] }); qc.invalidateQueries({ queryKey: ["storage-stats"] }); setRestoreTarget(null) },
     onError: () => toast.error("بازیابی ناموفق بود"),
   })
 
   const softDeleteMut = useMutation({
-    mutationFn: (id: string) => fetch(`/api/attachments/${id}`, { method: "DELETE", credentials: "include" }).then(r => r.json()),
+    mutationFn: (id: string) => fetch(`/api/attachments/${id}`, { method: "DELETE", credentials: "include", headers: authHeaders() }).then(r => r.json()),
     onSuccess: () => { toast.success("فایل به سطل زباله منتقل شد"); qc.invalidateQueries({ queryKey: ["attachments"] }); qc.invalidateQueries({ queryKey: ["storage-stats"] }); setDeleteTarget(null) },
     onError: () => toast.error("حذف ناموفق بود"),
   })
 
   const hardDeleteMut = useMutation({
-    mutationFn: (id: string) => fetch(`/api/attachments/${id}/permanent`, { method: "DELETE", credentials: "include" }).then(r => r.json()),
+    mutationFn: (id: string) => fetch(`/api/attachments/${id}/permanent`, { method: "DELETE", credentials: "include", headers: authHeaders() }).then(r => r.json()),
     onSuccess: () => { toast.success("فایل برای همیشه حذف شد"); qc.invalidateQueries({ queryKey: ["attachments"] }); qc.invalidateQueries({ queryKey: ["storage-stats"] }); setDeleteTarget(null) },
     onError: () => toast.error("حذف ناموفق بود"),
   })
@@ -469,7 +470,7 @@ function RetentionTab() {
   }>({
     queryKey: ["retention"],
     queryFn: async () => {
-      const res = await fetch("/api/attachments/retention", { credentials: "include" })
+      const res = await fetch("/api/attachments/retention", { credentials: "include", headers: authHeaders() })
       if (!res.ok) throw new Error("خطا")
       return res.json()
     },
@@ -477,7 +478,7 @@ function RetentionTab() {
 
   const updateMut = useMutation({
     mutationFn: (body: { ownerType: string; retentionDays: number | null; enabled: boolean }) =>
-      fetch("/api/attachments/retention", { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(body) }).then(r => r.json()),
+      fetch("/api/attachments/retention", { method: "PUT", headers: authHeaders({ "Content-Type": "application/json" }), credentials: "include", body: JSON.stringify(body) }).then(r => r.json()),
     onSuccess: () => { toast.success("سیاست نگهداری به‌روزرسانی شد"); qc.invalidateQueries({ queryKey: ["retention"] }) },
     onError: () => toast.error("به‌روزرسانی ناموفق بود"),
   })
@@ -578,7 +579,7 @@ function BackupTab() {
   const qc = useQueryClient()
   const [backupOpen, setBackupOpen] = React.useState(false)
   const backupMut = useMutation({
-    mutationFn: () => fetch("/api/attachments/backup", { method: "POST", credentials: "include" }).then(r => r.json()),
+    mutationFn: () => fetch("/api/attachments/backup", { method: "POST", credentials: "include", headers: authHeaders() }).then(r => r.json()),
     onSuccess: (data) => {
       toast.success(`بکاپ ساخته شد: ${toPersianDigits(data.fileCount)} فایل، ${formatBytes(data.filesBytes)}`)
       setBackupOpen(false)

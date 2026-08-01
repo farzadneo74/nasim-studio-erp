@@ -32,8 +32,10 @@ import {
   RefreshCw,
   StickyNote,
   X,
+  Send,
 } from "lucide-react"
 import { useApi } from "@/lib/api/client"
+import { authHeaders } from "@/lib/auth-context"
 import { useWorkspace } from "@/stores/workspace"
 import {
   PAYMENT_TYPES,
@@ -47,6 +49,7 @@ import {
   formatRialsShort,
   formatDate,
   formatDateTime,
+  formatTime,
   tomanToRials,
   toPersianDigits,
 } from "@/lib/format"
@@ -145,7 +148,7 @@ interface PaymentRow {
   createdAt: string
   project: {
     id: string
-    customer: { id: string; name: string }
+    customer: { id: string; name: string; phone?: string }
     servicePackage: { id: string; title: string }
   }
 }
@@ -161,24 +164,35 @@ interface ExpenseRow {
   createdAt: string
 }
 
-interface SalaryRow {
+interface SalaryEntry {
   id: string
+  source: "project_salary" | "salary_record"
   userId: string
   amount: number
-  isPaid: boolean
-  period: string
+  description: string | null
   note: string | null
-  paidAt: string | null
-  createdAt: string
+  tags: string[]
+  date: string
+  isSettled: boolean
+  settledAt: string | null
+  manualType: string | null
+  isPaid: boolean
+  project: { id: string; title: string } | null
+  sourceLabel: string
+}
+
+interface SalaryUserGroup {
   user: { id: string; firstName: string; lastName: string; role: string; name: string }
-  project: { id: string; customer: string; servicePackage: string }
-  ruleUsed: {
-    id: string
-    role: string
-    commissionType: string
-    commissionValue: number
-    applyOn: string
-  }
+  entries: SalaryEntry[]
+  totalUnsettled: number
+  totalAll: number
+  unsettledCount: number
+  settledCount: number
+}
+
+interface SalariesResponse {
+  users: SalaryUserGroup[]
+  totalUnsettled: number
 }
 
 interface CreditRow {
@@ -188,8 +202,16 @@ interface CreditRow {
   transactionType: string
   note: string | null
   createdAt: string
+  isSettled?: boolean
+  settledAt?: string | null
   customer: { id: string; name: string; phone: string; creditBalance: number }
   relatedContract: { id: string; contractNumber: string } | null
+  // ✅ اطلاعات معرف و پروژه مرتبط
+  referrerCustomerId?: string | null
+  referrerCustomerName?: string | null
+  referrerCustomerPhone?: string | null
+  relatedProjectId?: string | null
+  relatedProject?: { id: string; contractNumber: string | null; packageTitle: string | null } | null
   createdBy: { id: string; name: string } | null
 }
 
@@ -248,11 +270,6 @@ const CREDIT_TYPE_LABELS: Record<string, string> = {
   manual_adjustment: "تنظیم دستی",
   used: "مصرف شده",
 }
-const APPLY_ON_LABELS: Record<string, string> = {
-  field_work: "کار میدانی",
-  studio_work: "کار استودیو",
-  delivery: "تحویل",
-}
 
 // ============================================================
 // Main
@@ -287,7 +304,7 @@ function FinancesInner() {
   const kpis = dash?.kpis
 
   return (
-    <div>
+    <div dir="rtl" className="text-right">
       <PageHeader
         title="مالی"
         icon="💰"
@@ -362,7 +379,7 @@ function FinancesInner() {
               <Users className="h-3.5 w-3.5" /> حقوق‌ها
             </TabsTrigger>
             <TabsTrigger value="credit" className="gap-1.5">
-              <Wallet className="h-3.5 w-3.5" /> دفتر اعتبار
+              <Wallet className="h-3.5 w-3.5" /> تراکنش‌های اعتبار
             </TabsTrigger>
           </TabsList>
         </div>
@@ -726,6 +743,8 @@ function PaymentsTab() {
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editTarget, setEditTarget] = React.useState<PaymentRow | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<PaymentRow | null>(null)
+  // ✅ Tracks the payment id whose SMS receipt is currently being sent.
+  const [smsSendingId, setSmsSendingId] = React.useState<string | null>(null)
 
   const params = new URLSearchParams()
   if (search) params.set("search", search)
@@ -759,6 +778,37 @@ function PaymentsTab() {
       setDeleteTarget(null)
     },
     onError: () => toast.error("حذف پرداخت ناموفق بود"),
+  })
+
+  // ✅ Send SMS receipt to the customer for a confirmed payment.
+  //    Message: "مشتری گرامی {name}، پرداخت {amount} تومان شما در تاریخ {date} ساعت {time} دریافت شد."
+  const sendSmsMut = useMutation({
+    mutationFn: async (p: PaymentRow) => {
+      setSmsSendingId(p.id)
+      const amountToman = Math.round(p.amount / 10)
+      const amountDisplay = new Intl.NumberFormat("en-US").format(amountToman)
+      const d = new Date(p.datePaid)
+      const jDate = formatDate(d)
+      const tStr = formatTime(d)
+      const message = `مشتری گرامی ${p.project.customer.name}، پرداخت ${amountDisplay} تومان شما در تاریخ ${jDate} ساعت ${tStr} دریافت شد.`
+      const res = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ phone: p.project.customer.phone, message }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error((data as { error?: string })?.error || `Request failed (${res.status})`)
+      return data as { ok: boolean; skipped?: boolean }
+    },
+    onSuccess: (data) => {
+      if (data.skipped) {
+        toast.info("سرویس پیامک فعال نیست — پیامک ارسال نشد.")
+      } else {
+        toast.success("پیامک رسید پرداخت برای مشتری ارسال شد")
+      }
+    },
+    onError: (e: Error) => toast.error(e.message || "ارسال پیامک ناموفق بود"),
+    onSettled: () => setSmsSendingId(null),
   })
 
   const rows = data ?? []
@@ -807,9 +857,9 @@ function PaymentsTab() {
           </SelectContent>
         </Select>
         <DateRangeFromTo from={from} to={to} setFrom={setFrom} setTo={setTo} />
-        <Button className="gap-1.5 ml-auto" onClick={() => { setEditTarget(null); setDialogOpen(true) }}>
-          <Plus className="h-3.5 w-3.5" /> ثبت پرداخت
-        </Button>
+        {/* ✅ "ثبت پرداخت" button removed per spec — payments are now created
+            only from the customer / project flows. The dialog is kept here so
+            existing payment rows can still be edited. */}
         <RecordPaymentDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -823,13 +873,13 @@ function PaymentsTab() {
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow>
-                <TableHead className="w-[110px]">تاریخ</TableHead>
-                <TableHead>پروژه</TableHead>
+                <TableHead className="w-[160px] text-right">تاریخ و ساعت</TableHead>
+                <TableHead className="text-right">پروژه</TableHead>
                 <TableHead className="text-right">مبلغ</TableHead>
-                <TableHead>نوع</TableHead>
-                <TableHead>روش</TableHead>
-                <TableHead>وضعیت</TableHead>
-                <TableHead>یادداشت</TableHead>
+                <TableHead className="text-right">نوع</TableHead>
+                <TableHead className="text-right">روش</TableHead>
+                <TableHead className="text-right">وضعیت</TableHead>
+                <TableHead className="text-right">یادداشت</TableHead>
                 <TableHead className="text-right">عملیات</TableHead>
               </TableRow>
             </TableHeader>
@@ -849,10 +899,11 @@ function PaymentsTab() {
               ) : (
                 pagedRows.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatDate(p.datePaid)}
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap text-right" dir="rtl">
+                      {/* ✅ Date + time — "۱۴۰۵/۰۵/۰۱ - ۱۵:۳۰" */}
+                      {formatPaymentDateAndTime(p.datePaid)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <div className="font-medium text-sm">{p.project.customer.name}</div>
                       <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {p.project.servicePackage.title}
@@ -861,7 +912,7 @@ function PaymentsTab() {
                     <TableCell className="text-right font-mono text-sm whitespace-nowrap">
                       {formatRials(p.amount)} <span className="text-muted-foreground">تومان</span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <Badge
                         variant="secondary"
                         className="text-[10px] font-medium"
@@ -873,7 +924,7 @@ function PaymentsTab() {
                         {PAYMENT_TYPE_LABELS[p.paymentType] ?? p.paymentType}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <Badge
                         variant="secondary"
                         className="text-[10px] font-medium"
@@ -885,7 +936,7 @@ function PaymentsTab() {
                         {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       {p.isConfirmed ? (
                         <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
                           <CheckCircle2 className="h-3.5 w-3.5" /> تأییدشده
@@ -896,11 +947,28 @@ function PaymentsTab() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate text-right">
                       {p.note || "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {/* ✅ SMS button — only for confirmed payments */}
+                        {p.isConfirmed && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-sky-600 hover:text-sky-700"
+                            disabled={smsSendingId === p.id}
+                            onClick={() => sendSmsMut.mutate(p)}
+                            title="ارسال پیامک به مشتری"
+                          >
+                            {smsSendingId === p.id ? (
+                              <><RefreshCw className="h-3.5 w-3.5 animate-spin" /> در حال ارسال…</>
+                            ) : (
+                              <><Send className="h-3.5 w-3.5" /> ارسال پیامک</>
+                            )}
+                          </Button>
+                        )}
                         {!p.isConfirmed && (
                           <Button
                             size="sm"
@@ -1618,174 +1686,93 @@ const TRIGGER_LABELS: Record<string, string> = {
   after_photo_select: "بعد از انتخاب عکس",
 }
 
+// ============================================================
+// Salaries Tab — unified ProjectSalary + SalaryRecord ledger
+// (FIXES-10 #4: removed old SalaryRule/commission logic; now shows
+//  ALL employees, with expand/collapse arrows revealing individual
+//  salary entries. Unsettled items have a "تسویه" button.)
+// ============================================================
 function SalariesTab() {
   const api = useApi()
   const qc = useQueryClient()
 
   const [userId, setUserId] = React.useState<string>("all")
-  const [isPaid, setIsPaid] = React.useState<string>("all")
-  const [period, setPeriod] = React.useState<string>("all")
-  const [from, setFrom] = React.useState("")
-  const [to, setTo] = React.useState("")
-
-  const [noteTarget, setNoteTarget] = React.useState<SalaryRow | null>(null)
-  const [noteOpen, setNoteOpen] = React.useState(false)
+  const [onlyUnsettled, setOnlyUnsettled] = React.useState<boolean>(false)
   const [expandedUser, setExpandedUser] = React.useState<string | null>(null)
 
   const params = new URLSearchParams()
   if (userId !== "all") params.set("userId", userId)
-  if (isPaid !== "all") params.set("isPaid", isPaid)
-  if (period !== "all") params.set("period", period)
-  if (from) params.set("from", from)
-  if (to) params.set("to", to)
+  if (onlyUnsettled) params.set("onlyUnsettled", "1")
 
   const { data, isLoading } = useQuery({
-    queryKey: ["salaries", userId, isPaid, period, from, to],
-    queryFn: () => api.get<SalaryRow[]>(`/api/salaries?${params.toString()}`),
+    queryKey: ["salaries", userId, onlyUnsettled],
+    queryFn: () => api.get<SalariesResponse>(`/api/salaries?${params.toString()}`),
   })
 
-  const markPaidMut = useMutation({
-    mutationFn: (id: string) => api.patch(`/api/salaries/${id}`, { isPaid: true }),
+  // ✅ Settle / unsettle a single entry. Routes to the right endpoint based on source.
+  const settleMut = useMutation({
+    mutationFn: async (entry: SalaryEntry) => {
+      if (entry.source === "project_salary") {
+        // Cross-project sentinel: `/api/projects/any/salaries/[id]` accepts id="any".
+        return api.patch(`/api/projects/any/salaries/${entry.id}`, { isSettled: true })
+      }
+      return api.patch(`/api/salaries/${entry.id}`, { isSettled: true })
+    },
     onSuccess: () => {
+      toast.success("به‌عنوان تسویه‌شده علامت‌گذاری شد")
       qc.invalidateQueries({ queryKey: ["salaries"] })
       qc.invalidateQueries({ queryKey: ["dashboard"] })
     },
-    onError: () => toast.error("علامت‌گذاری به‌عنوان پرداخت‌شده ناموفق بود"),
+    onError: () => toast.error("علامت‌گذاری تسویه ناموفق بود"),
   })
 
-  const markUnpaidMut = useMutation({
-    mutationFn: (id: string) => api.patch(`/api/salaries/${id}`, { isPaid: false }),
+  const unsettleMut = useMutation({
+    mutationFn: async (entry: SalaryEntry) => {
+      if (entry.source === "project_salary") {
+        return api.patch(`/api/projects/any/salaries/${entry.id}`, { isSettled: false })
+      }
+      return api.patch(`/api/salaries/${entry.id}`, { isSettled: false })
+    },
     onSuccess: () => {
+      toast.success("وضعیت تسویه برداشته شد")
       qc.invalidateQueries({ queryKey: ["salaries"] })
       qc.invalidateQueries({ queryKey: ["dashboard"] })
     },
     onError: () => toast.error("برگرداندن وضعیت ناموفق بود"),
   })
 
-  // Mark ALL unpaid records for a user as paid (sequential PATCH calls).
-  const markAllPaidMut = useMutation({
-    mutationFn: async (recordIds: string[]) => {
-      for (const id of recordIds) {
-        await api.patch(`/api/salaries/${id}`, { isPaid: true })
-      }
-    },
-    onSuccess: (_data, recordIds) => {
-      toast.success(
-        `${toPersianDigits(recordIds.length)} رکورد به‌عنوان پرداخت‌شده علامت‌گذاری شد`
-      )
-      qc.invalidateQueries({ queryKey: ["salaries"] })
-      qc.invalidateQueries({ queryKey: ["dashboard"] })
-    },
-    onError: () => toast.error("علامت‌گذاری به‌عنوان پرداخت‌شده ناموفق بود"),
-  })
-
-  // Mark ALL paid records for a user back to unpaid (reverse the bulk pay action).
-  const markAllUnpaidMut = useMutation({
-    mutationFn: async (recordIds: string[]) => {
-      for (const id of recordIds) {
-        await api.patch(`/api/salaries/${id}`, { isPaid: false })
-      }
-    },
-    onSuccess: (_data, recordIds) => {
-      toast.success(
-        `${toPersianDigits(recordIds.length)} رکورد به پرداخت‌نشده برگردانده شد`
-      )
-      qc.invalidateQueries({ queryKey: ["salaries"] })
-      qc.invalidateQueries({ queryKey: ["dashboard"] })
-    },
-    onError: () => toast.error("برگرداندن وضعیت ناموفق بود"),
-  })
-
-  const refreshMut = useMutation({
-    mutationFn: () => api.post<{ created: number; period: string }>("/api/salaries/refresh"),
-    onSuccess: (res) => {
-      toast.success(
-        `تازه‌سازی ماهانه انجام شد — ${toPersianDigits(res.created)} رکورد جدید برای ${periodLabel(res.period)} ساخته شد`
-      )
-      qc.invalidateQueries({ queryKey: ["salaries"] })
-      qc.invalidateQueries({ queryKey: ["dashboard"] })
-    },
-    onError: () => toast.error("تازه‌سازی ماهانه ناموفق بود"),
-  })
-
-  const rows = data ?? []
-  const users = React.useMemo(() => {
-    const map = new Map<string, { id: string; name: string; role: string }>()
-    for (const r of rows) {
-      if (!map.has(r.user.id)) {
-        map.set(r.user.id, { id: r.user.id, name: r.user.name, role: r.user.role })
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [rows])
-
-  // Period options — derive from existing rows + current Jalali month (so the
-  // user can always filter to the current month even if no records exist yet).
-  const periodOptions = React.useMemo(() => {
-    const set = new Set<string>()
-    for (const r of rows) {
-      if (r.period) set.add(r.period)
-    }
-    // Always include the current Jalali month
-    const t = toJalali(new Date())
-    set.add(`${t.jy}-${String(t.jm).padStart(2, "0")}`)
-    return Array.from(set).sort().reverse()
-  }, [rows])
-
-  // Aggregate rows per user (sum amounts, capture paid/unpaid counts + latest paidAt).
-  const userAgg = React.useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        user: { id: string; name: string; role: string }
-        records: SalaryRow[]
-        total: number
-        unpaidTotal: number
-        unpaidCount: number
-        paidCount: number
-        latestPaidAt: string | null
-      }
-    >()
-    for (const r of rows) {
-      const existing = map.get(r.user.id) ?? {
-        user: { id: r.user.id, name: r.user.name, role: r.user.role },
-        records: [] as SalaryRow[],
-        total: 0,
-        unpaidTotal: 0,
-        unpaidCount: 0,
-        paidCount: 0,
-        latestPaidAt: null as string | null,
-      }
-      existing.records.push(r)
-      existing.total += r.amount
-      if (r.isPaid) {
-        existing.paidCount += 1
-        if (r.paidAt && (!existing.latestPaidAt || r.paidAt > existing.latestPaidAt)) {
-          existing.latestPaidAt = r.paidAt
+  // ✅ Settle ALL unsettled entries for a user in one click.
+  const settleAllMut = useMutation({
+    mutationFn: async (entries: SalaryEntry[]) => {
+      for (const e of entries) {
+        if (e.source === "project_salary") {
+          await api.patch(`/api/projects/any/salaries/${e.id}`, { isSettled: true })
+        } else {
+          await api.patch(`/api/salaries/${e.id}`, { isSettled: true })
         }
-      } else {
-        existing.unpaidCount += 1
-        existing.unpaidTotal += r.amount
       }
-      map.set(r.user.id, existing)
-    }
-    return Array.from(map.values()).sort((a, b) => a.user.name.localeCompare(b.user.name))
-  }, [rows])
+    },
+    onSuccess: (_d, entries) => {
+      toast.success(
+        `${toPersianDigits(entries.length)} رکورد به‌عنوان تسویه‌شده علامت‌گذاری شد`
+      )
+      qc.invalidateQueries({ queryKey: ["salaries"] })
+      qc.invalidateQueries({ queryKey: ["dashboard"] })
+    },
+    onError: () => toast.error("تسویه گروهی ناموفق بود"),
+  })
 
-  const unpaidTotal = rows.filter((r) => !r.isPaid).reduce((s, r) => s + r.amount, 0)
+  const groups = data?.users ?? []
+  const totalUnsettled = data?.totalUnsettled ?? 0
 
-  // chart data: unpaid by user
+  // chart data: unsettled by user
   const chartData = React.useMemo(() => {
-    const map = new Map<string, number>()
-    for (const r of rows) {
-      if (r.isPaid) continue
-      map.set(r.user.name, (map.get(r.user.name) ?? 0) + r.amount)
-    }
-    return Array.from(map.entries())
-      .map(([name, amount]) => ({ name, amount }))
+    return groups
+      .map((g) => ({ name: g.user.name, amount: g.totalUnsettled }))
+      .filter((x) => x.amount > 0)
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 8)
-  }, [rows])
+  }, [groups])
 
   const chartColors = ["#0ea5e9", "#a855f7", "#10b981", "#f59e0b", "#ec4899", "#64748b", "#22c55e", "#f43f5e"]
 
@@ -1793,42 +1780,24 @@ function SalariesTab() {
     <div className="space-y-4">
       <Toolbar>
         <Select value={userId} onValueChange={setUserId}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="کاربر" /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="کاربر" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">همه کاربران</SelectItem>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.name} · {ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}
+            <SelectItem value="all">همه کارمندان</SelectItem>
+            {groups.map((u) => (
+              <SelectItem key={u.user.id} value={u.user.id}>
+                {u.user.name} · {ROLE_LABELS[u.user.role as keyof typeof ROLE_LABELS] ?? u.user.role}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={isPaid} onValueChange={setIsPaid}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="وضعیت" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">همه</SelectItem>
-            <SelectItem value="false">پرداخت‌نشده</SelectItem>
-            <SelectItem value="true">پرداخت‌شده</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[170px]"><SelectValue placeholder="دوره" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">همه دوره‌ها</SelectItem>
-            {periodOptions.map((p) => (
-              <SelectItem key={p} value={p}>{periodLabel(p)}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <DateRangeFromTo from={from} to={to} setFrom={setFrom} setTo={setTo} />
         <Button
-          variant="outline"
-          className="gap-1.5 ml-auto"
-          disabled={refreshMut.isPending}
-          onClick={() => refreshMut.mutate()}
+          type="button"
+          variant={onlyUnsettled ? "default" : "outline"}
+          className="h-9 text-xs"
+          onClick={() => setOnlyUnsettled((v) => !v)}
         >
-          <RefreshCw className={cn("h-3.5 w-3.5", refreshMut.isPending && "animate-spin")} />
-          تازه‌سازی ماهانه
+          <Clock className="ml-1 h-3.5 w-3.5" />
+          {onlyUnsettled ? "نمایش همه" : "فقط تسویه‌نشده"}
         </Button>
       </Toolbar>
 
@@ -1836,20 +1805,20 @@ function SalariesTab() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            مجموع پرداخت‌نشده
+            مجموع تسویه‌نشده
           </div>
           <div className="mt-1.5 text-2xl font-semibold tracking-tight">
-            {formatRials(unpaidTotal)} <span className="text-sm text-muted-foreground">تومان</span>
+            {formatRials(totalUnsettled)} <span className="text-sm text-muted-foreground">تومان</span>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {toPersianDigits(rows.filter((r) => !r.isPaid).length)} رکورد در انتظار پرداخت
+            {toPersianDigits(groups.reduce((s, g) => s + g.unsettledCount, 0))} رکورد در انتظار تسویه
           </div>
         </div>
 
         {chartData.length > 0 && (
           <div className="rounded-xl border bg-card p-4">
             <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
-              پرداخت‌نشده بر اساس کاربر
+              تسویه‌نشده بر اساس کارمند
             </div>
             <ResponsiveContainer width="100%" height={120}>
               <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 8, top: 0, bottom: 0 }}>
@@ -1897,8 +1866,8 @@ function SalariesTab() {
             <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow>
                 <TableHead className="w-[40px]" />
-                <TableHead>کاربر</TableHead>
-                <TableHead className="text-right">مجموع مبلغ</TableHead>
+                <TableHead>کارمند</TableHead>
+                <TableHead className="text-right">مجموع تسویه‌نشده</TableHead>
                 <TableHead>تعداد رکورد</TableHead>
                 <TableHead>وضعیت</TableHead>
                 <TableHead className="text-right">عملیات</TableHead>
@@ -1911,33 +1880,40 @@ function SalariesTab() {
                     <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
-              ) : userAgg.length === 0 ? (
+              ) : groups.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6}>
-                    <EmptyState icon="👷" title="رکورد حقوقی وجود ندارد" description="با دکمه «تازه‌سازی ماهانه»، رکوردهای پورسانت پروژه‌های تحویل‌شده این ماه را بسازید." />
+                    <EmptyState icon="👷" title="کارمندی وجود ندارد" description="هنوز کارمندی برای این استودیو ثبت نشده است." />
                   </TableCell>
                 </TableRow>
               ) : (
-                userAgg.map((u) => {
+                groups.map((u) => {
                   const isExpanded = expandedUser === u.user.id
-                  const unpaidIds = u.records.filter((r) => !r.isPaid).map((r) => r.id)
-                  const paidIds = u.records.filter((r) => r.isPaid).map((r) => r.id)
-                  const allPaid = u.unpaidCount === 0
+                  const unsettledEntries = u.entries.filter((e) => !e.isSettled)
+                  const allSettled = u.unsettledCount === 0
                   return (
                     <React.Fragment key={u.user.id}>
-                      <TableRow className="cursor-pointer hover:bg-accent/40" onClick={() => setExpandedUser(isExpanded ? null : u.user.id)}>
+                      <TableRow
+                        className={cn(
+                          "cursor-pointer hover:bg-accent/40",
+                          u.entries.length === 0 && "opacity-60"
+                        )}
+                        onClick={() => u.entries.length > 0 && setExpandedUser(isExpanded ? null : u.user.id)}
+                      >
                         <TableCell className="text-center">
-                          <button
-                            type="button"
-                            aria-label={isExpanded ? "بستن جزئیات" : "باز کردن جزئیات"}
-                            className="text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setExpandedUser(isExpanded ? null : u.user.id)
-                            }}
-                          >
-                            {isExpanded ? "▼" : "◀"}
-                          </button>
+                          {u.entries.length > 0 && (
+                            <button
+                              type="button"
+                              aria-label={isExpanded ? "بستن جزئیات" : "باز کردن جزئیات"}
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setExpandedUser(isExpanded ? null : u.user.id)
+                              }}
+                            >
+                              {isExpanded ? "▼" : "◀"}
+                            </button>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1955,59 +1931,46 @@ function SalariesTab() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm whitespace-nowrap">
-                          <span className="font-semibold">{formatRials(u.unpaidTotal)}</span>
+                          <span className="font-semibold">{formatRials(u.totalUnsettled)}</span>
                           <span className="text-muted-foreground"> تومان</span>
-                          {u.paidCount > 0 && (
+                          {u.settledCount > 0 && (
                             <div className="text-[10px] text-muted-foreground mt-0.5">
-                              کل: {formatRials(u.total)} تومان
+                              کل: {formatRials(u.totalAll)} تومان
                             </div>
                           )}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {toPersianDigits(u.records.length)} رکورد
+                          {toPersianDigits(u.entries.length)} رکورد
                           <div className="text-[10px] mt-0.5">
-                            {toPersianDigits(u.unpaidCount)} پرداخت‌نشده · {toPersianDigits(u.paidCount)} پرداخت‌شده
+                            {toPersianDigits(u.unsettledCount)} باز · {toPersianDigits(u.settledCount)} تسویه
                           </div>
                         </TableCell>
                         <TableCell>
-                          {allPaid ? (
-                            <div>
-                              <Badge variant="secondary" className="text-[10px] gap-1 bg-emerald-500/15 text-emerald-600">
-                                <CheckCircle2 className="h-3 w-3" /> پرداخت‌شده
-                              </Badge>
-                              {u.latestPaidAt && (
-                                <div className="text-[10px] text-muted-foreground mt-0.5">
-                                  پرداخت شده در {formatDate(u.latestPaidAt)}
-                                </div>
-                              )}
-                            </div>
+                          {u.entries.length === 0 ? (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              بدون رکورد
+                            </Badge>
+                          ) : allSettled ? (
+                            <Badge variant="secondary" className="text-[10px] gap-1 bg-emerald-500/15 text-emerald-600">
+                              <CheckCircle2 className="h-3 w-3" /> همگی تسویه
+                            </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] gap-1 text-amber-600 border-amber-500/40">
-                              <Clock className="h-3 w-3" /> در انتظار پرداخت
+                              <Clock className="h-3 w-3" /> در انتظار تسویه
                             </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
-                            {allPaid ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 text-xs text-amber-600 hover:text-amber-700"
-                                disabled={markAllUnpaidMut.isPending}
-                                onClick={() => markAllUnpaidMut.mutate(paidIds)}
-                              >
-                                برگرداندن
-                              </Button>
-                            ) : (
+                            {!allSettled && unsettledEntries.length > 0 && (
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="h-7 px-2 text-xs"
-                                disabled={markAllPaidMut.isPending || unpaidIds.length === 0}
-                                onClick={() => markAllPaidMut.mutate(unpaidIds)}
+                                disabled={settleAllMut.isPending}
+                                onClick={() => settleAllMut.mutate(unsettledEntries)}
                               >
-                                <Check className="h-3.5 w-3.5" /> پرداخت شد
+                                <Check className="h-3.5 w-3.5" /> تسویه همه
                               </Button>
                             )}
                           </div>
@@ -2020,71 +1983,23 @@ function SalariesTab() {
                               <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
                                 جزئیات رکوردها — {u.user.name}
                               </div>
-                              <div className="space-y-1.5">
-                                {u.records.map((r) => (
-                                  <div
-                                    key={r.id}
-                                    className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs"
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <div className="font-medium text-foreground text-sm">
-                                        {r.project.customer} · {r.project.servicePackage}
-                                      </div>
-                                      <div className="text-[10px] text-muted-foreground mt-0.5">
-                                        {ROLE_LABELS[r.ruleUsed.role as keyof typeof ROLE_LABELS] ?? r.ruleUsed.role}
-                                        {" · "}
-                                        {r.ruleUsed.commissionType === "percent"
-                                          ? `${toPersianDigits(r.ruleUsed.commissionValue)}٪`
-                                          : `${formatRialsShort(r.ruleUsed.commissionValue)} تومان`}
-                                        {" · "}
-                                        {APPLY_ON_LABELS[r.ruleUsed.applyOn] ?? r.ruleUsed.applyOn}
-                                        {r.period ? ` · ${periodLabel(r.period)}` : ""}
-                                        {r.isPaid && r.paidAt ? ` · پرداخت شده در ${formatDate(r.paidAt)}` : ""}
-                                      </div>
-                                      {r.note && (
-                                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                                          یادداشت: {r.note}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <span className="font-mono text-sm">
-                                        {formatRials(r.amount)} <span className="text-muted-foreground">تومان</span>
-                                      </span>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                        aria-label="یادداشت"
-                                        onClick={() => { setNoteTarget(r); setNoteOpen(true) }}
-                                      >
-                                        <StickyNote className="h-3.5 w-3.5" />
-                                      </Button>
-                                      {r.isPaid ? (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2 text-xs text-amber-600 hover:text-amber-700"
-                                          disabled={markUnpaidMut.isPending}
-                                          onClick={() => markUnpaidMut.mutate(r.id)}
-                                        >
-                                          برگرداندن
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-7 px-2 text-xs"
-                                          disabled={markPaidMut.isPending}
-                                          onClick={() => markPaidMut.mutate(r.id)}
-                                        >
-                                          <Check className="h-3.5 w-3.5" /> پرداخت
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                              {u.entries.length === 0 ? (
+                                <div className="py-6 text-center text-xs text-muted-foreground">
+                                  هیچ رکورد حقوقی ثبت نشده است.
+                                </div>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {u.entries.map((r) => (
+                                    <SalaryEntryRow
+                                      key={`${r.source}-${r.id}`}
+                                      entry={r}
+                                      onSettle={() => settleMut.mutate(r)}
+                                      onUnsettle={() => unsettleMut.mutate(r)}
+                                      settling={settleMut.isPending || unsettleMut.isPending}
+                                    />
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2097,89 +2012,122 @@ function SalariesTab() {
           </Table>
         </div>
       </div>
-
-      <SalaryNoteDialog
-        open={noteOpen}
-        onOpenChange={setNoteOpen}
-        target={noteTarget}
-        onDone={() => setNoteTarget(null)}
-      />
     </div>
   )
 }
 
-function SalaryNoteDialog({
-  open,
-  onOpenChange,
-  target,
-  onDone,
+// ============================================================
+// SalaryEntryRow — one unified entry (project_salary | salary_record)
+// ============================================================
+const MANUAL_TYPE_LABELS: Record<string, string> = {
+  bonus: "پاداش",
+  penalty: "جریمه",
+  manual_salary: "حقوق دستی",
+}
+const MANUAL_TYPE_COLORS: Record<string, string> = {
+  bonus: "#10b981",
+  penalty: "#ef4444",
+  manual_salary: "#a855f7",
+}
+
+function SalaryEntryRow({
+  entry,
+  onSettle,
+  onUnsettle,
+  settling,
 }: {
-  open: boolean
-  onOpenChange: (o: boolean) => void
-  target: SalaryRow | null
-  onDone: () => void
+  entry: SalaryEntry
+  onSettle: () => void
+  onUnsettle: () => void
+  settling: boolean
 }) {
-  const api = useApi()
-  const qc = useQueryClient()
-  const [note, setNote] = React.useState("")
-  const [saving, setSaving] = React.useState(false)
+  const isProjectSalary = entry.source === "project_salary"
+  const sourceColor = isProjectSalary ? "#0ea5e9" : MANUAL_TYPE_COLORS[entry.manualType ?? "manual_salary"] ?? "#a855f7"
+  const sourceText = isProjectSalary
+    ? "حقوق پروژه"
+    : MANUAL_TYPE_LABELS[entry.manualType ?? "manual_salary"] ?? "دستی"
 
-  React.useEffect(() => {
-    if (open && target) {
-      setNote(target.note ?? "")
-    }
-  }, [open, target])
-
-  const submit = async () => {
-    if (!target) return
-    setSaving(true)
-    try {
-      await api.patch(`/api/salaries/${target.id}`, { note: note.trim() || null })
-      toast.success("یادداشت ذخیره شد")
-      qc.invalidateQueries({ queryKey: ["salaries"] })
-      onOpenChange(false)
-      onDone()
-    } catch {
-      toast.error("ذخیره یادداشت ناموفق بود")
-    } finally {
-      setSaving(false)
-    }
-  }
+  const description = entry.description ?? entry.note ?? null
+  const isNegative = entry.amount < 0
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        onOpenChange(o)
-        if (!o) onDone()
-      }}
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-xs transition-opacity",
+        entry.isSettled && "opacity-50"
+      )}
     >
-      <DialogContent className="sm:max-w-[460px]">
-        <DialogHeader>
-          <DialogTitle>یادداشت حقوق</DialogTitle>
-          <DialogDescription>
-            {target
-              ? `${target.user.name} — ${target.project.customer}`
-              : ""}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2 py-2">
-          <Label>یادداشت (اختیاری)</Label>
-          <Textarea
-            rows={4}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="مثلاً پرداخت در دو قسط، کسر بی‌کاری و غیره"
-          />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+            style={{ background: sourceColor + "22", color: sourceColor }}
+          >
+            {sourceText}
+          </span>
+          {entry.project && (
+            <span className="text-[11px] font-medium text-foreground">
+              {entry.project.title}
+            </span>
+          )}
+          {entry.isSettled && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium text-emerald-600">
+              <CheckCircle2 className="h-2.5 w-2.5" /> تسویه شده
+            </span>
+          )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>انصراف</Button>
-          <Button onClick={submit} disabled={saving}>
-            {saving ? "در حال ذخیره…" : "ذخیره یادداشت"}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+          <span>{formatDateTime(entry.date)}</span>
+          {entry.settledAt && (
+            <span>· تسویه در {formatDate(entry.settledAt)}</span>
+          )}
+          {entry.tags.length > 0 && (
+            <span className="flex items-center gap-1">
+              ·{" "}
+              {entry.tags.map((t, i) => (
+                <span
+                  key={i}
+                  className="rounded bg-muted px-1 py-0.5 text-[9px]"
+                >
+                  {t}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+        {description && (
+          <div className="mt-1 text-[11px] text-foreground/80">{description}</div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={cn("font-mono text-sm", isNegative && "text-rose-600")}>
+          {isNegative ? "−" : ""}
+          {formatRials(Math.abs(entry.amount))}{" "}
+          <span className="text-muted-foreground">تومان</span>
+        </span>
+        {entry.isSettled ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs text-amber-600 hover:text-amber-700"
+            disabled={settling}
+            onClick={onUnsettle}
+          >
+            برداشتن
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10 border-emerald-500/40"
+            disabled={settling}
+            onClick={onSettle}
+          >
+            <Check className="h-3.5 w-3.5" /> تسویه
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -2336,8 +2284,10 @@ function CreditLedgerTab() {
                 <TableHead>مشتری</TableHead>
                 <TableHead>نوع</TableHead>
                 <TableHead className="text-right">مبلغ</TableHead>
-                <TableHead>قرارداد مرتبط</TableHead>
+                <TableHead>معرف</TableHead>
+                <TableHead>پروژه مرتبط</TableHead>
                 <TableHead>یادداشت</TableHead>
+                <TableHead>وضعیت تسویه</TableHead>
                 <TableHead>ایجاد شده توسط</TableHead>
               </TableRow>
             </TableHeader>
@@ -2345,12 +2295,12 @@ function CreditLedgerTab() {
               {isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}><Skeleton className="h-8 w-full" /></TableCell>
+                    <TableCell colSpan={9}><Skeleton className="h-8 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={9}>
                     <EmptyState icon="🎁" title="تراکنش اعتباری وجود ندارد" description="پاداش‌های معرفی و تنظیمات اینجا نمایش داده می‌شوند." />
                   </TableCell>
                 </TableRow>
@@ -2384,11 +2334,51 @@ function CreditLedgerTab() {
                         {" "}
                         <span className="text-muted-foreground">تومان</span>
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {r.referrerCustomerName ? (
+                          <div>
+                            <div className="font-medium text-foreground">{r.referrerCustomerName}</div>
+                            {r.referrerCustomerPhone && (
+                              <div className="text-muted-foreground" dir="ltr">{r.referrerCustomerPhone}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {r.relatedContract ? r.relatedContract.contractNumber : "—"}
+                        {r.relatedProject ? (
+                          <div>
+                            {r.relatedProject.contractNumber && (
+                              <div className="font-medium text-foreground" dir="ltr">
+                                {r.relatedProject.contractNumber}
+                              </div>
+                            )}
+                            {r.relatedProject.packageTitle && (
+                              <div className="text-muted-foreground">{r.relatedProject.packageTitle}</div>
+                            )}
+                          </div>
+                        ) : r.relatedContract ? (
+                          <span dir="ltr">{r.relatedContract.contractNumber}</span>
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[240px]">
                         {r.note || "—"}
+                      </TableCell>
+                      <TableCell>
+                        {r.isSettled ? (
+                          <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/5 text-[10px] text-emerald-700 dark:text-emerald-400">
+                            <Check className="h-3 w-3" />
+                            تسویه شده
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">
+                            <Clock className="ml-0.5 h-3 w-3" />
+                            باز
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {r.createdBy?.name ?? "—"}
@@ -2638,5 +2628,22 @@ function periodLabel(period: string): string {
   const mo = Number(m[2])
   if (mo < 1 || mo > 12) return period
   return `${JALALI_MONTHS[mo - 1]} ${toPersianDigits(y)}`
+}
+
+/**
+ * Format a Date as `YYYY/MM/DD - HH:MM` in Jalali (Persian digits).
+ * Used in the payments list to show both the date and the time the
+ * payment was recorded.
+ */
+function formatPaymentDateAndTime(d: Date | string | null | undefined): string {
+  if (!d) return "—"
+  const date = new Date(d)
+  const { jy, jm, jd } = toJalali(date)
+  const yyyy = toPersianDigits(String(jy))
+  const mm = toPersianDigits(String(jm).padStart(2, "0"))
+  const dd = toPersianDigits(String(jd).padStart(2, "0"))
+  const h = toPersianDigits(String(date.getHours()).padStart(2, "0"))
+  const min = toPersianDigits(String(date.getMinutes()).padStart(2, "0"))
+  return `${yyyy}/${mm}/${dd} - ${h}:${min}`
 }
 

@@ -225,7 +225,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\01-main\\nasim-studio-ERP\\src\\generated\\master-client",
+      "value": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\03-main - Copy\\nasim-studio-ERP\\src\\generated\\master-client",
       "fromEnvVar": null
     },
     "config": {
@@ -239,7 +239,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\01-main\\nasim-studio-ERP\\prisma\\schema-master.prisma",
+    "sourceFilePath": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\03-main - Copy\\nasim-studio-ERP\\prisma\\schema-master.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

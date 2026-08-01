@@ -108,9 +108,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       }
 
       // Track-specific side effects
-      if (nextStage === "running" && track === "photo" && !project.actualStartDatetime) {
-        updateData.actualStartDatetime = now
-      }
+      // (actualStartDatetime/actualEndDatetime removed from schema)
     }
 
     // Compute the overall status from the (potentially updated) track statuses
@@ -144,10 +142,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       }
     }
 
-    // Delivered: set actualEndDatetime + salary automation (only when overall is delivered)
+    // Delivered: salary automation (only when overall is delivered)
     let salaryCreated = 0
     if (overall === "delivered") {
-      if (!project.actualEndDatetime) updateData.actualEndDatetime = now
       // Salary automation (idempotent)
       const activeRules = await db.salaryRule.findMany({ where: { isActive: true } })
       const totalPaid = project.payments.reduce((s, p) => s + Number(p.amount), 0)
@@ -207,8 +204,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       isReadyForDelivery: updated.isReadyForDelivery,
       readyDate: updated.readyDate,
       priceAtReadyTime: updated.priceAtReadyTime ? Number(updated.priceAtReadyTime) : null,
-      actualStartDatetime: updated.actualStartDatetime,
-      actualEndDatetime: updated.actualEndDatetime,
       salaryCreated,
     })
   } catch (e) {
@@ -279,9 +274,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       const newVideo = (updateData.videoStatus as string) || project.videoStatus
       const isMix = project.servicePackage.category === "mix"
       updateData.status = isMix ? overallStatus(newPhoto, newVideo) : overallStatus(newPhoto, null)
-      if (!project.actualStartDatetime && (updateData.photoStatus === "running" || updateData.videoStatus === "running")) {
-        updateData.actualStartDatetime = now
-      }
       await db.project.update({ where: { id }, data: updateData })
     }
 

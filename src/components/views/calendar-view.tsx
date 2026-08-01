@@ -55,7 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -89,6 +89,7 @@ interface CalEvent {
   status: string | null
   team: CalTeamMember[]
   isLeave: boolean
+  isStudio?: boolean
 }
 
 type ViewMode = "month" | "week" | "day"
@@ -117,15 +118,75 @@ function sameLocalDay(a: Date, b: Date) {
     a.getDate() === b.getDate()
   )
 }
+// ✅ Format time in Asia/Tehran timezone explicitly (avoids browser-local-timezone drift
+// when the server stores UTC ISO strings but the client is in a different tz).
+function formatTimeTehran(d: Date | string | null): string {
+  if (!d) return "—"
+  const date = typeof d === "string" ? new Date(d) : d
+  if (Number.isNaN(date.getTime())) return "—"
+  const s = date.toLocaleTimeString("fa-IR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tehran",
+  })
+  // fa-IR uses Persian digits already; normalize 24:00 -> 00:00 just in case.
+  return s.replace("۲۴", "۰۰")
+}
 function formatTime(d: Date | string | null) {
   if (!d) return "—"
-  return fmtTime(d)
+  return formatTimeTehran(d)
+}
+
+// ✅ Extract the hour:minute in Asia/Tehran timezone as a JS Date-like tuple
+// (used for the hour-grid positioning of events in the calendar so they line
+// up with the user's Tehran-time expectations regardless of the browser tz).
+function getTehranHourMinute(d: Date | string | null): { h: number; m: number } | null {
+  if (!d) return null
+  const date = typeof d === "string" ? new Date(d) : d
+  if (Number.isNaN(date.getTime())) return null
+  // Use Intl to get the Tehran-time "HH:MM" string, then parse.
+  const s = date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tehran",
+  })
+  const [h, m] = s.split(":").map(Number)
+  return { h: h === 24 ? 0 : h, m: m ?? 0 }
 }
 function toLocalInputValue(d: Date | string | null) {
   if (!d) return ""
   const date = typeof d === "string" ? new Date(d) : d
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  // ✅ Use Tehran-time components so the datetime-local input shows the correct
+  // Tehran wall-clock time even when the browser is in another timezone.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Tehran",
+  }).formatToParts(date)
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00"
+  // Intl can return "24" for midnight in some browsers; normalize.
+  const hour = get("hour") === "24" ? "00" : get("hour")
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`
+}
+
+// ✅ Returns the Tehran-time YYYY-MM-DD for a date (used as a stable day-bucket key
+// so events land in the same calendar cell regardless of the browser's timezone).
+function tehranDayKey(d: Date | string | null): string | null {
+  if (!d) return null
+  const date = typeof d === "string" ? new Date(d) : d
+  if (Number.isNaN(date.getTime())) return null
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Tehran",
+  }).format(date)
 }
 function initials(first: string, last: string) {
   return (first[0] ?? "") + (last[0] ?? "")
@@ -143,9 +204,10 @@ function isFriday(greg: Date) {
 const WEEK_HEADER = [6, 0, 1, 2, 3, 4, 5].map((i) => PERSIAN_WEEKDAYS_SHORT[i])
 const WEEK_HEADER_FULL = [6, 0, 1, 2, 3, 4, 5].map((i) => PERSIAN_WEEKDAYS[i])
 
-// Hour columns: 5:00 → 23:00
+// Hour columns: 5:00 → 24:00 (midnight)
+// 24 represents midnight (24:00 / 00:00 next day) and is displayed as "۲۴:۰۰".
 const HOUR_START = 5
-const HOUR_END = 23
+const HOUR_END = 24
 const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i)
 const HOUR_COL_PX = 64 // min width per hour column
 
@@ -162,7 +224,8 @@ export function CalendarView() {
   const [teamMemberId, setTeamMemberId] = React.useState<string>("")
   const [statusFilter, setStatusFilter] = React.useState<string[]>([])
   const [categoryFilter, setCategoryFilter] = React.useState<string[]>([])
-  const [showLeaves, setShowLeaves] = React.useState(true)
+  // ✅ Leaves toggle removed — replaced with the studio filter checkbox below.
+  const [studioOnly, setStudioOnly] = React.useState(false)
   const [selectedEvent, setSelectedEvent] = React.useState<CalEvent | null>(null)
 
   const range = React.useMemo(() => {
@@ -191,14 +254,21 @@ export function CalendarView() {
     if (teamMemberId) params.set("teamMemberId", teamMemberId)
     if (statusFilter.length) params.set("status", statusFilter.join(","))
     if (categoryFilter.length) params.set("category", categoryFilter.join(","))
-    params.set("includeLeaves", String(showLeaves))
+    // ✅ Leaves are no longer requested by default (removed filter toggle).
+    // If we ever want them back, set includeLeaves=true here.
     return params.toString()
-  }, [range, teamMemberId, statusFilter, categoryFilter, showLeaves])
+  }, [range, teamMemberId, statusFilter, categoryFilter])
 
   const { data: events = [], isLoading } = useQuery<CalEvent[]>({
     queryKey: ["calendar-events", queryString, role],
     queryFn: () => api.get<CalEvent[]>(`/api/calendar/events?${queryString}`),
   })
+
+  // ✅ Client-side studio filter: when checked, only show events whose `isStudio === true`.
+  const visibleEvents = React.useMemo(() => {
+    if (!studioOnly) return events
+    return events.filter((e) => e.isStudio === true)
+  }, [events, studioOnly])
 
   const { data: users = [] } = useQuery<
     { id: string; firstName: string; lastName: string; role: string }[]
@@ -217,14 +287,16 @@ export function CalendarView() {
 
   const eventsByDay = React.useMemo(() => {
     const map = new Map<string, CalEvent[]>()
-    for (const ev of events) {
+    for (const ev of visibleEvents) {
       if (!ev.start) continue
-      const key = startOfDayLocal(new Date(ev.start)).toDateString()
+      // ✅ Use Tehran-day key so events land on the correct calendar cell regardless
+      // of the browser's local timezone.
+      const key = tehranDayKey(ev.start) ?? startOfDayLocal(new Date(ev.start)).toDateString()
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(ev)
     }
     return map
-  }, [events])
+  }, [visibleEvents])
 
   const periodLabel = React.useMemo(() => {
     if (viewMode === "month") {
@@ -258,6 +330,16 @@ export function CalendarView() {
   }
   function toggleCategory(c: string) {
     setCategoryFilter((p) => (p.includes(c) ? p.filter((x) => x !== c) : [...p, c]))
+  }
+
+  // ✅ When clicking on an event with a projectId, navigate directly to the project
+  // detail page. Leaves (no projectId) still open the dialog.
+  function handleEventClick(ev: CalEvent) {
+    if (ev.projectId) {
+      openProject(ev.projectId)
+      return
+    }
+    setSelectedEvent(ev)
   }
 
   return (
@@ -409,8 +491,15 @@ export function CalendarView() {
           </Popover>
 
           <div className="flex items-center gap-1.5 rounded-md border px-2 py-1">
-            <Switch checked={showLeaves} onCheckedChange={setShowLeaves} />
-            <span className="text-xs">مرخصی‌ها</span>
+            <Checkbox
+              id="studio-only-filter"
+              checked={studioOnly}
+              onCheckedChange={(v) => setStudioOnly(Boolean(v))}
+              className="size-3.5"
+            />
+            <label htmlFor="studio-only-filter" className="cursor-pointer text-xs select-none">
+              فیلتر آتلیه
+            </label>
           </div>
         </div>
       </div>
@@ -446,7 +535,7 @@ export function CalendarView() {
               eventsByDay={eventsByDay}
               cursor={cursor}
               holidays={holidays}
-              onEventClick={setSelectedEvent}
+              onEventClick={handleEventClick}
               onDayClick={(d) => {
                 setCursor(d)
                 setViewMode("day")
@@ -457,14 +546,14 @@ export function CalendarView() {
               eventsByDay={eventsByDay}
               days={Array.from({ length: 7 }, (_, i) => addDays(startOfPersianWeek(cursor), i))}
               holidays={holidays}
-              onEventClick={setSelectedEvent}
+              onEventClick={handleEventClick}
             />
           ) : (
             <RowDayListView
               eventsByDay={eventsByDay}
               days={[cursor]}
               holidays={holidays}
-              onEventClick={setSelectedEvent}
+              onEventClick={handleEventClick}
             />
           )}
         </div>
@@ -682,7 +771,7 @@ function MonthView({
           const isToday =
             inMonth && todayJ.jy === cursorJ.jy && todayJ.jm === cell.jm && todayJ.jd === cell.jd
           const d = cell.greg
-          const dayKey = d ? startOfDayLocal(d).toDateString() : `empty-${i}`
+          const dayKey = d ? (tehranDayKey(d) ?? `empty-${i}`) : `empty-${i}`
           const dayEvents = eventsByDay.get(dayKey) ?? []
           const visible = dayEvents.slice(0, 3)
           const overflow = dayEvents.length - visible.length
@@ -780,21 +869,28 @@ function RowDayListView({
   onEventClick: (e: CalEvent) => void
 }) {
   const today = new Date()
+  // ✅ Grid template shared by the header, the day-label row, the empty row,
+  // and every customer sub-row. First column = 180px (day/customer name),
+  // then one column per hour (5..24).
+  const gridTemplate = `180px repeat(${HOURS.length}, minmax(${HOUR_COL_PX}px, 1fr))`
   return (
     <div className="overflow-x-auto overflow-y-auto rounded-xl border bg-card shadow-sm scroll-thin" style={{ maxHeight: "70vh" }}>
       <div className="min-w-[760px]">
         {/* Hour header row — sticky at top so hours stay visible while scrolling */}
         <div
           className="grid border-b bg-muted/95 backdrop-blur sticky top-0 z-20"
-          style={{ gridTemplateColumns: `180px repeat(${HOURS.length}, minmax(${HOUR_COL_PX}px, 1fr))` }}
+          style={{ gridTemplateColumns: gridTemplate }}
         >
           <div className="border-l px-2 py-2 text-[11px] font-semibold text-muted-foreground">
             روز / ساعت
           </div>
-          {HOURS.map((h) => (
+          {HOURS.map((h, i) => (
             <div
               key={h}
-              className="border-l px-1 py-2 text-center text-[11px] font-medium text-muted-foreground last:border-l-0"
+              className={cn(
+                "border-l px-1 py-2 text-center text-[11px] font-medium text-muted-foreground last:border-l-0",
+                i % 2 === 1 && "bg-muted/40"
+              )}
             >
               {toPersianDigits(String(h).padStart(2, "0"))}:۰۰
             </div>
@@ -803,7 +899,7 @@ function RowDayListView({
 
         {/* Day rows */}
         {days.map((day, di) => {
-          const dayKey = startOfDayLocal(day).toDateString()
+          const dayKey = tehranDayKey(day) ?? startOfDayLocal(day).toDateString()
           const dayEvents = eventsByDay.get(dayKey) ?? []
           const isToday = sameLocalDay(day, today)
           const dj = toJalali(day)
@@ -825,13 +921,15 @@ function RowDayListView({
               className={cn(
                 "border-b last:border-b-0",
                 isToday && "bg-primary/5",
-                isOff && "bg-rose-500/5"
+                isOff && "bg-rose-500/5",
+                // ✅ Alternating row background for plain days (subtle striping).
+                !isToday && !isOff && di % 2 === 1 && "bg-muted/20"
               )}
             >
               {/* Day label row */}
               <div
-                className="grid items-center border-b bg-muted/20"
-                style={{ gridTemplateColumns: `180px repeat(${HOURS.length}, minmax(${HOUR_COL_PX}px, 1fr))` }}
+                className="grid items-center border-b bg-muted/30"
+                style={{ gridTemplateColumns: gridTemplate }}
               >
                 <div className="border-l px-2 py-2">
                   <div className={cn("text-xs font-semibold", isOff ? "text-rose-500" : "")}>
@@ -841,17 +939,22 @@ function RowDayListView({
                     {isToday ? "امروز" : holiday ? holiday.title.slice(0, 18) : friday ? "جمعه" : ""}
                   </div>
                 </div>
-                <div className="col-span-full" />
+                {/* ✅ FIX: was `col-span-full` (= grid-column: 1/-1) which made this
+                    filler wrap to a new row, leaving the hour cells visually empty
+                    on the day-label row. Now explicitly starts at column 2 and spans
+                    to the end so it sits to the RIGHT of the day-name column. */}
+                <div style={{ gridColumn: "2 / -1" }} />
               </div>
 
               {/* Customer sub-rows (or a single empty row if no events) */}
               {customerGroups.length === 0 ? (
                 <div
                   className="grid h-10 items-center text-[11px] text-muted-foreground"
-                  style={{ gridTemplateColumns: `180px repeat(${HOURS.length}, minmax(${HOUR_COL_PX}px, 1fr))` }}
+                  style={{ gridTemplateColumns: gridTemplate }}
                 >
                   <div className="border-l px-2 text-muted-foreground/60">بدون رویداد</div>
-                  <div className="col-span-full" />
+                  {/* ✅ FIX: same as above — start at column 2 instead of col-span-full. */}
+                  <div style={{ gridColumn: "2 / -1" }} className="border-l" />
                 </div>
               ) : (
                 customerGroups.map(([customer, evs]) => (
@@ -898,44 +1001,60 @@ function CustomerSubRow({
           ({toPersianDigits(events.length)})
         </span>
       </div>
-      {/* Hour cells with absolutely-positioned events */}
-      <div className="relative col-span-full" style={{ height: 44 }}>
-        {/* hour grid lines */}
+      {/* ✅ FIX: was `col-span-full` (= grid-column: 1/-1) which forced this hour
+          cells div to wrap to a brand-new grid row spanning ALL columns (including
+          the 180px customer-label column). That made every absolutely-positioned
+          event render shifted to the right by ~180px (events at hour 5 appeared
+          over the customer name instead of at the 05:00 column).
+
+          Now we explicitly start at column 2 and span to the end, so the hour
+          cells div sits exactly over the 20 hour columns (5..24), and the
+          leftPct/widthPct math (`((startH - HOUR_START) / HOURS.length) * 100`)
+          aligns perfectly with the visible hour grid. */}
+      <div className="relative" style={{ gridColumn: "2 / -1", height: 44 }}>
+        {/* hour grid lines — RTL: استفاده از right به جای left */}
         {HOURS.map((h, i) => (
           <div
             key={h}
-            className={cn("absolute top-0 bottom-0 border-l", i === 0 && "border-l-0")}
-            style={{ left: `${(i / HOURS.length) * 100}%`, width: `${100 / HOURS.length}%` }}
+            className={cn(
+              "absolute top-0 bottom-0 border-r border-muted-foreground/10",
+              i === 0 && "border-r-0",
+              i % 2 === 1 && "bg-muted/30"
+            )}
+            style={{ right: `${(i / HOURS.length) * 100}%`, width: `${100 / HOURS.length}%` }}
           />
         ))}
-        {/* events */}
+        {/* events — RTL: محاسبه از راست */}
         {events.map((ev) => {
-          const start = ev.start ? new Date(ev.start) : null
-          const end = ev.end ? new Date(ev.end) : null
-          if (!start) return null
-          let startH = start.getHours() + start.getMinutes() / 60
-          let endH = end ? end.getHours() + end.getMinutes() / 60 : startH + 1
-          // clamp to visible window
+          const startHM = ev.start ? getTehranHourMinute(ev.start) : null
+          const endHM = ev.end ? getTehranHourMinute(ev.end) : null
+          if (!startHM) return null
+          let startH = startHM.h + startHM.m / 60
+          let endH = endHM ? endHM.h + endHM.m / 60 : startH + 1
+          if (endHM && endHM.h === 0 && startHM.h > 0) endH = 24
           const clampedStart = Math.max(startH, HOUR_START)
-          const clampedEnd = Math.min(endH, HOUR_END + 1)
+          const clampedEnd = Math.min(endH, HOUR_END)
           if (clampedEnd <= clampedStart) return null
-          const leftPct = ((clampedStart - HOUR_START) / HOURS.length) * 100
+          // ✅ RTL: right به جای left — ساعت ۵ در راست، ساعت ۲۴ در چپ
+          const rightPct = ((clampedStart - HOUR_START) / HOURS.length) * 100
           const widthPct = ((clampedEnd - clampedStart) / HOURS.length) * 100
           const evColor = eventColor(ev)
           return (
             <button
               key={ev.id}
               onClick={() => onEventClick(ev)}
-              className="absolute top-1 bottom-1 overflow-hidden rounded-md border-r-2 px-1.5 py-0.5 text-right text-[10px] leading-tight shadow-sm hover:z-10 hover:scale-y-105 transition-transform"
+              className="absolute top-1 bottom-1 overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 text-right text-[10px] leading-tight shadow-sm hover:z-10 transition-transform"
               style={{
-                left: `${leftPct}%`,
+                right: `${rightPct}%`,
                 width: `${widthPct}%`,
                 background: evColor.bg,
-                borderRightColor: evColor.border,
+                borderLeftColor: evColor.border,
               }}
               title={ev.packageTitle}
             >
-              <div className="truncate font-semibold">{ev.packageTitle}</div>
+              <div className="truncate font-semibold" style={{ color: evColor.border }}>
+                {ev.packageTitle}
+              </div>
               <div className="truncate text-[9px] text-muted-foreground">
                 {formatTime(ev.start)} – {formatTime(ev.end)}
               </div>

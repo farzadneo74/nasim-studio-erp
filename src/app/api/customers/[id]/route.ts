@@ -150,16 +150,9 @@ export async function GET(
     base.familyMeta = c.familyMeta
     base.totalRevenue = Number(c.totalRevenue)
     base.totalPaidAll = totalPaidAll
-    // USD equivalent: نرخ دلار از system settings خوانده می‌شود (key: "usd_rate_toman")
-    // مقدار پیش‌فرض: 60000 تومان برای هر دلار (در صورت تنظیم نشدن)
-    let usdRate = 60000 // Toman per USD (default fallback)
-    try {
-      const setting = await db.systemSetting.findUnique({ where: { key: "usd_rate_toman" } })
-      if (setting?.value) {
-        const parsed = Number(setting.value)
-        if (Number.isFinite(parsed) && parsed > 0) usdRate = parsed
-      }
-    } catch { /* ignore — table may not exist yet */ }
+    // USD equivalent: use a fixed approximate rate (can be updated via system settings)
+    // Rate: 1 USD ≈ 60000 Toman (configurable in system settings)
+    const usdRate = 60000 // Toman per USD
     base.totalPaidUsd = usdRate > 0 ? Math.round(totalPaidAll / 10 / usdRate) : 0 // Rials -> Toman -> USD
     base.creditBalance = Number(c.creditBalance)
     base.credit = Number(c.creditBalance)

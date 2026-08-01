@@ -148,7 +148,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await getCurrentStudioUserId()
+  const userId = await getCurrentUserId(db, role)
   if (!userId) {
     return NextResponse.json({ error: "کاربر فعال یافت نشد" }, { status: 400 })
   }
@@ -298,7 +298,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   // دریافت دیتابیس استودیوی فعال
   const db = await getCurrentStudioDb()
   if (!db) return NextResponse.json({ error: "استودیو انتخاب نشده" }, { status: 400 })
-  const userId = await getCurrentStudioUserId()
+  const userId = await getCurrentUserId(db, role)
   if (!userId) {
     return NextResponse.json({ error: "کاربر فعال یافت نشد" }, { status: 400 })
   }

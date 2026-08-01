@@ -132,6 +132,9 @@ export async function GET(req: Request) {
       priceAtReadyTime: p.priceAtReadyTime,
       packageCurrentPrice: p.servicePackage.currentPrice,
       totalConfirmedPaid: totalPaid,
+      // ✅ اصلاح قیمت و تخفیف — روی قیمت «زنده» اعمال می‌شوند
+      priceAdjustment: (p as any).priceAdjustment ?? 0,
+      discountAmount: (p as any).discountAmount ?? 0,
     })
 
     const team = [
@@ -190,6 +193,20 @@ interface SmsAssignmentInput {
   offsetDaysOverride?: number | null
 }
 
+interface ScheduleInput {
+  locationId?: string | null
+  address?: string | null
+  startDatetime?: string | null
+  endDatetime?: string | null
+  note?: string | null
+  order?: number
+}
+
+interface CustomItemInput {
+  name?: string
+  price?: number
+}
+
 interface CreateBody {
   customerId?: string
   newCustomer?: {
@@ -210,6 +227,10 @@ interface CreateBody {
   referralCode?: string
   manualDiscount?: number
   discountAmount?: number // Toman (will be converted to Rials × 10)
+  priceAdjustment?: number // Toman (positive = increase, negative = decrease)
+  referralRewardOverride?: number | null // Toman (null = use package default)
+  projectAddress?: string
+  projectLocationId?: string | null
   startDatetime?: string
   endDatetime?: string
   deliveryDeadline?: string
@@ -217,12 +238,16 @@ interface CreateBody {
   studioTeamIds?: string[]
   printedDescription?: string
   customDescription?: string
-  customTasks?: string[]
-  customEquipment?: string[]
+  // ✅ Tasks/equipment — accept both legacy string arrays and {name, price} object arrays.
+  customTasks?: (string | CustomItemInput)[]
+  customEquipment?: (string | CustomItemInput)[]
   isPriceFrozen?: boolean
   pricingStrategy?: string
-  priceAdjustment?: number // Toman (will be converted to Rials × 10) — adjustment to base price
   smsAssignments?: SmsAssignmentInput[]
+  // ✅ ProjectSchedules — multi-location/multi-time entries to create alongside the project.
+  schedules?: ScheduleInput[]
+  // ✅ آتلیه — این پروژه در آتلیه استودیو انجام می‌شود
+  isStudio?: boolean
   // contract
   createNewContract?: boolean
   existingContractId?: string
@@ -339,6 +364,25 @@ export async function POST(req: Request) {
   const adjustedBasePrice = Math.max(0, basePrice + priceAdjustmentRials)
   const calculatedPrice = Math.max(0, adjustedBasePrice - discountRials)
 
+  // ✅ سود معرف override — Toman (از UI) → Rials (در DB). null = از پکیج استفاده کن.
+  let referralRewardOverrideRials: number | null = null
+  if (body.referralRewardOverride !== undefined && body.referralRewardOverride !== null) {
+    const v = Number(body.referralRewardOverride)
+    if (Number.isFinite(v) && v > 0) {
+      referralRewardOverrideRials = v * 10
+    }
+  }
+
+  // ✅ آدرس و مکان اجرای پروژه
+  const projectAddress =
+    typeof body.projectAddress === "string" && body.projectAddress.trim()
+      ? body.projectAddress.trim()
+      : null
+  const projectLocationId =
+    typeof body.projectLocationId === "string" && body.projectLocationId.trim()
+      ? body.projectLocationId.trim()
+      : null
+
   // --- Referral code validation ---
   let referralCodeId: string | null = null
   let referrerId: string | null = null
@@ -380,13 +424,34 @@ export async function POST(req: Request) {
   }
 
   // --- Tasks (from customTasks or default from package) ---
+  // ✅ Accept both legacy string arrays and {name, price} object arrays.
+  function normalizeItems(arr: unknown[] | undefined): { name: string; price: number }[] {
+    if (!Array.isArray(arr)) return []
+    return arr
+      .map((t) => {
+        if (typeof t === "string") return { name: t.trim(), price: 0 }
+        if (t && typeof t === "object") {
+          return { name: String((t as any).name ?? "").trim(), price: Number((t as any).price ?? 0) || 0 }
+        }
+        return null
+      })
+      .filter((t): t is { name: string; price: number } => !!t && t.name.length > 0)
+  }
+
+  const customTasksNormalized = normalizeItems(body.customTasks as unknown[] | undefined)
+  const customEquipmentNormalized = normalizeItems(body.customEquipment as unknown[] | undefined)
+
   let defaultTasks: string[] = []
-  if (Array.isArray(body.customTasks) && body.customTasks.length > 0) {
-    defaultTasks = body.customTasks.filter((t) => typeof t === "string" && t.trim())
+  if (customTasksNormalized.length > 0) {
+    defaultTasks = customTasksNormalized.map((t) => t.name)
   } else {
     try {
       defaultTasks = JSON.parse(pkg.defaultTasks || "[]")
       if (!Array.isArray(defaultTasks)) defaultTasks = []
+      // Normalize: objects → name; strings → as-is.
+      defaultTasks = defaultTasks
+        .map((t: any) => typeof t === "string" ? t : (t && typeof t === "object" ? String(t.name ?? "") : ""))
+        .filter((s: string) => s.trim().length > 0)
     } catch {
       defaultTasks = []
     }
@@ -403,13 +468,24 @@ export async function POST(req: Request) {
         lockedPrice: null,
         isPriceFrozen: Boolean(body.isPriceFrozen) && (role === "admin" || role === "manager"),
         discountAmount: discountRials,
+        // ✅ ذخیره اصلاح قیمت و سود معرف override
+        priceAdjustment: priceAdjustmentRials,
+        referralRewardOverride: referralRewardOverrideRials,
+        // ✅ ذخیره آدرس و مکان اجرا
+        projectAddress,
+        projectLocationId,
         startDatetime: body.startDatetime ? new Date(body.startDatetime) : null,
         endDatetime: body.endDatetime ? new Date(body.endDatetime) : null,
         deliveryDeadline: body.deliveryDeadline ? new Date(body.deliveryDeadline) : null,
         status: "scheduled",
         printedDescription: body.customDescription || body.printedDescription || pkg.defaultDescription,
+        // ✅ Per-project task/equipment overrides (stored as JSON; empty array = use package defaults)
+        customTasksJson: JSON.stringify(customTasksNormalized),
+        customEquipmentJson: JSON.stringify(customEquipmentNormalized),
         fieldTeam: body.fieldTeamIds?.length ? { connect: body.fieldTeamIds.map((id) => ({ id })) } : undefined,
         studioTeam: body.studioTeamIds?.length ? { connect: body.studioTeamIds.map((id) => ({ id })) } : undefined,
+        // ✅ آتلیه — flag for studio-shoot projects
+        isStudio: Boolean(body.isStudio),
       },
     })
 
@@ -423,6 +499,60 @@ export async function POST(req: Request) {
           order: i,
         })),
       })
+    }
+
+    // ✅ Create ProjectSchedule entries (multi-location/multi-time)
+    if (Array.isArray(body.schedules) && body.schedules.length > 0) {
+      const validSchedules = body.schedules.filter(
+        (s) => s && typeof s === "object" && (
+          (s.locationId && typeof s.locationId === "string" && s.locationId.trim()) ||
+          (s.address && typeof s.address === "string" && s.address.trim()) ||
+          s.startDatetime ||
+          s.endDatetime ||
+          (s.note && typeof s.note === "string" && s.note.trim())
+        )
+      )
+      // Validate any locationIds exist (skip invalid ones rather than failing)
+      const locationIds = Array.from(new Set(
+        validSchedules
+          .map((s) => (typeof s.locationId === "string" ? s.locationId.trim() : ""))
+          .filter((id) => id.length > 0)
+      ))
+      let validLocationIds = new Set<string>()
+      if (locationIds.length > 0) {
+        try {
+          const locs = await tx.projectLocation.findMany({
+            where: { id: { in: locationIds } },
+            select: { id: true },
+          })
+          validLocationIds = new Set(locs.map((l) => l.id))
+        } catch { /* ignore */ }
+      }
+      const scheduleCreates: Promise<unknown>[] = validSchedules
+        .map((s, idx): Promise<unknown> | null => {
+          const lid = typeof s.locationId === "string" && s.locationId.trim() ? s.locationId.trim() : null
+          const safeLid = lid && validLocationIds.has(lid) ? lid : null
+          const address = typeof s.address === "string" && s.address.trim() ? s.address.trim() : null
+          const startD = s.startDatetime ? new Date(s.startDatetime) : null
+          const endD = s.endDatetime ? new Date(s.endDatetime) : null
+          const note = typeof s.note === "string" && s.note.trim() ? s.note.trim() : null
+          const order = typeof s.order === "number" ? s.order : idx
+          // Skip if no useful data at all
+          if (!safeLid && !address && !startD && !endD && !note) return null
+          return tx.projectSchedule.create({
+            data: {
+              projectId: proj.id,
+              locationId: safeLid,
+              address,
+              startDatetime: startD && !Number.isNaN(startD.getTime()) ? startD : null,
+              endDatetime: endD && !Number.isNaN(endD.getTime()) ? endD : null,
+              note,
+              order,
+            },
+          }).catch(() => null) as Promise<unknown>
+        })
+        .filter((p): p is Promise<unknown> => p !== null)
+      await Promise.all(scheduleCreates)
     }
 
     // SMS assignments: create ProjectSmsAssignment rows for enabled automations

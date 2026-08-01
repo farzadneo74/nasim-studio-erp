@@ -36,37 +36,87 @@ export async function GET(req: Request) {
       customer: true,
       relatedContract: true,
       createdBy: true,
+      // ✅ اطلاعات پروژه مرتبط
+      relatedProject: {
+        select: {
+          id: true,
+          contract: { select: { contractNumber: true } },
+          servicePackage: { select: { title: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   })
 
+  // ✅ Batch-lookup referrer customers to avoid N+1 queries.
+  const referrerIds = Array.from(
+    new Set(
+      txs
+        .map((t) => (t as any).referrerCustomerId)
+        .filter((rid): rid is string => typeof rid === "string" && rid.length > 0)
+    )
+  )
+  const referrerMap = new Map<string, { id: string; name: string; phone: string }>()
+  if (referrerIds.length > 0) {
+    try {
+      const referrers = await db.customer.findMany({
+        where: { id: { in: referrerIds } },
+        select: { id: true, name: true, phone: true },
+      })
+      for (const r of referrers) {
+        referrerMap.set(r.id, { id: r.id, name: r.name, phone: r.phone })
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return NextResponse.json(
-    txs.map((t) => ({
-      id: t.id,
-      customerId: t.customerId,
-      amount: Number(t.amount),
-      transactionType: t.transactionType,
-      note: t.note,
-      createdAt: t.createdAt,
-      customer: {
-        id: t.customer.id,
-        name: t.customer.name,
-        phone: t.customer.phone,
-        creditBalance: Number(t.customer.creditBalance),
-      },
-      relatedContract: t.relatedContract
-        ? {
-            id: t.relatedContract.id,
-            contractNumber: t.relatedContract.contractNumber,
-          }
-        : null,
-      createdBy: t.createdBy
-        ? {
-            id: t.createdBy.id,
-            name: `${t.createdBy.firstName} ${t.createdBy.lastName}`,
-          }
-        : null,
-    }))
+    txs.map((t) => {
+      const refId = (t as any).referrerCustomerId as string | null
+      const ref = refId ? referrerMap.get(refId) ?? null : null
+      const proj = (t as any).relatedProject
+      return {
+        id: t.id,
+        customerId: t.customerId,
+        amount: Number(t.amount),
+        transactionType: t.transactionType,
+        note: t.note,
+        createdAt: t.createdAt,
+        isSettled: (t as any).isSettled ?? false,
+        settledAt: (t as any).settledAt ?? null,
+        customer: {
+          id: t.customer.id,
+          name: t.customer.name,
+          phone: t.customer.phone,
+          creditBalance: Number(t.customer.creditBalance),
+        },
+        // ✅ اطلاعات معرف و پروژه مرتبط
+        referrerCustomerId: refId ?? null,
+        referrerCustomerName: ref?.name ?? null,
+        referrerCustomerPhone: ref?.phone ?? null,
+        relatedProjectId: (t as any).relatedProjectId ?? null,
+        relatedProject: proj
+          ? {
+              id: proj.id,
+              contractNumber: proj.contract?.contractNumber ?? null,
+              packageTitle: proj.servicePackage?.title ?? null,
+            }
+          : null,
+        relatedContract: t.relatedContract
+          ? {
+              id: t.relatedContract.id,
+              contractNumber: t.relatedContract.contractNumber,
+            }
+          : null,
+        createdBy: t.createdBy
+          ? {
+              id: t.createdBy.id,
+              name: `${t.createdBy.firstName} ${t.createdBy.lastName}`,
+            }
+          : null,
+      }
+    })
   )
 }
 

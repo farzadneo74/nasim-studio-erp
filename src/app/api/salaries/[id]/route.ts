@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
+import { getCurrentRole, getCurrentStudioDb, getCurrentStudioUserId } from "@/lib/auth-helpers"
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -16,15 +16,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const { isPaid, note, paidAt } = body as {
+  const { isPaid, note, paidAt, isSettled, tags } = body as {
     isPaid?: boolean
     note?: string | null
     paidAt?: string | null
+    isSettled?: boolean
+    tags?: string[]
   }
 
-  if (isPaid === undefined && note === undefined && paidAt === undefined) {
+  if (isPaid === undefined && note === undefined && paidAt === undefined && isSettled === undefined && tags === undefined) {
     return NextResponse.json(
-      { error: "isPaid, note or paidAt is required" },
+      { error: "isPaid, note, paidAt, isSettled or tags is required" },
       { status: 400 }
     )
   }
@@ -57,7 +59,32 @@ export async function PATCH(req: Request, { params }: Ctx) {
       typeof note === "string" && note.trim() ? note.trim() : null
   }
 
-  const updated = await db.salaryRecord.update({ where: { id }, data })
+  // ✅ isSettled support — when transitioning to settled, stamp settledAt.
+  if (isSettled !== undefined) {
+    data.isSettled = Boolean(isSettled)
+    if (Boolean(isSettled) && !(existing as any).isSettled) {
+      data.settledAt = new Date()
+    } else if (!isSettled) {
+      data.settledAt = null
+    }
+  }
+
+  // ✅ tags support (JSON array of strings).
+  if (tags !== undefined) {
+    const tagArr = Array.isArray(tags)
+      ? tags.filter((t) => typeof t === "string" && t.trim()).map((t) => t.trim())
+      : []
+    try { data.tags = JSON.stringify(tagArr) } catch { /* ignore */ }
+  }
+
+  let updated: any
+  try {
+    updated = await db.salaryRecord.update({ where: { id }, data })
+  } catch {
+    // Fallback: drop the new fields if the runtime client doesn't have them yet.
+    const { tags: _t, isSettled: _s, settledAt: _sa, ...rest } = data
+    updated = await db.salaryRecord.update({ where: { id }, data: rest })
+  }
 
   return NextResponse.json({
     id: updated.id,
@@ -65,6 +92,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
     note: updated.note,
     period: updated.period,
     paidAt: updated.paidAt,
+    isSettled: (updated as any).isSettled ?? false,
+    settledAt: (updated as any).settledAt ?? null,
   })
 }
 

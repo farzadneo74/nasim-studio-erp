@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
+import { getCurrentRole, getCurrentStudioDb, getCurrentStudioUserId } from "@/lib/auth-helpers"
 import { TECHNICAL_ROLES } from "@/lib/constants"
 
 /**
@@ -11,9 +11,11 @@ import { TECHNICAL_ROLES } from "@/lib/constants"
  *   category          — comma-separated PackageCategory list (photo|video|mix)
  *   includeLeaves     — "true" to also return approved LeaveRequest rows as grey events
  *
- * RBAC: all roles can view. Technical roles (photographer/editor/qc/logistics) see
- * only projects where someone of their role is on the team (demo stand-in for
- * "their own projects" since the demo role switcher has no user identity).
+ * RBAC:
+ *   - admin/manager/sales: see ALL events in the studio.
+ *   - Technical roles (photographer/videographer/pro_crew/editor/film_editor):
+ *     see only events for projects where they are in the fieldTeam. Falls back to
+ *     "first user of this role" if we can't resolve the studio user (demo mode).
  */
 export async function GET(req: NextRequest) {
   const role = await getCurrentRole()
@@ -67,12 +69,18 @@ export async function GET(req: NextRequest) {
     ]
   }
 
-  // For technical roles, narrow to projects where someone of their role is on a team
+  // ✅ For technical roles: narrow to projects where the CURRENT user is in the
+  // fieldTeam. If we can't resolve the studio user id (e.g. all-studios mode),
+  // fall back to "first user of this role" for demo compatibility.
   if ((TECHNICAL_ROLES as readonly string[]).includes(role)) {
-    where.OR = [
-      { fieldTeam: { some: { role } } },
-      { studioTeam: { some: { role } } },
-    ]
+    const currentUserId = await getCurrentStudioUserId()
+    if (currentUserId) {
+      where.fieldTeam = { some: { id: currentUserId } }
+    } else {
+      where.OR = [
+        { fieldTeam: { some: { role } } },
+      ]
+    }
   }
 
   const projects = await db.project.findMany({
@@ -109,6 +117,8 @@ export async function GET(req: NextRequest) {
         team: u.team,
       })),
       isLeave: false,
+      // ✅ Surface the studio flag so the calendar can filter by it.
+      isStudio: Boolean((p as any).isStudio),
     }
   })
 

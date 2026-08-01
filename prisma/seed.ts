@@ -427,6 +427,8 @@ async function main() {
 
     const readyDate = ps.readyDays != null ? days(ps.readyDays) : null
     const isReady = ps.status === "ready" || ps.status === "delivered"
+    // ✅ actualStartDatetime/actualEndDatetime removed from schema — kept local
+    // variables for use in workflow stage timestamps below.
     const actualEnd = ps.status === "delivered" ? days(ps.readyDays! + 3) : null
     const actualStart = ["running", "managing", "editing", "qc", "render", "ready", "delivered"].includes(ps.status) ? days(ps.startDays) : null
     const isPhoto = pkg.category === "photo" || pkg.category === "mix"
@@ -453,8 +455,6 @@ async function main() {
         isReadyForDelivery: isReady,
         readyDate,
         priceAtReadyTime: readyDate ? pkg.currentPrice : null,
-        actualStartDatetime: actualStart,
-        actualEndDatetime: actualEnd,
         fieldTeam: { connect: ps.fieldTeam.map((id) => ({ id })) },
         studioTeam: { connect: ps.studioTeam.map((id) => ({ id })) },
       },

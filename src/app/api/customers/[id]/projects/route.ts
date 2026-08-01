@@ -128,9 +128,11 @@ export async function GET(
     }))
   }
 
-  const projectsOut = projects.map((p) => {
+  // ✅ محاسبه با for...of چون نیاز به await برای printPhotoTotal داریم
+  const projectsOut: any[] = []
+  for (const p of projects) {
     const confirmedPaid = p.payments
-      .filter((x) => x.isConfirmed)
+      .filter((x) => x.isConfirmed && (x as any).paymentFor !== "print_photo")
       .reduce((s, x) => s + Number(x.amount), 0)
     const eff = getEffectivePrice({
       pricingStrategy: p.pricingStrategy as never,
@@ -142,8 +144,33 @@ export async function GET(
       priceAtReadyTime: p.priceAtReadyTime,
       packageCurrentPrice: p.servicePackage.currentPrice,
       totalConfirmedPaid: confirmedPaid,
+      // ✅ اصلاح قیمت و تخفیف — برای محاسبه دقیق قیمت مؤثر
+      priceAdjustment: (p as any).priceAdjustment ?? 0,
+      discountAmount: p.discountAmount ?? 0,
     })
-    return {
+
+    // ✅ محاسبه جمع عکس‌های چاپی
+    let printPhotoTotal = 0
+    try {
+      const photos = await db.projectPrintPhoto.findMany({
+        where: { projectId: p.id },
+        include: { printPhotoPrice: { select: { price: true } } },
+      })
+      printPhotoTotal = photos.reduce((sum, pp) => {
+        const unitPrice = pp.exemptFromPriceUpdate && pp.frozenPrice
+          ? Number(pp.frozenPrice)
+          : Number(pp.printPhotoPrice?.price ?? 0)
+        return sum + (unitPrice * pp.quantity)
+      }, 0)
+    } catch { /* ignore */ }
+
+    // ✅ پرداخت‌های عکس‌های چاپی
+    const printPhotoPaid = p.payments
+      .filter((x) => x.isConfirmed && (x as any).paymentFor === "print_photo")
+      .reduce((s, x) => s + Number(x.amount), 0)
+    const printPhotoBalance = Math.max(0, printPhotoTotal - printPhotoPaid)
+
+    projectsOut.push({
       id: p.id,
       contractNumber: p.contract.contractNumber,
       title: p.servicePackage.title,
@@ -155,14 +182,20 @@ export async function GET(
       startDatetime: p.startDatetime ? p.startDatetime.toISOString() : null,
       endDatetime: p.endDatetime ? p.endDatetime.toISOString() : null,
       deliveryDeadline: p.deliveryDeadline ? p.deliveryDeadline.toISOString() : null,
-      actualStartDatetime: p.actualStartDatetime ? p.actualStartDatetime.toISOString() : null,
-      actualEndDatetime: p.actualEndDatetime ? p.actualEndDatetime.toISOString() : null,
       printedDescription: p.printedDescription,
       effectivePrice: seeBalance ? eff : null,
       calculatedPrice: seeFinance ? Number(p.calculatedPrice) : null,
       discountAmount: seeFinance ? Number(p.discountAmount ?? 0) : 0,
+      // ✅ اصلاح قیمت برای نمایش در UI
+      priceAdjustment: seeFinance ? Number((p as any).priceAdjustment ?? 0) : 0,
+      // ✅ قیمت پایه پکیج (بدون اصلاح)
+      packageCurrentPrice: seeFinance ? Number(p.servicePackage.currentPrice) : null,
       totalPaid: seeBalance ? confirmedPaid : null,
       balance: seeBalance ? Math.max(0, eff - confirmedPaid) : null,
+      // ✅ عکس‌های چاپی
+      printPhotoTotal: seeBalance ? printPhotoTotal : null,
+      printPhotoPaid: seeBalance ? printPhotoPaid : null,
+      printPhotoBalance: seeBalance ? printPhotoBalance : null,
       isDelivered: p.status === "delivered",
       team: [...p.fieldTeam, ...p.studioTeam, ].map((u) => ({
         id: u.id,
@@ -175,6 +208,7 @@ export async function GET(
             amount: Number(pay.amount),
             paymentType: pay.paymentType,
             method: pay.method,
+            paymentFor: (pay as any).paymentFor ?? "project",
             datePaid: pay.datePaid.toISOString(),
             note: pay.note,
             isConfirmed: pay.isConfirmed,
@@ -211,8 +245,8 @@ export async function GET(
             }))
         : [],
       notesCount: p.notes.length,
-    }
-  })
+    })
+  }
 
   return NextResponse.json({
     customer: {

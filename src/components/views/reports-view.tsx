@@ -12,8 +12,6 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
   Cell,
   Legend,
 } from "recharts"
@@ -38,7 +36,7 @@ import {
   type PackageCategory,
   type Role,
 } from "@/lib/constants"
-import { formatRials, formatRialsShort } from "@/lib/format"
+import { formatRials, formatRialsShort, toPersianDigits } from "@/lib/format"
 import { formatJalaliShort } from "@/lib/jalali"
 
 import { PageHeader, StatCard, SectionCard, EmptyState } from "./_shared"
@@ -83,10 +81,13 @@ interface ReportData {
   debtors: {
     id: string
     customer: string
+    customerId?: string
     package: string
     effectivePrice: number
     paid: number
     balance: number
+    totalBalance?: number
+    projectCount?: number
     status: string
   }[]
   unpaidSalaries: { name: string; amount: number; role?: string; userId?: string }[]
@@ -384,42 +385,26 @@ export function ReportsView() {
               {data.revenueByCategory.every((d) => d.value === 0) ? (
                 <EmptyState title="درآمدی ثبت نشده است" />
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={data.revenueByCategory.map((d) => ({
-                        ...d,
-                        name: CATEGORY_LABELS[d.name as PackageCategory] ?? d.name,
-                      }))}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      label={({ name, value }: { name: string; value: number }) =>
-                        `${name}: ${formatRialsShort(value)}`
-                      }
-                      labelLine={false}
-                    >
-                      {data.revenueByCategory.map((d) => (
-                        <Cell
-                          key={d.name}
-                          fill={CATEGORY_COLORS[d.name as PackageCategory] ?? "#94a3b8"}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      formatter={(v: number, n: string) => [formatRials(v) + " تومان", n]}
-                    />
-                    <Legend
-                      iconType="circle"
-                      wrapperStyle={{ fontSize: 11 }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {data.revenueByCategory.map((d) => {
+                    const total = data.revenueByCategory.reduce((s, x) => s + x.value, 0)
+                    const pct = total > 0 ? (d.value / total) * 100 : 0
+                    const color = CATEGORY_COLORS[d.name as PackageCategory] ?? "#94a3b8"
+                    return (
+                      <div key={d.name} className="rounded-xl border p-4" style={{ borderColor: color + "40" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full" style={{ background: color }} />
+                          <span className="text-sm font-medium">{CATEGORY_LABELS[d.name as PackageCategory] ?? d.name}</span>
+                        </div>
+                        <div className="mt-2 text-xl font-bold">{formatRialsShort(d.value)}</div>
+                        <div className="text-xs text-muted-foreground">{toPersianDigits(Math.round(pct))}٪ از کل</div>
+                        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </SectionCard>
           </div>
@@ -428,110 +413,50 @@ export function ReportsView() {
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <SectionCard
               title="درآمد بر اساس پکیج"
-              description="پکیج‌های برتر از نظر درآمد — عنوان پکیج در راست، نمودار از راست به چپ"
+              description="پکیج‌های برتر از نظر درآمد"
               className="lg:col-span-2"
             >
               {data.revenueByPackage.length === 0 ? (
                 <EmptyState title="درآمد پکیجی وجود ندارد" />
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(220, data.revenueByPackage.length * 36)}>
-                  <BarChart
-                    data={data.revenueByPackage}
-                    layout="vertical"
-                    margin={{ left: 16, right: 60, top: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => formatRialsShort(v)}
-                      reversed
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      width={180}
-                      orientation="right"
-                      tickFormatter={(v: string) =>
-                        v.length > 28 ? v.slice(0, 26) + "…" : v
-                      }
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      formatter={(v: number) => formatRials(v) + " تومان"}
-                      cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      name="درآمد"
-                      fill="#0ea5e9"
-                      radius={[4, 0, 0, 4]}
-                      barSize={18}
-                      label={{
-                        position: "right",
-                        fill: "var(--foreground)",
-                        fontSize: 10,
-                        formatter: (v: number) => formatRialsShort(v),
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="space-y-1.5">
+                  {data.revenueByPackage.slice(0, 10).map((p, i) => {
+                    const max = Math.max(...data.revenueByPackage.map((x) => x.value), 1)
+                    const pct = (p.value / max) * 100
+                    return (
+                      <div key={i} className="flex items-center gap-2 rounded-lg border bg-card/50 p-2.5 text-sm">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
+                          {toPersianDigits(i + 1)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-medium" title={p.name}>{p.name}</span>
+                        <div className="hidden h-2 w-24 overflow-hidden rounded-full bg-muted sm:block">
+                          <div className="h-full rounded-full bg-sky-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="shrink-0 font-bold tabular-nums">{formatRialsShort(p.value)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </SectionCard>
 
             <SectionCard
               title="توزیع وضعیت‌های پروژه"
-              description="تعداد در هر مرحله (برچسب‌ها چرخیده برای خوانایی)"
+              description="تعداد پروژه در هر مرحله"
             >
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={data.statusDist} margin={{ left: 20, right: 8, top: 8, bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis
-                    dataKey="status"
-                    stroke="var(--muted-foreground)"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    interval={0}
-                    angle={-90}
-                    textAnchor="end"
-                    height={80}
-                    tickFormatter={(v: string) =>
-                      STATUS_LABELS[v as ProjectStatus] ?? v
-                    }
-                  />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    formatter={(v: number, n: string) => [
-                      v,
-                      STATUS_LABELS[n as ProjectStatus] ?? n,
-                    ]}
-                    cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                  />
-                  <Bar dataKey="count" name="پروژه‌ها" radius={[4, 4, 0, 0]} barSize={28}>
-                    {data.statusDist.map((s) => (
-                      <Cell
-                        key={s.status}
-                        fill={STATUS_COLORS[s.status as ProjectStatus] ?? "#94a3b8"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-2">
+                {data.statusDist.map((s) => {
+                  const color = STATUS_COLORS[s.status as ProjectStatus] ?? "#94a3b8"
+                  return (
+                    <div key={s.status} className="rounded-lg border p-3 text-center" style={{ borderColor: color + "40" }}>
+                      <div className="text-2xl font-bold" style={{ color }}>{toPersianDigits(s.count)}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                        {STATUS_LABELS[s.status as ProjectStatus] ?? s.status}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </SectionCard>
           </div>
 
@@ -539,55 +464,30 @@ export function ReportsView() {
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <SectionCard
               title="بدهکاران"
-              description="پروژه‌های دارای مانده باقی‌مانده"
+              description="مجموع بدهی هر مشتری از همه پروژه‌ها"
               className="lg:col-span-2"
             >
               {data.debtors.length === 0 ? (
-                <EmptyState
-                  icon="✅"
-                  title="مانده بدهی وجود ندارد"
-                  description="همه پروژه‌های استودیو تسویه شده‌اند."
-                />
+                <EmptyState icon="✅" title="مانده بدهی وجود ندارد" description="همه مشتریان تسویه شده‌اند." />
               ) : (
                 <div className="max-h-96 overflow-y-auto scroll-thin">
-                  <Table>
+                  <Table dir="rtl">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>مشتری</TableHead>
-                        <TableHead className="hidden md:table-cell">پکیج</TableHead>
-                        <TableHead className="text-right">قیمت مؤثر</TableHead>
-                        <TableHead className="text-right">پرداخت‌شده</TableHead>
-                        <TableHead className="text-right">مانده</TableHead>
-                        <TableHead>وضعیت</TableHead>
+                        <TableHead className="text-right">نام مشتری</TableHead>
+                        <TableHead className="text-center">تعداد پروژه</TableHead>
+                        <TableHead className="text-right">مجموع بدهی</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.debtors.map((d) => (
-                        <TableRow key={d.id}>
-                          <TableCell className="font-medium">{d.customer}</TableCell>
-                          <TableCell className="hidden max-w-[180px] truncate text-xs text-muted-foreground md:table-cell">
-                            {d.package}
+                        <TableRow key={d.customerId || d.id}>
+                          <TableCell className="text-right font-medium">{d.customer}</TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">
+                            {toPersianDigits(d.projectCount ?? 1)}
                           </TableCell>
-                          <TableCell className="text-right text-xs">
-                            {formatRialsShort(d.effectivePrice)}
-                          </TableCell>
-                          <TableCell className="text-right text-xs">
-                            {formatRialsShort(d.paid)}
-                          </TableCell>
-                          <TableCell className="text-right text-xs font-semibold text-rose-600">
-                            {formatRialsShort(d.balance)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px]"
-                              style={{
-                                background: STATUS_COLORS[d.status as ProjectStatus] + "22",
-                                color: STATUS_COLORS[d.status as ProjectStatus],
-                              }}
-                            >
-                              {STATUS_LABELS[d.status as ProjectStatus] ?? d.status}
-                            </Badge>
+                          <TableCell className="text-right font-bold text-rose-600 dark:text-rose-400">
+                            {formatRialsShort(d.totalBalance ?? d.balance)} تومان
                           </TableCell>
                         </TableRow>
                       ))}
@@ -599,79 +499,38 @@ export function ReportsView() {
 
             <SectionCard
               title="مشتریان برتر"
-              description="بر اساس درآمد در بازه انتخاب‌شده — نام در راست، نمودار از راست به چپ"
+              description="بر اساس درآمد در بازه انتخاب‌شده"
             >
               {data.topCustomers.length === 0 ? (
                 <EmptyState title="هنوز مشتری‌ای وجود ندارد" />
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(220, data.topCustomers.length * 48)}>
-                  <BarChart
-                    data={data.topCustomers}
-                    layout="vertical"
-                    margin={{ left: 16, right: 60, top: 4 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => formatRialsShort(v)}
-                      reversed
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="var(--muted-foreground)"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      width={120}
-                      orientation="right"
-                      tickFormatter={(v: string) =>
-                        v.length > 16 ? v.slice(0, 14) + "…" : v
-                      }
-                    />
-                    <Tooltip
-                      contentStyle={TOOLTIP_STYLE}
-                      formatter={(v: number) => formatRials(v) + " تومان"}
-                      cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    />
-                    <Bar
-                      dataKey="revenue"
-                      name="درآمد"
-                      fill="#a855f7"
-                      radius={[4, 0, 0, 4]}
-                      barSize={20}
-                      label={{
-                        position: "right",
-                        fill: "var(--foreground)",
-                        fontSize: 10,
-                        formatter: (v: number) => formatRialsShort(v),
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="space-y-1.5">
+                  {data.topCustomers.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border bg-card/50 p-2.5 text-sm">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500 text-[10px] font-bold text-white">
+                        {toPersianDigits(i + 1)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-medium" title={c.name}>{c.name}</span>
+                      <span className="shrink-0 font-bold tabular-nums text-violet-600 dark:text-violet-400">
+                        {formatRialsShort(c.revenue)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </SectionCard>
           </div>
 
-          {/* Unpaid salaries — colored by role, RTL like other charts */}
+          {/* Unpaid salaries */}
           <div className="mt-4">
             <SectionCard
               title="حقوق پرداخت‌نشده بر اساس کاربر"
-              description="پورسانت و پرداخت‌های هر پروژه در انتظار پرداخت — رنگ بر اساس نقش"
+              description="پورسانت و پرداخت‌های هر پروژه در انتظار پرداخت"
             >
               {data.unpaidSalaries.length === 0 ? (
-                <EmptyState
-                  icon="✅"
-                  title="همه حقوق‌ها پرداخت شده"
-                  description="هیچ پرداخت پورسانت معوقی وجود ندارد."
-                />
+                <EmptyState icon="✅" title="همه حقوق‌ها پرداخت شده" description="هیچ پرداخت پورسانت معوقی وجود ندارد." />
               ) : (
-                <>
-                  {/* Legend by role */}
+                <div className="space-y-1.5">
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     {Object.entries(ROLE_COLORS).map(([role, color]) => (
                       <div key={role} className="flex items-center gap-1 text-[10px]">
@@ -680,62 +539,22 @@ export function ReportsView() {
                       </div>
                     ))}
                   </div>
-                  <ResponsiveContainer width="100%" height={Math.max(200, data.unpaidSalaries.length * 44)}>
-                    <BarChart
-                      data={data.unpaidSalaries}
-                      layout="vertical"
-                      margin={{ left: 16, right: 60, top: 4 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                      <XAxis
-                        type="number"
-                        stroke="var(--muted-foreground)"
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(v) => formatRialsShort(v)}
-                        reversed
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        stroke="var(--muted-foreground)"
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        width={140}
-                        orientation="right"
-                        tickFormatter={(v: string) =>
-                          v.length > 18 ? v.slice(0, 16) + "…" : v
-                        }
-                      />
-                      <Tooltip
-                        contentStyle={TOOLTIP_STYLE}
-                        formatter={(v: number) => formatRials(v) + " تومان"}
-                        cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                      />
-                      <Bar
-                        dataKey="amount"
-                        name="پرداخت‌نشده"
-                        radius={[4, 0, 0, 4]}
-                        barSize={20}
-                        label={{
-                          position: "right",
-                          fill: "var(--foreground)",
-                          fontSize: 10,
-                          formatter: (v: number) => formatRialsShort(v),
-                        }}
-                      >
-                        {data.unpaidSalaries.map((s, i) => (
-                          <Cell
-                            key={i}
-                            fill={ROLE_COLORS[s.role as keyof typeof ROLE_COLORS] ?? "#f59e0b"}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </>
+                  {data.unpaidSalaries.map((s, i) => {
+                    const color = ROLE_COLORS[s.role as keyof typeof ROLE_COLORS] ?? "#f59e0b"
+                    return (
+                      <div key={i} className="flex items-center gap-2 rounded-lg border bg-card/50 p-2.5 text-sm">
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: color }} />
+                        <span className="min-w-0 flex-1 truncate font-medium" title={s.name}>{s.name}</span>
+                        <Badge variant="outline" className="shrink-0 text-[9px]">
+                          {ROLE_LABELS[s.role as keyof typeof ROLE_LABELS] ?? s.role}
+                        </Badge>
+                        <span className="shrink-0 font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                          {formatRialsShort(s.amount)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               )}
             </SectionCard>
           </div>
