@@ -161,26 +161,52 @@ export async function GET(req: NextRequest) {
     count: projects.filter((p) => p.status === st).length,
   }))
 
-  // Debtors: projects where balance > 0
-  const debtors = projects
-    .map((p) => {
-      const eff = effPrice(p)
-      const paid = p.payments
-        .filter((x) => x.isConfirmed)
-        .reduce((s, x) => s + Number(x.amount), 0)
-      const balance = Math.max(0, eff - paid)
-      return {
-        id: p.id,
-        customer: p.contract.customer.name,
-        package: p.servicePackage.title,
-        effectivePrice: eff,
-        paid,
-        balance,
-        status: p.status,
-      }
+  // Debtors: aggregate by customer (مجموع بدهی هر مشتری از همه پروژه‌هاش)
+  const debtorMap: Record<string, {
+    customerId: string
+    customer: string
+    totalBalance: number
+    projectCount: number
+    projects: { id: string; package: string; effectivePrice: number; paid: number; balance: number; status: string }[]
+  }> = {}
+  for (const p of projects) {
+    const eff = effPrice(p)
+    const paid = p.payments
+      .filter((x) => x.isConfirmed)
+      .reduce((s, x) => s + Number(x.amount), 0)
+    const balance = Math.max(0, eff - paid)
+    if (balance <= 0) continue
+    const cid = p.contract.customer.id
+    const cname = p.contract.customer.name
+    if (!debtorMap[cid]) {
+      debtorMap[cid] = { customerId: cid, customer: cname, totalBalance: 0, projectCount: 0, projects: [] }
+    }
+    debtorMap[cid].totalBalance += balance
+    debtorMap[cid].projectCount += 1
+    debtorMap[cid].projects.push({
+      id: p.id,
+      package: p.servicePackage.title,
+      effectivePrice: eff,
+      paid,
+      balance,
+      status: p.status,
     })
-    .filter((d) => d.balance > 0)
-    .sort((a, b) => b.balance - a.balance)
+  }
+  const debtors = Object.values(debtorMap)
+    .sort((a, b) => b.totalBalance - a.totalBalance)
+    // Legacy fields for backward-compat (اولین پروژه رو می‌ذاریم)
+    .map((d) => ({
+      id: d.projects[0]?.id ?? d.customerId,
+      customer: d.customer,
+      customerId: d.customerId,
+      package: d.projects[0]?.package ?? "",
+      effectivePrice: d.projects[0]?.effectivePrice ?? 0,
+      paid: d.projects[0]?.paid ?? 0,
+      balance: d.totalBalance,
+      totalBalance: d.totalBalance,
+      projectCount: d.projectCount,
+      status: d.projects[0]?.status ?? "",
+    }))
 
   // Unpaid salaries by user
   const unpaidMap: Record<string, { name: string; amount: number; role?: string; userId?: string }> = {}

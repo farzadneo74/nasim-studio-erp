@@ -142,6 +142,9 @@ export async function GET(req: Request, { params }: Ctx) {
       customer: {
         id: p.project.contract.customer.id,
         name: p.project.contract.customer.name,
+        // ✅ Include phone so the Finances view can send an SMS receipt
+        //    to the customer (confirmed payments only).
+        phone: p.project.contract.customer.phone,
       },
       servicePackage: {
         id: p.project.servicePackage.id,
@@ -170,13 +173,14 @@ export async function POST(req: Request, { params }: Ctx) {
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const { amount, paymentType, method, datePaid, note, isConfirmed } = body as {
+  const { amount, paymentType, method, datePaid, note, isConfirmed, paymentFor } = body as {
     amount?: number
     paymentType?: string
     method?: string
     datePaid?: string
     note?: string
     isConfirmed?: boolean
+    paymentFor?: string // "project" | "print_photo"
   }
 
   if (!amount || Number(amount) <= 0) {
@@ -218,6 +222,8 @@ export async function POST(req: Request, { params }: Ctx) {
         amount: Number(amount),
         paymentType,
         method,
+        // ✅ پرداخت برای پروژه اصلی یا عکس‌های چاپی
+        paymentFor: paymentFor === "print_photo" ? "print_photo" : "project",
         datePaid: datePaid ? new Date(datePaid) : new Date(),
         note: note.trim(),
         isConfirmed: Boolean(isConfirmed),
@@ -235,6 +241,7 @@ export async function POST(req: Request, { params }: Ctx) {
         amount: Number(amount),
         paymentType,
         method,
+        paymentFor: paymentFor === "print_photo" ? "print_photo" : "project",
         datePaid: datePaid ? new Date(datePaid) : new Date(),
         note: note.trim(),
         isConfirmed: Boolean(isConfirmed),
@@ -296,6 +303,7 @@ export async function POST(req: Request, { params }: Ctx) {
     amount: Number(payment.amount),
     paymentType: payment.paymentType,
     method: payment.method,
+    paymentFor: (payment as any).paymentFor ?? "project",
     datePaid: payment.datePaid,
     note: payment.note,
     isConfirmed: payment.isConfirmed,

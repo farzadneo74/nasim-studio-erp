@@ -59,6 +59,7 @@ import {
   Camera as CameraIcon,
   ArrowLeft,
   Move,
+  Lock,
 } from "lucide-react"
 
 import { useWorkspace } from "@/stores/workspace"
@@ -275,6 +276,30 @@ function isOverdue(dueDate: string | null, completed: boolean): boolean {
   const dueDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
   return dueDay < todayDay
+}
+
+// ============================================================
+// Fixed (system) kanban columns
+// ============================================================
+// "در صف" is always the FIRST column (workflow assignments create cards here).
+// "انجام شده" is always the LAST column (moving a card here marks it done +
+// notifies the assigner). Users cannot delete or rename either column.
+const QUEUE_COLUMN_TITLE = "در صف"
+const DONE_COLUMN_TITLE = "انجام شده"
+function isFixedColumnTitle(title: string): boolean {
+  return title === QUEUE_COLUMN_TITLE || title === DONE_COLUMN_TITLE
+}
+// Defensive ordering: ensures "در صف" is first and "انجام شده" is last, with
+// middle columns in their existing relative order. The server also enforces this
+// on GET, but we apply it client-side too so DnD never shows them out of place.
+function enforceFixedColumnOrder<T extends { title: string }>(cols: T[]): T[] {
+  if (cols.length === 0) return cols
+  const queue = cols.filter((c) => c.title === QUEUE_COLUMN_TITLE)
+  const done = cols.filter((c) => c.title === DONE_COLUMN_TITLE)
+  const middle = cols.filter(
+    (c) => c.title !== QUEUE_COLUMN_TITLE && c.title !== DONE_COLUMN_TITLE
+  )
+  return [...queue, ...middle, ...done]
 }
 
 // ============================================================
@@ -1365,7 +1390,7 @@ function SortableColumn({
     transform: colTransform,
     transition: colTransition,
     isDragging: colDragging,
-  } = useSortable({ id: column.id, data: { type: "column", column } })
+  } = useSortable({ id: column.id, data: { type: "column", column }, disabled: isFixedColumnTitle(column.title) })
 
   const colStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(colTransform),
@@ -1393,6 +1418,8 @@ function SortableColumn({
 
   const cardIds = column.cards.map((c) => c.id)
   const completedCount = column.cards.filter((c) => c.completed).length
+  // ✅ System-fixed columns cannot be renamed, deleted, or reordered.
+  const isFixedColumn = isFixedColumnTitle(column.title)
 
   return (
     <div
@@ -1403,15 +1430,21 @@ function SortableColumn({
       {/* Header */}
       <div className="flex items-center justify-between gap-1 border-b p-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <button
-            type="button"
-            className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/60 hover:bg-accent hover:text-muted-foreground"
-            aria-label="جابه‌جایی ستون"
-            {...colAttrs}
-            {...colListeners}
-          >
-            <GripVertical className="size-3.5" />
-          </button>
+          {/* Drag handle — hidden for fixed columns (they can't be reordered). */}
+          {!isFixedColumn && (
+            <button
+              type="button"
+              className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/60 hover:bg-accent hover:text-muted-foreground"
+              aria-label="جابه‌جایی ستون"
+              {...colAttrs}
+              {...colListeners}
+            >
+              <GripVertical className="size-3.5" />
+            </button>
+          )}
+          {isFixedColumn && (
+            <Lock className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />
+          )}
           <ColorPickerPopover
             color={column.color}
             onChange={(c) => onColorChange(column, c)}
@@ -1442,11 +1475,16 @@ function SortableColumn({
           ) : (
             <button
               type="button"
-              onClick={() => setEditingTitle(true)}
-              className="min-w-0 flex-1 truncate text-right text-sm font-semibold hover:bg-accent/50 rounded px-1 py-0.5"
-              title="برای ویرایش، کلیک کنید"
+              onClick={() => !isFixedColumn && setEditingTitle(true)}
+              disabled={isFixedColumn}
+              className={cn(
+                "min-w-0 flex-1 truncate rounded px-1 py-0.5 text-right text-sm font-semibold",
+                isFixedColumn ? "cursor-default" : "hover:bg-accent/50",
+              )}
+              title={isFixedColumn ? "ستون ثابت سیستم — قابل تغییر نام نیست" : "برای ویرایش، کلیک کنید"}
             >
               {column.title}
+              {isFixedColumn && <Lock className="mr-1 inline size-3 align-text-bottom text-muted-foreground" />}
             </button>
           )}
           <Badge variant="outline" className="shrink-0 text-[10px]">
@@ -1469,10 +1507,13 @@ function SortableColumn({
           <DropdownMenuContent align="start" className="w-44">
             <DropdownMenuLabel className="text-xs">{column.title}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setEditingTitle(true)}>
-              <Pencil className="ml-2 size-3.5" />
-              تغییر نام
-            </DropdownMenuItem>
+            {/* Rename — only available for non-fixed columns. */}
+            {!isFixedColumn && (
+              <DropdownMenuItem onClick={() => setEditingTitle(true)}>
+                <Pencil className="ml-2 size-3.5" />
+                تغییر نام
+              </DropdownMenuItem>
+            )}
             <ColorPickerMenuItem
               color={column.color}
               onChange={(c) => onColorChange(column, c)}
@@ -1481,14 +1522,28 @@ function SortableColumn({
               <Plus className="ml-2 size-3.5" />
               افزودن کارت
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDeleteColumn(column)}
-              className="text-rose-600 focus:text-rose-600"
-            >
-              <Trash2 className="ml-2 size-3.5" />
-              حذف ستون
-            </DropdownMenuItem>
+            {/* Delete — only available for non-fixed columns. */}
+            {!isFixedColumn && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDeleteColumn(column)}
+                  className="text-rose-600 focus:text-rose-600"
+                >
+                  <Trash2 className="ml-2 size-3.5" />
+                  حذف ستون
+                </DropdownMenuItem>
+              </>
+            )}
+            {isFixedColumn && (
+              <>
+                <DropdownMenuSeparator />
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                  <Lock className="size-3" />
+                  ستون ثابت سیستم
+                </div>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -1859,10 +1914,16 @@ export function MyTasksView() {
   const [localColumns, setLocalColumns] = React.useState<KanbanColumnData[] | null>(null)
   React.useEffect(() => {
     // Reset local copy whenever server data changes (e.g. after invalidation).
-    setLocalColumns(columns.length > 0 ? columns : null)
-  }, [kanbanQ.dataUpdatedAt])  
+    setLocalColumns(columns.length > 0 ? enforceFixedColumnOrder(columns) : null)
+  }, [kanbanQ.dataUpdatedAt])
 
-  const displayColumns = localColumns ?? columns
+  // ✅ Always enforce the "در صف" first / "انجام شده" last invariant on the
+  // displayed columns. The server normalizes too, but this guards against any
+  // race condition or stale cache so the user never sees them out of place.
+  const displayColumns = React.useMemo(
+    () => enforceFixedColumnOrder(localColumns ?? columns),
+    [localColumns, columns]
+  )
 
   // ---- DnD state ----
   const [activeCard, setActiveCard] = React.useState<KanbanCardData | null>(null)
@@ -1953,7 +2014,29 @@ export function MyTasksView() {
       const fromIdx = base.findIndex((c) => c.id === activeId)
       const toIdx = base.findIndex((c) => c.id === overId)
       if (fromIdx === -1 || toIdx === -1) return
-      const next = arrayMove(base, fromIdx, toIdx)
+      // ✅ Fixed columns ("در صف" / "انجام شده") cannot be reordered — skip
+      // any column reorder that would move them or push a middle column past them.
+      const movedCol = base[fromIdx]
+      const targetCol = base[toIdx]
+      if (
+        movedCol && isFixedColumnTitle(movedCol.title) ||
+        targetCol && isFixedColumnTitle(targetCol.title)
+      ) {
+        return
+      }
+      // Build the next ordering by only swapping middle columns (queue stays
+      // first, done stays last). We move the active column to the over column's
+      // position within the middle slice, then re-assemble.
+      const queue = base.filter((c) => c.title === QUEUE_COLUMN_TITLE)
+      const done = base.filter((c) => c.title === DONE_COLUMN_TITLE)
+      let middle = base.filter(
+        (c) => c.title !== QUEUE_COLUMN_TITLE && c.title !== DONE_COLUMN_TITLE
+      )
+      const mFrom = middle.findIndex((c) => c.id === activeId)
+      const mTo = middle.findIndex((c) => c.id === overId)
+      if (mFrom === -1 || mTo === -1) return
+      middle = arrayMove(middle, mFrom, mTo)
+      const next = [...queue, ...middle, ...done]
       setLocalColumns(next)
       // Persist new orders.
       void persistColumnOrder(next)
@@ -2011,15 +2094,20 @@ export function MyTasksView() {
     }
 
     setLocalColumns(next)
-    void persistCardOrder(next, sourceCol.id, targetColumnId)
+    void persistCardOrder(next, sourceCol.id, targetColumnId, card, targetColumnId)
   }
 
   async function persistColumnOrder(next: KanbanColumnData[]) {
     try {
+      // ✅ Only persist order for non-fixed columns. The server's GET endpoint
+      // already normalizes "در صف"=0 and "انجام شده"=last, so we don't need to
+      // PATCH those (and trying to would also be ignored by the server anyway).
       await Promise.all(
-        next.map((c, i) =>
-          mutate(`/api/kanban/columns/${c.id}`, "PATCH", { order: i })
-        )
+        next
+          .filter((c) => !isFixedColumnTitle(c.title))
+          .map((c, i) =>
+            mutate(`/api/kanban/columns/${c.id}`, "PATCH", { order: i + 1 })
+          )
       )
       qc.invalidateQueries({ queryKey: ["kanban", role] })
     } catch (e) {
@@ -2030,7 +2118,13 @@ export function MyTasksView() {
     }
   }
 
-  async function persistCardOrder(next: KanbanColumnData[], sourceColId: string, targetColId: string) {
+  async function persistCardOrder(
+    next: KanbanColumnData[],
+    sourceColId: string,
+    targetColId: string,
+    movedCard?: KanbanCardData,
+    movedToColumnId?: string
+  ) {
     try {
       const affected = next.filter((c) => c.id === sourceColId || c.id === targetColId)
       await Promise.all(
@@ -2046,6 +2140,17 @@ export function MyTasksView() {
         )
       )
       qc.invalidateQueries({ queryKey: ["kanban", role] })
+      // ✅ Per FIXES-7B: when a card is moved to the "انجام شده" column, the
+      // server auto-sends a notification to the workflow assigner / card
+      // creator. Show a confirmation toast so the user knows the manager has
+      // been notified.
+      if (movedCard && movedToColumnId) {
+        const targetCol = next.find((c) => c.id === movedToColumnId)
+        if (targetCol && targetCol.title === DONE_COLUMN_TITLE) {
+          toast.success("کار انجام شد — به مدیر اطلاع داده شد")
+          qc.invalidateQueries({ queryKey: ["notifications"] })
+        }
+      }
     } catch (e) {
       toast.error("ذخیره ترتیب کارت‌ها ناموفق بود", {
         description: e instanceof Error ? e.message : undefined,
@@ -2271,7 +2376,15 @@ export function MyTasksView() {
         order: newOrder,
       })
       qc.invalidateQueries({ queryKey: ["kanban", role] })
-      toast.success("کارت منتقل شد")
+      // ✅ Per FIXES-7B: when a card is moved to the "انجام شده" column, the
+      // server auto-sends a notification. Show a confirmation toast so the user
+      // knows the manager has been notified. Otherwise just confirm the move.
+      if (targetCol && targetCol.title === DONE_COLUMN_TITLE) {
+        toast.success("کار انجام شد — به مدیر اطلاع داده شد")
+        qc.invalidateQueries({ queryKey: ["notifications"] })
+      } else {
+        toast.success("کارت منتقل شد")
+      }
     } catch (e) {
       toast.error("انتقال کارت ناموفق بود", { description: e instanceof Error ? e.message : undefined })
       qc.invalidateQueries({ queryKey: ["kanban", role] })

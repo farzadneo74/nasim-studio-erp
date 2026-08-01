@@ -27,6 +27,23 @@ async function scopeProjectForRole(role: Role, project: any, db: Awaited<ReturnT
   const seeFinance = CAN_ACCESS_FULL_FINANCE.includes(role)
   const canSeePhone = role === "admin" || role === "manager" || role === "sales" || role === "photographer"
 
+  // Parse customTasksJson / customEquipmentJson (both legacy string arrays and {name, price} objects).
+  const parseItems = (s: string | null | undefined): { name: string; price: number }[] => {
+    if (!s) return []
+    try {
+      const v = JSON.parse(s)
+      if (!Array.isArray(v)) return []
+      return v.map((item: any) => {
+        if (typeof item === "string") return { name: item, price: 0 }
+        if (item && typeof item === "object") {
+          return { name: String(item.name ?? ""), price: Number(item.price ?? 0) || 0 }
+        }
+        return { name: String(item), price: 0 }
+      }).filter((item) => item.name.trim().length > 0)
+    } catch { return [] }
+  }
+  const safeParseItemsInline = parseItems
+
   const totalPaid = project.payments
     .filter((p: any) => p.isConfirmed)
     .reduce((s: number, p: any) => s + Number(p.amount), 0)
@@ -41,9 +58,31 @@ async function scopeProjectForRole(role: Role, project: any, db: Awaited<ReturnT
     priceAtReadyTime: project.priceAtReadyTime,
     packageCurrentPrice: project.servicePackage.currentPrice,
     totalConfirmedPaid: totalPaid,
+    // ✅ اصلاح قیمت و تخفیف — روی قیمت «زنده» اعمال می‌شوند
+    priceAdjustment: (project as any).priceAdjustment ?? 0,
+    discountAmount: (project as any).discountAmount ?? 0,
   })
 
   const salaryRecords = project.salaryRecords || []
+
+  // ✅ محاسبه printPhotoTotal به‌صورت دستی (چون total یه فیلد محاسباتی است)
+  let printPhotoTotal = 0
+  if (seeBalance) {
+    try {
+      const photos = await db.projectPrintPhoto.findMany({
+        where: { projectId: params.id },
+        include: { printPhotoPrice: { select: { price: true } } },
+      })
+      printPhotoTotal = photos.reduce((sum, p) => {
+        const unitPrice = p.exemptFromPriceUpdate && p.frozenPrice
+          ? Number(p.frozenPrice)
+          : Number(p.printPhotoPrice?.price ?? 0)
+        return sum + (unitPrice * p.quantity)
+      }, 0)
+    } catch {
+      printPhotoTotal = 0
+    }
+  }
 
   return {
     id: project.id,
@@ -78,23 +117,31 @@ async function scopeProjectForRole(role: Role, project: any, db: Awaited<ReturnT
     isPriceFrozen: seeFinance ? project.isPriceFrozen : null,
     exemptFromPhotoPriceUpdate: project.exemptFromPhotoPriceUpdate ?? false,
     discountAmount: seeFinance ? Number(project.discountAmount ?? 0) : null,
+    // ✅ اصلاح قیمت، سود معرف override، آدرس و مکان اجرا
+    priceAdjustment: seeFinance ? Number((project as any).priceAdjustment ?? 0) : null,
+    referralRewardOverride:
+      seeFinance && (project as any).referralRewardOverride != null
+        ? Number((project as any).referralRewardOverride)
+        : null,
+    projectAddress: (project as any).projectAddress ?? null,
+    projectLocationId: (project as any).projectLocationId ?? null,
+    // ✅ آتلیه — flag for studio-shoot projects
+    isStudio: Boolean((project as any).isStudio),
     startDatetime: project.startDatetime,
     endDatetime: project.endDatetime,
     deliveryDeadline: project.deliveryDeadline,
     status: project.status,
     printedDescription: project.printedDescription,
+    // ✅ Per-project overrides (parsed from JSON)
+    customTasks: safeParseItemsInline((project as any).customTasksJson),
+    customEquipment: safeParseItemsInline((project as any).customEquipmentJson),
     isReadyForDelivery: project.isReadyForDelivery,
     readyDate: project.readyDate,
     priceAtReadyTime: seeFinance ? (project.priceAtReadyTime ? Number(project.priceAtReadyTime) : null) : null,
-    actualStartDatetime: project.actualStartDatetime,
-    actualEndDatetime: project.actualEndDatetime,
     effectivePrice: seeBalance ? eff : null,
     totalPaid: seeBalance ? totalPaid : null,
     balance: seeBalance ? Math.max(0, eff - totalPaid) : null,
-    printPhotoTotal: seeBalance ? await db.projectPrintPhoto.aggregate({
-      where: { projectId: params.id },
-      _sum: { total: true },
-    }).then((r) => Number(r._sum.total ?? 0)).catch(() => 0) : null,
+    printPhotoTotal: seeBalance ? printPhotoTotal : null,
     fieldTeam: project.fieldTeam.map(userBrief),
     studioTeam: project.studioTeam.map(userBrief),
     tasks: (project.tasks || []).map((t: any) => ({
@@ -311,6 +358,10 @@ export async function GET(_req: Request, { params }: Ctx) {
 }
 
 // ---- PATCH: update schedule/description/teams/pricing strategy/discount/actual times ----
+interface CustomItem {
+  name?: string
+  price?: number
+}
 interface PatchBody {
   startDatetime?: string | null
   endDatetime?: string | null
@@ -320,8 +371,19 @@ interface PatchBody {
   studioTeamIds?: string[]
   pricingStrategy?: string
   discountAmount?: number // Toman; will be converted to Rials × 10
-  actualStartDatetime?: string | null
-  actualEndDatetime?: string | null
+  priceAdjustment?: number // Toman (positive = increase, negative = decrease)
+  referralRewardOverride?: number | null // Toman; null = use package default
+  projectAddress?: string | null
+  projectLocationId?: string | null
+  servicePackageId?: string
+  isPriceFrozen?: boolean
+  exemptFromPhotoPriceUpdate?: boolean
+  // ✅ Editable tasks/equipment (override the package defaults for THIS project)
+  customTasks?: CustomItem[]
+  customEquipment?: CustomItem[]
+  customDescription?: string
+  // ✅ آتلیه — flag for studio-shoot projects
+  isStudio?: boolean
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
@@ -343,12 +405,56 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (body.endDatetime !== undefined) data.endDatetime = body.endDatetime ? new Date(body.endDatetime) : null
   if (body.deliveryDeadline !== undefined) data.deliveryDeadline = body.deliveryDeadline ? new Date(body.deliveryDeadline) : null
   if (body.printedDescription !== undefined) data.printedDescription = body.printedDescription
-  // Real execution times (manual override). Empty string clears them.
-  if (body.actualStartDatetime !== undefined) {
-    data.actualStartDatetime = body.actualStartDatetime ? new Date(body.actualStartDatetime) : null
+  // ✅ customDescription → printedDescription (mirrors POST behavior)
+  if (body.customDescription !== undefined) data.printedDescription = body.customDescription || null
+
+  // ✅ Change service package (admin only) — preserves payments (we don't touch them).
+  let packageChanged = false
+  if (body.servicePackageId !== undefined && role === "admin" && typeof body.servicePackageId === "string" && body.servicePackageId.trim()) {
+    const newPkg = await db.servicePackage.findUnique({
+      where: { id: body.servicePackageId },
+      select: { id: true, currentPrice: true, pricingStrategy: true, defaultTasks: true, defaultEquipment: true },
+    })
+    if (newPkg) {
+      data.servicePackageId = newPkg.id
+      packageChanged = true
+      // Re-derive calculatedPrice with new package base + existing priceAdjustment/discount
+      const basePrice = Number(newPkg.currentPrice)
+      const adj = Number((project as any).priceAdjustment ?? 0)
+      const disc = Number(project.discountAmount ?? 0)
+      const adjustedBase = Math.max(0, basePrice + adj)
+      data.calculatedPrice = Math.max(0, adjustedBase - disc)
+    }
   }
-  if (body.actualEndDatetime !== undefined) {
-    data.actualEndDatetime = body.actualEndDatetime ? new Date(body.actualEndDatetime) : null
+
+  // ✅ Custom tasks/equipment — accept array of {name, price} and persist as JSON.
+  // If the package changed AND no customTasks were provided, reset to the new package's defaults.
+  function normalizeItems(arr: CustomItem[] | undefined): { name: string; price: number }[] {
+    if (!Array.isArray(arr)) return []
+    return (arr as any[])
+      .map((t) => {
+        if (typeof t === "string") return { name: t.trim(), price: 0 }
+        if (t && typeof t === "object") {
+          return { name: String(t.name ?? "").trim(), price: Number(t.price ?? 0) || 0 }
+        }
+        return null
+      })
+      .filter((t): t is { name: string; price: number } => !!t && t.name.length > 0)
+  }
+
+  if (Array.isArray(body.customTasks)) {
+    const tasks = normalizeItems(body.customTasks)
+    data.customTasksJson = JSON.stringify(tasks)
+  } else if (packageChanged) {
+    // Package changed but no explicit customTasks — clear override so package defaults apply
+    data.customTasksJson = "[]"
+  }
+
+  if (Array.isArray(body.customEquipment)) {
+    const equip = normalizeItems(body.customEquipment)
+    data.customEquipmentJson = JSON.stringify(equip)
+  } else if (packageChanged) {
+    data.customEquipmentJson = "[]"
   }
 
   // Only admin can change pricing strategy
@@ -357,25 +463,159 @@ export async function PATCH(req: Request, { params }: Ctx) {
   }
 
   // Discount amount (Toman → Rials). Allowed for admin/manager.
+  // ✅ Also re-derive calculatedPrice using both priceAdjustment and discount.
+  const pkgForPrice =
+    body.discountAmount !== undefined || body.priceAdjustment !== undefined
+      ? await db.servicePackage.findUnique({
+          where: { id: project.servicePackageId },
+          select: { currentPrice: true },
+        })
+      : null
+
+  if (body.priceAdjustment !== undefined) {
+    const toman = Number(body.priceAdjustment || 0) // allow negative
+    data.priceAdjustment = toman * 10
+  }
+  if (body.referralRewardOverride !== undefined) {
+    // null or 0/empty → null (use package default). Positive Toman → Rials.
+    if (body.referralRewardOverride === null) {
+      data.referralRewardOverride = null
+    } else {
+      const v = Number(body.referralRewardOverride)
+      data.referralRewardOverride = Number.isFinite(v) && v > 0 ? v * 10 : null
+    }
+  }
+  if (body.projectAddress !== undefined) {
+    data.projectAddress =
+      typeof body.projectAddress === "string" && body.projectAddress.trim()
+        ? body.projectAddress.trim()
+        : null
+  }
+  if (body.projectLocationId !== undefined) {
+    data.projectLocationId =
+      typeof body.projectLocationId === "string" && body.projectLocationId.trim()
+        ? body.projectLocationId.trim()
+        : null
+  }
+
   if (body.discountAmount !== undefined) {
     const toman = Math.max(0, Number(body.discountAmount || 0))
     const rials = toman * 10
     data.discountAmount = rials
-    // Re-derive calculatedPrice = currentPackagePrice - discount, if package is available.
-    const pkg = await db.servicePackage.findUnique({
-      where: { id: project.servicePackageId },
-      select: { currentPrice: true },
-    })
-    if (pkg) {
-      data.calculatedPrice = Math.max(0, Number(pkg.currentPrice) - rials)
-    }
+  }
+  // ✅ Re-derive calculatedPrice = (pkg.currentPrice + priceAdjustment) - discount
+  if (pkgForPrice && (body.discountAmount !== undefined || body.priceAdjustment !== undefined)) {
+    const basePrice = Number(pkgForPrice.currentPrice)
+    const adj =
+      body.priceAdjustment !== undefined
+        ? Number(body.priceAdjustment || 0) * 10
+        : Number((project as any).priceAdjustment ?? 0)
+    const disc =
+      body.discountAmount !== undefined
+        ? Math.max(0, Number(body.discountAmount || 0)) * 10
+        : Number(project.discountAmount ?? 0)
+    const adjustedBase = Math.max(0, basePrice + adj)
+    data.calculatedPrice = Math.max(0, adjustedBase - disc)
   }
 
   // Team reassignments (full replace)
-  if (body.fieldTeamIds !== undefined) data.fieldTeam = { set: body.fieldTeamIds.map((uid) => ({ id: uid })) }
+  // ✅ When fieldTeam changes, capture the BEFORE state so we can detect newly
+  // added members and notify them after the update.
+  let previousFieldTeamIds: string[] = []
+  if (body.fieldTeamIds !== undefined) {
+    try {
+      const before = await db.project.findUnique({
+        where: { id },
+        select: { fieldTeam: { select: { id: true } } },
+      })
+      previousFieldTeamIds = (before?.fieldTeam ?? []).map((u) => u.id)
+    } catch { /* ignore */ }
+    data.fieldTeam = { set: body.fieldTeamIds.map((uid) => ({ id: uid })) }
+  }
+  // ✅ studioTeamIds is still accepted (the API still honors it to clear existing
+  // studio team — e.g. passing `studioTeamIds: []` removes everyone). The UI no
+  // longer sends this from the TeamTab, but the API contract is preserved.
   if (body.studioTeamIds !== undefined) data.studioTeam = { set: body.studioTeamIds.map((uid) => ({ id: uid })) }
 
-  const updated = await db.project.update({ where: { id }, data })
+  // ✅ Freeze toggles (admin/manager)
+  if (body.isPriceFrozen !== undefined) data.isPriceFrozen = Boolean(body.isPriceFrozen)
+  if (body.exemptFromPhotoPriceUpdate !== undefined) data.exemptFromPhotoPriceUpdate = Boolean(body.exemptFromPhotoPriceUpdate)
+  // ✅ آتلیه — flag for studio-shoot projects
+  if (body.isStudio !== undefined) data.isStudio = Boolean(body.isStudio)
+
+  const updated = await db.project.update({ where: { id }, data: data as any })
+
+  // ✅ Send a Notification to each newly-added fieldTeam member.
+  if (body.fieldTeamIds !== undefined) {
+    const prevSet = new Set(previousFieldTeamIds)
+    const newlyAdded = body.fieldTeamIds.filter((uid) => !prevSet.has(uid))
+    if (newlyAdded.length > 0) {
+      // Resolve project title for a friendlier message
+      let projectTitle = "پروژه"
+      try {
+        const proj = await db.project.findUnique({
+          where: { id },
+          select: { servicePackage: { select: { title: true } } },
+        })
+        projectTitle = proj?.servicePackage?.title || projectTitle
+      } catch { /* ignore */ }
+      for (const newMemberId of newlyAdded) {
+        try {
+          await db.notification.create({
+            data: {
+              userId: newMemberId,
+              type: "info",
+              title: "شما به پروژه اضافه شدید",
+              message: `${projectTitle} — شما به تیم اجرایی این پروژه اضافه شدید`,
+              link: "projects",
+              refId: id,
+            },
+          })
+        } catch { /* best-effort */ }
+      }
+    }
+  }
+
+  // ✅ When custom tasks are provided (or package changed), replace existing Task rows
+  // so the project's task list reflects the new package defaults / user edits.
+  if (Array.isArray(body.customTasks) || packageChanged) {
+    try {
+      await db.task.deleteMany({ where: { projectId: id } })
+      // Use the explicit customTasks if provided; otherwise load from the (possibly new) package defaults.
+      let taskTitles: string[] = []
+      if (Array.isArray(body.customTasks)) {
+        const normalized = normalizeItems(body.customTasks)
+        taskTitles = normalized.map((t) => t.name)
+      } else {
+        // Package changed with no customTasks → use the new package's defaultTasks
+        const newPkgId = (updated as any).servicePackageId
+        const pkg = await db.servicePackage.findUnique({
+          where: { id: newPkgId },
+          select: { defaultTasks: true },
+        })
+        if (pkg?.defaultTasks) {
+          try {
+            const parsed = JSON.parse(pkg.defaultTasks)
+            if (Array.isArray(parsed)) {
+              taskTitles = parsed
+                .map((t: any) => typeof t === "string" ? t : (t && typeof t === "object" ? String(t.name ?? "") : ""))
+                .filter((s: string) => s.trim().length > 0)
+            }
+          } catch { /* ignore */ }
+        }
+      }
+      if (taskTitles.length > 0) {
+        await db.task.createMany({
+          data: taskTitles.map((title, i) => ({
+            projectId: id,
+            title,
+            status: "todo",
+            order: i,
+          })),
+        })
+      }
+    } catch { /* defensive: tasks table might be stale on edge cases */ }
+  }
 
   return NextResponse.json({
     id: updated.id,
@@ -385,11 +625,43 @@ export async function PATCH(req: Request, { params }: Ctx) {
     deliveryDeadline: updated.deliveryDeadline,
     printedDescription: updated.printedDescription,
     pricingStrategy: updated.pricingStrategy,
+    isPriceFrozen: updated.isPriceFrozen,
+    exemptFromPhotoPriceUpdate: updated.exemptFromPhotoPriceUpdate,
     discountAmount: updated.discountAmount ? Number(updated.discountAmount) : 0,
     calculatedPrice: updated.calculatedPrice != null ? Number(updated.calculatedPrice) : null,
-    actualStartDatetime: updated.actualStartDatetime,
-    actualEndDatetime: updated.actualEndDatetime,
+    // ✅ فیلدهای جدید
+    priceAdjustment: Number((updated as any).priceAdjustment ?? 0),
+    referralRewardOverride:
+      (updated as any).referralRewardOverride != null
+        ? Number((updated as any).referralRewardOverride)
+        : null,
+    projectAddress: (updated as any).projectAddress ?? null,
+    projectLocationId: (updated as any).projectLocationId ?? null,
+    servicePackageId: updated.servicePackageId,
+    // ✅ آتلیه — flag for studio-shoot projects
+    isStudio: Boolean((updated as any).isStudio),
+    // ✅ Custom tasks/equipment (parsed back from JSON for the response)
+    customTasks: safeParseItems((updated as any).customTasksJson),
+    customEquipment: safeParseItems((updated as any).customEquipmentJson),
   })
+}
+
+// Parse a JSON array of {name, price} (or legacy string array). Returns [] on error.
+function safeParseItems(s: string | null | undefined): { name: string; price: number }[] {
+  if (!s) return []
+  try {
+    const v = JSON.parse(s)
+    if (!Array.isArray(v)) return []
+    return v.map((item: any) => {
+      if (typeof item === "string") return { name: item, price: 0 }
+      if (item && typeof item === "object") {
+        return { name: String(item.name ?? ""), price: Number(item.price ?? 0) || 0 }
+      }
+      return { name: String(item), price: 0 }
+    }).filter((item) => item.name.trim().length > 0)
+  } catch {
+    return []
+  }
 }
 
 // ---- DELETE: hard-delete a project (admin/manager only).

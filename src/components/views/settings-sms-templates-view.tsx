@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Trash2, Send, Eye, Clock, Zap } from "lucide-react"
+import { Plus, Pencil, Trash2, Eye, Clock, Zap, Sparkles, MessageSquare, Bell } from "lucide-react"
 import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
 import { useWorkspace } from "@/stores/workspace"
 import { toPersianDigits } from "@/lib/format"
+import { authHeaders } from "@/lib/auth-context"
 
 import { PageHeader, EmptyState, SectionCard } from "./_shared"
 import { Button } from "@/components/ui/button"
@@ -96,6 +97,8 @@ const TRIGGER_DESCRIPTIONS: Record<TriggerEvent, string> = {
 const PLACEHOLDERS = [
   "{customer_name}",
   "{event_date}",
+  "{project_date}",
+  "{studio_name}",
   "{remaining_days}",
   "{deadline}",
   "{amount}",
@@ -117,7 +120,7 @@ export function SettingsSmsTemplatesView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div dir="rtl" className="space-y-8 text-right">
       <TemplatesSection canEdit={canEdit} />
       <AutomationsSection canEdit={canEdit} />
     </div>
@@ -125,7 +128,10 @@ export function SettingsSmsTemplatesView() {
 }
 
 // ============================================================
-// Templates section (existing CRUD, kept intact)
+// Templates section — modern card-based layout (FIXES-10 #5)
+// Each template is a card with: name, preview, trigger info,
+// edit/delete buttons. The new/edit dialog has a LIVE PREVIEW
+// showing how the message would look with sample data.
 // ============================================================
 function TemplatesSection({ canEdit }: { canEdit: boolean }) {
   const api = useApi()
@@ -137,6 +143,13 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
     queryFn: () => api.get("/api/sms-templates"),
   })
 
+  // ✅ Fetch automations so each card can show "which automations use it".
+  const { data: autoData } = useQuery<{ items: SmsAutomation[] }>({
+    queryKey: ["sms-automations"],
+    queryFn: () => api.get("/api/sms-automations"),
+  })
+  const automations = autoData?.items ?? []
+
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<SMSTemplate | null>(null)
   const [form, setForm] = React.useState<{ name: string; templateText: string; isActive: boolean }>({
@@ -145,9 +158,6 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
     isActive: true,
   })
   const [deleteTarget, setDeleteTarget] = React.useState<SMSTemplate | null>(null)
-
-  // Preview panel
-  const [previewId, setPreviewId] = React.useState<string>("")
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -162,7 +172,7 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
         editing ? `/api/sms-templates/${editing.id}` : "/api/sms-templates",
         {
           method: editing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json", "x-demo-role": role },
+          headers: authHeaders({ "Content-Type": "application/json", "x-demo-role": role }),
           body: JSON.stringify(payload),
         }
       )
@@ -178,7 +188,6 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
       setEditing(null)
       setForm({ name: "", templateText: "", isActive: true })
       qc.invalidateQueries({ queryKey: ["sms-templates"] })
-      // Automations depend on templates list — refresh too
       qc.invalidateQueries({ queryKey: ["sms-automations"] })
     },
     onError: (e: Error) => toast.error(e.message),
@@ -188,7 +197,7 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
     mutationFn: async (t: SMSTemplate) => {
       const res = await fetch(`/api/sms-templates/${t.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-demo-role": role },
+        headers: authHeaders({ "Content-Type": "application/json", "x-demo-role": role }),
         body: JSON.stringify({ isActive: !t.isActive }),
       })
       const d = await res.json().catch(() => ({}))
@@ -205,7 +214,7 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/sms-templates/${id}`, {
         method: "DELETE",
-        headers: { "x-demo-role": role },
+        headers: authHeaders({ "x-demo-role": role }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -222,200 +231,110 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const previewTemplate = data?.find((t) => t.id === previewId) || data?.[0]
+  // For each template, list automations that use it
+  function automationsFor(templateId: string): SmsAutomation[] {
+    return automations.filter((a) => a.templateId === templateId)
+  }
 
   return (
-    <div>
-      <PageHeader
-        title="قالب‌های پیامک"
-        icon="💬"
-        description="قالب‌های اعلان به مشتری"
-        actions={
-          canEdit && (
+    <div dir="rtl" className="text-right">
+      {/* Header banner — gradient + new-template button */}
+      <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-l from-sky-500 via-violet-500 to-fuchsia-500 p-6 text-white shadow-lg">
+        <div className="absolute inset-0 opacity-20" style={{
+          backgroundImage: "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(255,255,255,0.3) 0%, transparent 50%)"
+        }} />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+              <MessageSquare className="h-6 w-6" />
+            </div>
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                قالب‌های پیامک
+                <Sparkles className="h-4 w-4 text-yellow-200" />
+              </h2>
+              <p className="mt-1 text-sm text-white/90">
+                قالب‌های قابل استفاده مجدد با متغیرهای پویا برای اعلان‌های خودکار مشتری
+              </p>
+            </div>
+          </div>
+          {canEdit && (
             <Button
               onClick={() => {
                 setEditing(null)
                 setForm({ name: "", templateText: "", isActive: true })
                 setDialogOpen(true)
               }}
+              className="shrink-0 border-2 border-white/40 bg-white/20 text-white shadow-md backdrop-blur-sm transition hover:bg-white/30 hover:shadow-lg"
             >
-              <Plus className="mr-1.5 h-4 w-4" />
-              قالب جدید
+              <Plus className="ml-1.5 h-4 w-4" />
+              افزودن قالب جدید
             </Button>
-          )
-        }
-      />
-
-      <SectionCard title="قالب‌ها">
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : !data || data.length === 0 ? (
-          <EmptyState
-            icon="💬"
-            title="هنوز قالب پیامکی وجود ندارد"
-            description="قالب‌های قابل استفاده مجدد با متغیرها برای اعلان‌های خودکار مشتری ایجاد کنید."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[180px]">نام</TableHead>
-                  <TableHead className="min-w-[320px]">متن قالب</TableHead>
-                  <TableHead className="text-center">فعال</TableHead>
-                  {canEdit && <TableHead className="text-right">عملیات</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <div className="font-medium">{t.name}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="line-clamp-2 max-w-md text-xs text-muted-foreground">
-                        {t.templateText}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {canEdit ? (
-                        <Switch
-                          checked={t.isActive}
-                          onCheckedChange={() => toggleActiveMut.mutate(t)}
-                          aria-label="تغییر وضعیت فعال"
-                        />
-                      ) : (
-                        <span
-                          className={
-                            t.isActive
-                              ? "text-xs font-medium text-emerald-600"
-                              : "text-xs font-medium text-muted-foreground"
-                          }
-                        >
-                          {t.isActive ? "فعال" : "غیرفعال"}
-                        </span>
-                      )}
-                    </TableCell>
-                    {canEdit && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditing(t)
-                              setForm({
-                                name: t.name,
-                                templateText: t.templateText,
-                                isActive: t.isActive,
-                              })
-                              setDialogOpen(true)
-                            }}
-                            aria-label="ویرایش قالب"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteTarget(t)}
-                            aria-label="حذف قالب"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Preview panel */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <SectionCard
-          title="پیش‌نمایش"
-          description="نمایش قالب با داده‌های نمونه"
-          className="lg:col-span-2"
-        >
-          {!data || data.length === 0 ? (
-            <EmptyState
-              icon="👁️"
-              title="چیزی برای پیش‌نمایش نیست"
-              description="ابتدا یک قالب ایجاد کنید."
-            />
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <Label>قالب</Label>
-                <Select
-                  value={previewId || data[0]?.id}
-                  onValueChange={(v) => setPreviewId(v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="یک قالب انتخاب کنید" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {data.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <Eye className="h-3.5 w-3.5" />
-                  پیش‌نمایش رندر شده
-                </div>
-                <p className="whitespace-pre-wrap text-sm">
-                  {renderPreview(previewTemplate?.templateText || "")}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    toast.success("پیامک در صف ارسال (دمو)", {
-                      description: previewTemplate?.name,
-                    })
-                  }
-                >
-                  <Send className="mr-1.5 h-3.5 w-3.5" />
-                  ارسال آزمایشی
-                </Button>
-              </div>
-            </div>
           )}
-        </SectionCard>
-
-        <SectionCard title="متغیرها" description="توکن‌های قابل استفاده">
-          <div className="space-y-2">
-            {PLACEHOLDERS.map((p) => (
-              <div
-                key={p}
-                className="flex items-center justify-between rounded-md border bg-card px-3 py-2"
-              >
-                <code className="text-xs font-mono">{p}</code>
-                <span className="text-xs text-muted-foreground">
-                  {PLACEHOLDER_DESCRIPTIONS[p]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
+        </div>
       </div>
 
-      <Dialog
+      {/* Templates grid */}
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-52 rounded-2xl" />
+          ))}
+        </div>
+      ) : !data || data.length === 0 ? (
+        <EmptyState
+          icon="💬"
+          title="هنوز قالب پیامکی وجود ندارد"
+          description="قالب‌های قابل استفاده مجدد با متغیرها برای اعلان‌های خودکار مشتری ایجاد کنید."
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {data.map((t) => {
+            const usedBy = automationsFor(t.id)
+            return (
+              <TemplateCard
+                key={t.id}
+                template={t}
+                automations={usedBy}
+                canEdit={canEdit}
+                onEdit={() => {
+                  setEditing(t)
+                  setForm({
+                    name: t.name,
+                    templateText: t.templateText,
+                    isActive: t.isActive,
+                  })
+                  setDialogOpen(true)
+                }}
+                onDelete={() => setDeleteTarget(t)}
+                onToggleActive={() => toggleActiveMut.mutate(t)}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {/* Variables hint bar */}
+      <div className="mt-6 rounded-xl border bg-muted/30 p-4" dir="rtl">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+          <Sparkles className="h-3.5 w-3.5" />
+          متغیرهای قابل استفاده در قالب
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {PLACEHOLDERS.map((p) => (
+            <div
+              key={p}
+              className="flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs"
+            >
+              <code className="font-mono text-violet-600 dark:text-violet-300">{p}</code>
+              <span className="text-muted-foreground">— {PLACEHOLDER_DESCRIPTIONS[p]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* New / edit dialog with LIVE PREVIEW */}
+      <TemplateDialog
         open={dialogOpen}
         onOpenChange={(o) => {
           setDialogOpen(o)
@@ -424,78 +343,12 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
             setForm({ name: "", templateText: "", isActive: true })
           }
         }}
-      >
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{editing ? "ویرایش قالب" : "قالب پیامک جدید"}</DialogTitle>
-            <DialogDescription>
-              از متغیرها برای شخصی‌سازی پیام‌ها استفاده کنید. این متغیرها هنگام ارسال جایگزین می‌شوند.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="tpl-name">نام</Label>
-              <Input
-                id="tpl-name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="مثلاً یادآوری پروژه (۳ روز مانده)"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="tpl-text">متن قالب</Label>
-              <Textarea
-                id="tpl-text"
-                rows={5}
-                value={form.templateText}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, templateText: e.target.value }))
-                }
-                placeholder="مشتری گرامی {customer_name}، رویداد شما {remaining_days} روز دیگر ({event_date}) برگزار می‌شود. — استودیو لومن"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {PLACEHOLDERS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        templateText: f.templateText + (f.templateText ? " " : "") + p,
-                      }))
-                    }
-                    className="rounded-md border bg-muted px-2 py-0.5 font-mono text-xs transition hover:bg-muted/70"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                id="tpl-active"
-                checked={form.isActive}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
-              />
-              <Label htmlFor="tpl-active" className="cursor-pointer">
-                فعال
-              </Label>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              انصراف
-            </Button>
-            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-              {saveMut.isPending ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "ایجاد قالب"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        form={form}
+        setForm={setForm}
+        editing={editing}
+        saving={saveMut.isPending}
+        onSave={() => saveMut.mutate()}
+      />
 
       <AlertDialog
         open={!!deleteTarget}
@@ -521,6 +374,295 @@ function TemplatesSection({ canEdit }: { canEdit: boolean }) {
       </AlertDialog>
     </div>
   )
+}
+
+// ============================================================
+// TemplateCard — one card per template (modern, gradient, RTL)
+// ============================================================
+function TemplateCard({
+  template,
+  automations,
+  canEdit,
+  onEdit,
+  onDelete,
+  onToggleActive,
+}: {
+  template: SMSTemplate
+  automations: SmsAutomation[]
+  canEdit: boolean
+  onEdit: () => void
+  onDelete: () => void
+  onToggleActive: () => void
+}) {
+  return (
+    <div
+      dir="rtl"
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-2xl border bg-card text-right shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl",
+        !template.isActive && "opacity-70 grayscale-[40%]"
+      )}
+    >
+      {/* Top gradient strip */}
+      <div className={cn(
+        "h-1.5 w-full bg-gradient-to-l",
+        template.isActive
+          ? "from-sky-500 via-violet-500 to-fuchsia-500"
+          : "from-slate-300 via-slate-300 to-slate-300"
+      )} />
+
+      <div className="flex flex-1 flex-col p-4">
+        {/* Header row: name + active badge */}
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-base font-bold text-foreground">
+                {template.name}
+              </h3>
+              {template.isActive ? (
+                <Badge className="bg-emerald-500/15 text-[9px] text-emerald-600 hover:bg-emerald-500/20">
+                  فعال
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[9px] text-muted-foreground">
+                  غیرفعال
+                </Badge>
+              )}
+            </div>
+          </div>
+          {canEdit && (
+            <Switch
+              checked={template.isActive}
+              onCheckedChange={onToggleActive}
+              aria-label="تغییر وضعیت فعال"
+            />
+          )}
+        </div>
+
+        {/* Preview text — shows the raw template with variables highlighted */}
+        <div className="mb-3 rounded-lg border bg-gradient-to-bl from-muted/40 to-muted/10 p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Eye className="h-3 w-3" /> متن قالب
+          </div>
+          <p className="line-clamp-3 whitespace-pre-wrap break-words text-xs leading-relaxed text-foreground/90">
+            {renderTemplateWithHighlights(template.templateText)}
+          </p>
+        </div>
+
+        {/* Trigger info — which automations use this template */}
+        <div className="mb-3">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Bell className="h-3 w-3" /> استفاده در اتوماسیون
+          </div>
+          {automations.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground/70">
+              هنوز در هیچ اتوماسیونی استفاده نشده
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {automations.map((a) => (
+                <span
+                  key={a.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                  title={`${TRIGGER_LABELS[a.triggerEvent as TriggerEvent] ?? a.triggerEvent} · آفست ${a.offsetDays}`}
+                >
+                  <Zap className="h-2.5 w-2.5" />
+                  {a.name}
+                  <span className="text-amber-600/70 dark:text-amber-400/70">
+                    ({TRIGGER_LABELS[a.triggerEvent as TriggerEvent] ?? a.triggerEvent})
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer: edit/delete actions */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t pt-3">
+          <div className="text-[10px] text-muted-foreground">
+            {toPersianDigits(template.templateText.length)} نویسه
+          </div>
+          {canEdit && (
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px] transition hover:bg-sky-500/10 hover:text-sky-600"
+                onClick={onEdit}
+              >
+                <Pencil className="h-3 w-3" /> ویرایش
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-[11px] text-rose-600 transition hover:bg-rose-500/10 hover:text-rose-700"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3 w-3" /> حذف
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// TemplateDialog — create/edit with LIVE PREVIEW
+// ============================================================
+function TemplateDialog({
+  open,
+  onOpenChange,
+  form,
+  setForm,
+  editing,
+  saving,
+  onSave,
+}: {
+  open: boolean
+  onOpenChange: (o: boolean) => void
+  form: { name: string; templateText: string; isActive: boolean }
+  setForm: React.Dispatch<React.SetStateAction<{ name: string; templateText: string; isActive: boolean }>>
+  editing: SMSTemplate | null
+  saving: boolean
+  onSave: () => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl" dir="rtl">
+        <DialogHeader className="text-right">
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-violet-500" />
+            {editing ? "ویرایش قالب" : "قالب پیامک جدید"}
+          </DialogTitle>
+          <DialogDescription className="text-right">
+            از متغیرها برای شخصی‌سازی پیام‌ها استفاده کنید. این متغیرها هنگام ارسال جایگزین می‌شوند.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="tpl-name">نام قالب</Label>
+            <Input
+              id="tpl-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="مثلاً یادآوری پروژه (۳ روز مانده)"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="tpl-text">متن قالب</Label>
+            <Textarea
+              id="tpl-text"
+              rows={5}
+              value={form.templateText}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, templateText: e.target.value }))
+              }
+              placeholder="مشتری گرامی {customer_name}، رویداد شما {remaining_days} روز دیگر ({event_date}) برگزار می‌شود. — {studio_name}"
+              className="mt-1 resize-none"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {PLACEHOLDERS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      templateText: f.templateText + (f.templateText ? " " : "") + p,
+                    }))
+                  }
+                  className="rounded-md border border-violet-500/30 bg-violet-500/5 px-2 py-0.5 font-mono text-xs text-violet-700 transition hover:bg-violet-500/15 dark:text-violet-300"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ✅ LIVE PREVIEW — shows the rendered message with sample data */}
+          <div className="overflow-hidden rounded-xl border bg-gradient-to-bl from-sky-500/5 to-violet-500/5">
+            <div className="flex items-center gap-2 border-b bg-white/50 px-4 py-2 text-[11px] font-semibold text-muted-foreground dark:bg-black/20">
+              <Eye className="h-3.5 w-3.5" />
+              پیش‌نمایش زنده
+              <span className="text-muted-foreground/60">— با داده‌های نمونه</span>
+            </div>
+            <div className="px-4 py-3">
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                {form.templateText.trim()
+                  ? renderPreview(form.templateText)
+                  : <span className="text-muted-foreground/60">متن قالب اینجا نمایش داده می‌شود…</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch
+              id="tpl-active"
+              checked={form.isActive}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
+            />
+            <Label htmlFor="tpl-active" className="cursor-pointer">
+              فعال
+            </Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            انصراف
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={saving}
+            className="bg-gradient-to-l from-sky-500 to-violet-500 text-white shadow-md transition hover:from-sky-600 hover:to-violet-600"
+          >
+            {saving ? "در حال ذخیره…" : editing ? "ذخیره تغییرات" : "ایجاد قالب"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ============================================================
+// Helpers — render template text with variable highlighting
+// ============================================================
+// Replaces each `{variable}` token with a styled span so the user can
+// visually distinguish placeholders from plain text inside the card preview.
+function renderTemplateWithHighlights(text: string): React.ReactNode {
+  if (!text) return <span className="text-muted-foreground/60">— خالی —</span>
+  const parts: React.ReactNode[] = []
+  const re = /\{(\w+)\}/g
+  let lastIndex = 0
+  let m: RegExpExecArray | null
+  let key = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      parts.push(<span key={key++}>{text.slice(lastIndex, m.index)}</span>)
+    }
+    parts.push(
+      <span
+        key={key++}
+        className="rounded bg-violet-500/15 px-1 font-mono text-[10px] text-violet-700 dark:text-violet-300"
+      >
+        {m[0]}
+      </span>
+    )
+    lastIndex = m.index + m[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(<span key={key++}>{text.slice(lastIndex)}</span>)
+  }
+  return parts
+}
+
+// Lightweight cn helper (avoids adding a cn import just for this file).
+function cn(...inputs: Array<string | false | null | undefined>): string {
+  return inputs.filter(Boolean).join(" ")
 }
 
 // ============================================================
@@ -973,6 +1115,8 @@ function AutomationDialog({
 const PLACEHOLDER_DESCRIPTIONS: Record<string, string> = {
   "{customer_name}": "نام مشتری",
   "{event_date}": "تاریخ رویداد",
+  "{project_date}": "تاریخ پروژه",
+  "{studio_name}": "نام استودیو",
   "{remaining_days}": "روزهای باقی‌مانده",
   "{deadline}": "مهلت تحویل",
   "{amount}": "مبلغ قابل پرداخت",
@@ -982,6 +1126,8 @@ function renderPreview(text: string): string {
   return text
     .replace(/\{customer_name\}/g, "سحر و رضا")
     .replace(/\{event_date\}/g, "۲۴ خرداد ۱۴۰۵")
+    .replace(/\{project_date\}/g, "۲۴ خرداد ۱۴۰۵")
+    .replace(/\{studio_name\}/g, "استودیو لومن")
     .replace(/\{remaining_days\}/g, "۳")
     .replace(/\{deadline\}/g, "۲۳ مرداد ۱۴۰۵")
     .replace(/\{amount\}/g, "۹٬۲۰۰٬۰۰۰")

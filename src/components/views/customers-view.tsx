@@ -28,6 +28,7 @@ import {
   FileText,
   Loader2,
   TrendingUp,
+  TrendingDown,
   Download,
   Camera,
   Image as ImageIcon,
@@ -45,10 +46,12 @@ import {
   History,
   UserPlus,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react"
 
 import { useWorkspace } from "@/stores/workspace"
 import { useApi } from "@/lib/api/client"
+import { authHeaders } from "@/lib/auth-context"
 import {
   formatRials,
   formatRialsShort,
@@ -201,6 +204,8 @@ interface CreditTx {
   note: string | null
   contractNumber: string | null
   createdAt: string
+  isSettled?: boolean
+  settledAt?: string | null
 }
 interface CustomerDetail {
   id: string
@@ -2447,6 +2452,10 @@ function AddCreditDialog({
 }) {
   const mutate = useMutate()
   const queryClient = useQueryClient()
+  // ✅ "افزایش/کسر اعتبار" — mirrors the Finances view's CreditAdjustDialog but
+  //    with the customer pre-selected (no customer picker, since this dialog is
+  //    opened from the customer profile sheet).
+  const [direction, setDirection] = React.useState<"add" | "subtract">("add")
   const [amount, setAmount] = React.useState(0)
   const [note, setNote] = React.useState("")
   const [submitting, setSubmitting] = React.useState(false)
@@ -2454,6 +2463,7 @@ function AddCreditDialog({
 
   React.useEffect(() => {
     if (open) {
+      setDirection("add")
       setAmount(0)
       setNote("")
       setError(null)
@@ -2462,19 +2472,20 @@ function AddCreditDialog({
 
   const submit = async () => {
     setError(null)
-    if (!Number.isFinite(amount) || amount === 0) {
-      setError("مبلغ غیر از صفر وارد کنید (برای کسر از عدد منفی استفاده کنید)")
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("مبلغ باید بزرگتر از ۰ باشد")
       return
     }
     setSubmitting(true)
     try {
-      // Convert Toman → Rials before sending to the API (which stores Decimal Rials).
-      const rials = tomanToRials(amount)
+      // amount is in Toman; API expects Rials. Negative for subtract direction.
+      const rials = tomanToRials(amount) * (direction === "add" ? 1 : -1)
       await mutate(`/api/customers/${customerId}/credit-transactions`, "POST", {
         amount: rials,
+        transactionType: "manual_adjustment",
         note: note.trim() || undefined,
       })
-      toast.success("اعتبار تنظیم شد")
+      toast.success(direction === "add" ? "اعتبار افزایش یافت" : "اعتبار کسر شد")
       queryClient.invalidateQueries({ queryKey: ["customer-detail", customerId] })
       queryClient.invalidateQueries({ queryKey: ["credit-txs", customerId] })
       queryClient.invalidateQueries({ queryKey: ["customers"] })
@@ -2490,11 +2501,11 @@ function AddCreditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-[420px]" dir="rtl">
         <DialogHeader>
-          <DialogTitle>تنظیم دستی اعتبار</DialogTitle>
+          <DialogTitle>افزایش / کسر اعتبار</DialogTitle>
           <DialogDescription>
-            افزود یا کسر اعتبار. برای کسر از مبلغ منفی استفاده کنید. مبلغ به تومان وارد می‌شود.
+            اعتبار این مشتری را به‌صورت دستی افزایش یا کاهش دهید. مبلغ به تومان وارد می‌شود.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
@@ -2503,17 +2514,49 @@ function AddCreditDialog({
               {error}
             </div>
           )}
+
+          {/* Operation type — add or subtract */}
+          <div className="space-y-1.5">
+            <Label>نوع عملیات</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDirection("add")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                  direction === "add"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-input bg-transparent hover:bg-accent/50"
+                )}
+              >
+                <TrendingUp className="h-3.5 w-3.5" /> افزایش اعتبار
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirection("subtract")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                  direction === "subtract"
+                    ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                    : "border-input bg-transparent hover:bg-accent/50"
+                )}
+              >
+                <TrendingDown className="h-3.5 w-3.5" /> کسر اعتبار
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="credit-amount">مبلغ (تومان)</Label>
             <TomanInput
               id="credit-amount"
               value={amount}
               onValueChange={setAmount}
-              placeholder="مثلاً ۵۰۰٬۰۰۰ یا -۲۰۰٬۰۰۰"
+              placeholder="مثلاً ۵۰۰٬۰۰۰"
             />
-            {amount !== 0 && (
+            {amount > 0 && (
               <p className="text-xs text-muted-foreground">
-                {amount > 0 ? "+" : ""}
+                {direction === "add" ? "+" : "−"}
                 {formatRialsShort(tomanToRials(amount))} تومان
               </p>
             )}
@@ -2524,7 +2567,7 @@ function AddCreditDialog({
               id="credit-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="دلیل تنظیم"
+              placeholder="دلیل تنظیم دستی اعتبار…"
             />
           </div>
         </div>
@@ -2534,7 +2577,7 @@ function AddCreditDialog({
           </Button>
           <Button onClick={submit} disabled={submitting}>
             {submitting && <Loader2 className="mr-1.5 size-4 animate-spin" />}
-            اعمال تغییر
+            {direction === "add" ? "افزایش اعتبار" : "کسر اعتبار"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2658,7 +2701,12 @@ function CustomerProjectsSection({ customerId }: { customerId: string }) {
   const api = useApi()
   const role = useWorkspace((s) => s.role)
   const openProject = useWorkspace((s) => s.openProject)
+  const openProjectForCustomer = useWorkspace((s) => s.openProjectForCustomer)
+  // ✅ FIXES-9A task #3: opens the New-Project Wizard with this customer pre-selected
+  // (skips step 1, goes directly to step 2).
+  const openProjectWizard = useWorkspace((s) => s.openProjectWizard)
   const seeBalance = role === "admin" || role === "manager" || role === "sales"
+  const canCreate = role === "admin" || role === "manager" || role === "sales"
 
   const { data, isLoading } = useQuery({
     queryKey: ["customer-projects", customerId],
@@ -2675,6 +2723,17 @@ function CustomerProjectsSection({ customerId }: { customerId: string }) {
         projects.length === 0
           ? "این مشتری هنوز پروژه‌ای ندارد."
           : `مجموع ${projects.length} پروژه — پروژه‌های در حال انجام با پس‌زمینه کهربایی مشخص شده‌اند.`
+      }
+      actions={
+        canCreate ? (
+          <Button
+            size="sm"
+            onClick={() => openProjectWizard(customerId)}
+            title="پروژه جدید برای این مشتری"
+          >
+            <Plus className="mr-1.5 size-3.5" /> پروژه جدید برای این مشتری
+          </Button>
+        ) : null
       }
     >
       {isLoading ? (
@@ -2695,7 +2754,7 @@ function CustomerProjectsSection({ customerId }: { customerId: string }) {
               <button
                 key={p.id}
                 type="button"
-                onClick={() => openProject(p.id)}
+                onClick={() => openProjectForCustomer(p.id, customerId)}
                 className={cn(
                   "flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-right transition",
                   isDelivered
@@ -2886,7 +2945,6 @@ function CustomerProfileSheet({
   const mutate = useMutate()
   const role = useWorkspace((s) => s.role)
   const openCustomer = useWorkspace((s) => s.openCustomer)
-  const setPage = useWorkspace((s) => s.setPage)
   const queryClient = useQueryClient()
 
   const canSeeFinance = role === "admin" || role === "manager"
@@ -2906,6 +2964,9 @@ function CustomerProfileSheet({
   })
 
   const [creditOpen, setCreditOpen] = React.useState(false)
+  const [settleOpen, setSettleOpen] = React.useState(false)
+  const [settleNote, setSettleNote] = React.useState("")
+  const [settling, setSettling] = React.useState(false)
   const [familyEditing, setFamilyEditing] = React.useState(false)
   const [familyDraft, setFamilyDraft] = React.useState<FamilyMeta>({ spouse: null, children: [] })
   const [savingFamily, setSavingFamily] = React.useState(false)
@@ -2990,22 +3051,9 @@ function CustomerProfileSheet({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {canManage && customer && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        onClose()
-                        setPage("projects")
-                      }}
-                      title="ایجاد پروژه برای این مشتری"
-                    >
-                      <Plus className="mr-1.5 size-3.5" /> پروژه جدید
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => onEdit(customer.id)}>
-                      <Pencil className="mr-1.5 size-3.5" /> ویرایش
-                    </Button>
-                  </>
+                  <Button variant="outline" size="sm" onClick={() => onEdit(customer.id)}>
+                    <Pencil className="mr-1.5 size-3.5" /> ویرایش
+                  </Button>
                 )}
               </div>
             </div>
@@ -3296,9 +3344,21 @@ function CustomerProfileSheet({
                     title="تراکنش‌های اعتبار"
                     description="پاداش‌ها، تنظیمات دستی و مصرف‌ها."
                     actions={
-                      <Button variant="outline" size="sm" onClick={() => setCreditOpen(true)}>
-                        <Plus className="mr-1.5 size-3.5" /> افزودن اعتبار دستی
-                      </Button>
+                      <div className="flex gap-2">
+                        {(customer.creditBalance ?? 0) > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-rose-600 hover:text-rose-700 border-rose-200 hover:border-rose-300 dark:border-rose-800"
+                            onClick={() => setSettleOpen(true)}
+                          >
+                            <CheckCircle2 className="mr-1.5 size-3.5" /> تسویه اعتبار
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => setCreditOpen(true)}>
+                          <Plus className="mr-1.5 size-3.5" /> افزایش / کسر اعتبار
+                        </Button>
+                      </div>
                     }
                   >
                     {(!customer.creditTxs || customer.creditTxs.length === 0) ? (
@@ -3325,7 +3385,14 @@ function CustomerProfileSheet({
                                     {formatDateTime(tx.createdAt)}
                                   </td>
                                   <td className="py-2 pr-3">
-                                    <CreditTxBadge type={tx.transactionType} />
+                                    <div className="flex items-center gap-1.5">
+                                      <CreditTxBadge type={tx.transactionType} />
+                                      {tx.isSettled && (
+                                        <Badge variant="outline" className="text-[9px] text-slate-500 border-slate-300 dark:border-slate-700">
+                                          تسویه شده
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </td>
                                   <td
                                     className={cn(
@@ -3363,6 +3430,72 @@ function CustomerProfileSheet({
           onOpenChange={setCreditOpen}
           customerId={customer.id}
         />
+      )}
+
+      {/* ✅ Settle Credit Dialog با توضیحات اجباری */}
+      {customer && (
+        <Dialog open={settleOpen} onOpenChange={(o) => { setSettleOpen(o); if (!o) setSettleNote("") }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-rose-500" />
+                تسویه اعتبار
+              </DialogTitle>
+              <DialogDescription>
+                مشتری: <strong>{customer.name}</strong> — موجودی فعلی:{" "}
+                <strong>{toPersianDigits((customer.creditBalance ?? 0).toLocaleString("en-US"))} تومان</strong>
+                <br />
+                پس از تسویه، اعتبار به صفر تغییر می‌کند. این عمل قابل بازگشت نیست.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">توضیحات تسویه (اجباری)</Label>
+                <Textarea
+                  value={settleNote}
+                  onChange={(e) => setSettleNote(e.target.value)}
+                  placeholder="مثلاً: اعتبار به‌صورت نقدی به مشتری پرداخت شد"
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  نام انجام‌دهنده به‌صورت خودکار ثبت می‌شود.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setSettleOpen(false); setSettleNote("") }}>
+                انصراف
+              </Button>
+              <Button
+                disabled={settling || !settleNote.trim()}
+                onClick={async () => {
+                  setSettling(true)
+                  try {
+                    const res = await fetch(`/api/customers/${customer.id}/credit-transactions/settle`, {
+                      method: "POST",
+                      headers: authHeaders({ "Content-Type": "application/json" }),
+                      body: JSON.stringify({ note: settleNote.trim() }),
+                    })
+                    const d = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(d.error || "خطا در تسویه")
+                    toast.success(d.message || "اعتبار تسویه شد")
+                    setSettleOpen(false)
+                    setSettleNote("")
+                    queryClient.invalidateQueries({ queryKey: ["customer", customer.id] })
+                  } catch (e: any) {
+                    toast.error(e.message || "خطا در تسویه اعتبار")
+                  } finally {
+                    setSettling(false)
+                  }
+                }}
+                className="bg-rose-600 hover:bg-rose-700"
+              >
+                {settling ? "در حال تسویه..." : "تسویه اعتبار"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       <ImageLightbox
@@ -3666,9 +3799,6 @@ function CustomerRow({
             )}
             {visible.totalProjects && (
               <span>پروژه‌ها: {customer.totalProjects}</span>
-            )}
-            {visible.totalRevenue && canSeeFinance && (
-              <span>درآمد: {formatRialsShort(revenue)} ت</span>
             )}
             {visible.debt && canSeeFinance && (
               <span

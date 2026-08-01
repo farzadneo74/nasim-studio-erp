@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Pencil, Users, Calculator, Award, ShieldCheck, KeyRound } from "lucide-react"
+import { Plus, Pencil, Users, Calculator, Award, ShieldCheck, KeyRound, History, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
 import { useApi } from "@/lib/api/client"
@@ -19,7 +19,7 @@ import {
   type Role,
   type PermissionKey,
 } from "@/lib/constants"
-import { formatRials, formatRialsShort, toPersianDigits } from "@/lib/format"
+import { formatRials, formatRialsShort, toPersianDigits, formatDate, formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import { PageHeader, EmptyState, SectionCard, StatCard } from "./_shared"
@@ -166,7 +166,7 @@ export function SettingsEmployeesView() {
       <PageHeader
         title="کارمندان"
         icon="👥"
-        description="مدیریت کارمندان، نقش‌ها، قوانین حقوق و پاداش‌ها"
+        description="مدیریت کارمندان، نقش‌ها، پاداش‌ها/جریمه‌ها و سطوح دسترسی"
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -174,11 +174,14 @@ export function SettingsEmployeesView() {
           <TabsTrigger value="employees" className="gap-1.5">
             <Users className="h-3.5 w-3.5" /> کارمندان
           </TabsTrigger>
-          <TabsTrigger value="salary-rules" className="gap-1.5">
-            <Calculator className="h-3.5 w-3.5" /> قوانین حقوق
-          </TabsTrigger>
+          {/* ✅ "قوانین حقوق" tab removed per spec — the SalaryRule model is
+              kept in schema but no longer used. Rule-based salary calculation
+              is now superseded by per-project + manual entries. */}
           <TabsTrigger value="manual-salary" className="gap-1.5">
-            <Award className="h-3.5 w-3.5" /> حقوق دستی و پاداش
+            <Award className="h-3.5 w-3.5" /> پاداش و جریمه دستی
+          </TabsTrigger>
+          <TabsTrigger value="salary-history" className="gap-1.5">
+            <History className="h-3.5 w-3.5" /> تاریخچه حقوق
           </TabsTrigger>
           <TabsTrigger value="permissions" className="gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" /> سطوح دسترسی
@@ -188,11 +191,11 @@ export function SettingsEmployeesView() {
         <TabsContent value="employees" className="mt-4">
           <EmployeesTab canManage={canManage} />
         </TabsContent>
-        <TabsContent value="salary-rules" className="mt-4">
-          <SalaryRulesTab canManage={canManage} />
-        </TabsContent>
         <TabsContent value="manual-salary" className="mt-4">
           <ManualSalaryTab canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="salary-history" className="mt-4">
+          <SalaryHistoryTab />
         </TabsContent>
         <TabsContent value="permissions" className="mt-4">
           <PermissionsTab canManage={canManage} currentRole={migrateRole(role) as Role} />
@@ -618,100 +621,22 @@ function EmployeeDialog({
 }
 
 // ============================================================
-// Tab 2: Salary rules (imported from existing view)
+// Tab 2 REMOVED: Salary rules tab is no longer used.
+// The SalaryRule model is kept in the Prisma schema for backward compatibility
+// with existing rows and the GET/POST /api/salary-rules endpoints, but the
+// tab itself has been removed from this view per spec. The rule-based
+// auto-calculation is superseded by per-project + manual entries.
 // ============================================================
-function SalaryRulesTab({ canManage }: { canManage: boolean }) {
-  const api = useApi()
-  const qc = useQueryClient()
-
-  const { data, isLoading } = useQuery<SalaryRule[]>({
-    queryKey: ["salary-rules-emp"],
-    queryFn: async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
-      const res = await fetch("/api/salary-rules", {
-        credentials: "include",
-        headers: { "x-demo-role": "admin", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      })
-      const d = await res.json()
-      return Array.isArray(d) ? d : (d.items || [])
-    },
-  })
-
-  const toggleMut = useMutation({
-    mutationFn: async (r: SalaryRule) => api.patch(`/api/salary-rules/${r.id}`, { isActive: !r.isActive }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["salary-rules-emp"] }),
-    onError: () => toast.error("به‌روزرسانی ناموفق بود"),
-  })
-
-  return (
-    <SectionCard
-      title="قوانین حقوق"
-      description="مدل درآمد کارمندان — درصد یا مبلغ ثابت per پروژه"
-    >
-      {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : !data || data.length === 0 ? (
-        <EmptyState icon="🧮" title="هنوز قانون حقوقی تعریف نشده" />
-      ) : (
-        <div className="overflow-x-auto">
-          <Table dir="rtl">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">نقش</TableHead>
-                <TableHead className="text-right">نوع پورسانت</TableHead>
-                <TableHead className="text-right">مقدار</TableHead>
-                <TableHead className="text-right">اعمال روی</TableHead>
-                <TableHead className="text-center">فعال</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-right">
-                    <Badge variant="outline" className="border-transparent bg-primary/10 text-primary text-[10px]">
-                      {ROLE_LABELS[r.role as Role] ?? r.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    {r.commissionType === "percent" ? "درصدی" : "ثابت per پروژه"}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {r.commissionType === "percent"
-                      ? `${toPersianDigits(String(r.commissionValue))}٪`
-                      : `${formatRialsShort(r.commissionValue)} ت`}
-                  </TableCell>
-                  <TableCell className="text-right text-xs">
-                    {r.applyOn === "field_work" ? "کار میدانی" : r.applyOn === "studio_work" ? "کار استودیو" : "تحویل"}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Switch
-                      checked={r.isActive}
-                      onCheckedChange={() => toggleMut.mutate(r)}
-                      disabled={!canManage}
-                      className="scale-75"
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </SectionCard>
-  )
-}
 
 // ============================================================
-// Tab 3: Manual salary + rewards/penalties
+// Tab 3: Manual salary + rewards/penalties (پاداش و جریمه دستی)
 // ============================================================
 function ManualSalaryTab({ canManage }: { canManage: boolean }) {
   const api = useApi()
   const qc = useQueryClient()
   const [selectedUserId, setSelectedUserId] = React.useState<string>("")
+  // ✅ "type" field: "bonus" (positive) | "penalty" (negative deduction)
+  const [entryType, setEntryType] = React.useState<"bonus" | "penalty">("bonus")
   const [amount, setAmount] = React.useState("")
   const [note, setNote] = React.useState("")
   const [submitting, setSubmitting] = React.useState(false)
@@ -734,12 +659,6 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
     queryFn: () => api.get("/api/salaries"),
   })
 
-  const formatNum = (val: string) => {
-    const raw = val.replace(/[^0-9]/g, "")
-    if (!raw) return ""
-    return Number(raw).toLocaleString("en-US")
-  }
-
   const submit = async () => {
     const toman = Number(amount.replace(/,/g, ""))
     if (!selectedUserId || !toman || toman <= 0) {
@@ -752,13 +671,17 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
     }
     setSubmitting(true)
     try {
+      // ✅ POST /api/salaries with `type` field — the API signs the amount
+      //    (penalty → negative) and sends an in-app notification to the employee.
       await api.post("/api/salaries", {
         userId: selectedUserId,
-        amount: Math.round(toman * 10),
+        amount: Math.round(toman * 10), // Rials
         note: note.trim(),
+        type: entryType,
       })
-      toast.success("حقوق دستی ثبت شد")
+      toast.success(entryType === "bonus" ? "پاداش ثبت شد" : "جریمه ثبت شد")
       qc.invalidateQueries({ queryKey: ["salaries-manual"] })
+      qc.invalidateQueries({ queryKey: ["salary-history"] })
       setAmount("")
       setNote("")
     } catch (e) {
@@ -771,7 +694,7 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
   return (
     <div className="space-y-4">
       {canManage && (
-        <SectionCard title="ثبت حقوق دستی / پاداش / تنبیه" description="مبلغ به تومان وارد می‌شود — مثبت = پاداش، منفی = کسر">
+        <SectionCard title="ثبت پاداش / جریمه دستی" description="مبلغ به تومان وارد می‌شود — برای کارمند پیامک/اعلان ارسال می‌شود">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>کارمند <span className="text-rose-500">*</span></Label>
@@ -788,33 +711,64 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
             </div>
             <div className="space-y-1.5">
               <Label>مبلغ (تومان) <span className="text-rose-500">*</span></Label>
-              <Input
-                dir="ltr"
-                value={formatNum(amount)}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="500,000"
-                className="text-left font-mono"
+              <TomanInput
+                value={Number(amount.replace(/,/g, "") || "0")}
+                onValueChange={(v) => setAmount(String(v))}
+                placeholder="مثلاً ۵۰۰٬۰۰۰"
               />
               {amount && Number(amount.replace(/,/g, "")) > 0 && (
                 <p className="text-[10px] text-muted-foreground">
+                  {entryType === "penalty" ? "−" : "+"}
                   {toPersianDigits(Number(amount.replace(/,/g, "")).toLocaleString("fa-IR"))} تومان
                 </p>
               )}
             </div>
           </div>
-          <div className="mt-2 space-y-1.5">
+
+          {/* ✅ Operation type — bonus or penalty */}
+          <div className="mt-3 space-y-1.5">
+            <Label>نوع عملیات <span className="text-rose-500">*</span></Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setEntryType("bonus")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                  entryType === "bonus"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-input bg-transparent hover:bg-accent/50"
+                )}
+              >
+                <Award className="h-3.5 w-3.5" /> پاداش
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryType("penalty")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm transition-colors",
+                  entryType === "penalty"
+                    ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                    : "border-input bg-transparent hover:bg-accent/50"
+                )}
+              >
+                <AlertCircle className="h-3.5 w-3.5" /> جریمه
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-1.5">
             <Label>یادداشت <span className="text-rose-500">*</span></Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثلاً: پاداش پروژه عروسی سحر و رضا" />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={entryType === "bonus" ? "مثلاً: پاداش پروژه عروسی سحر و رضا" : "مثلاً: جریمه تأخیر در تحویل پروژه"} />
           </div>
           <div className="mt-3 flex justify-end">
             <Button onClick={submit} disabled={submitting || !selectedUserId || !amount || !note.trim()}>
-              {submitting ? "در حال ذخیره..." : "ثبت"}
+              {submitting ? "در حال ذخیره..." : entryType === "bonus" ? "ثبت پاداش" : "ثبت جریمه"}
             </Button>
           </div>
         </SectionCard>
       )}
 
-      <SectionCard title="تاریخچه حقوق‌های ثبت‌شده" description="لیست تمام حقوق‌های دستی و پورسانت‌ها">
+      <SectionCard title="تاریخچه حقوق‌های ثبت‌شده" description="لیست تمام پاداش‌ها، جریمه‌ها و پورسانت‌ها">
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -829,21 +783,29 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-right">کارمند</TableHead>
+                  <TableHead className="text-right">نوع</TableHead>
                   <TableHead className="text-right">مبلغ</TableHead>
                   <TableHead className="text-right">یادداشت</TableHead>
                   <TableHead className="text-right">تاریخ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {salaries.items.map((s) => {
+                {salaries.items.map((s: any) => {
                   const u = (users || []).find((x) => x.id === s.userId)
+                  const isPenalty = (s.manualType === "penalty") || (Number(s.amount) < 0)
                   return (
-                    <TableRow key={s.id}>
+                    <TableRow key={s.id} className={cn((s as any).isSettled && "opacity-50")}>
                       <TableCell className="text-right text-sm">
                         {u ? `${u.firstName} ${u.lastName}` : "—"}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className={cn("text-[10px]", isPenalty ? "border-rose-300 text-rose-600 dark:border-rose-700 dark:text-rose-400" : "border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400")}>
+                          {isPenalty ? "جریمه" : "پاداش"}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
-                        {formatRialsShort(s.amount)} ت
+                        {isPenalty ? "−" : ""}
+                        {formatRialsShort(Math.abs(Number(s.amount)))} ت
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">
                         {s.note || "—"}
@@ -860,6 +822,185 @@ function ManualSalaryTab({ canManage }: { canManage: boolean }) {
         )}
       </SectionCard>
     </div>
+  )
+}
+
+// ============================================================
+// Tab 3b: Salary History — unified timeline (ProjectSalary + manual entries)
+// ============================================================
+interface SalaryHistoryItem {
+  id: string
+  source: "project_salary" | "salary_record"
+  projectName: string
+  amount: number // Rials (negative for penalties)
+  description: string | null
+  note: string | null
+  tags: string[]
+  date: string
+  isSettled: boolean
+  settledAt: string | null
+  manualType?: string
+  isPaid?: boolean
+}
+
+function SalaryHistoryTab() {
+  const api = useApi()
+  const qc = useQueryClient()
+  const [selectedUserId, setSelectedUserId] = React.useState<string>("")
+
+  const { data: users } = useQuery<Employee[]>({
+    queryKey: ["users-employees"],
+    queryFn: async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("nasim-session-token") : null
+      const res = await fetch("/api/users", {
+        credentials: "include",
+        headers: { "x-demo-role": "admin", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      const d = await res.json()
+      return Array.isArray(d) ? d : (d.items || [])
+    },
+  })
+
+  const { data, isLoading } = useQuery<{ items: SalaryHistoryItem[] }>({
+    queryKey: ["salary-history", selectedUserId],
+    enabled: !!selectedUserId,
+    queryFn: () => api.get(`/api/users/${selectedUserId}/salary-history`),
+  })
+
+  const settleMut = useMutation({
+    mutationFn: async (item: SalaryHistoryItem) => {
+      if (item.source === "project_salary") {
+        // ProjectSalary → PATCH /api/projects/[id]/salaries/[salaryId]
+        // We don't have the projectId on the client, but the route requires it.
+        // The server allows the URL form `/api/projects/any/salaries/[salaryId]`
+        // since we only need the salaryId. Use "any" as a sentinel.
+        return api.patch(`/api/projects/any/salaries/${item.id}`, { isSettled: !item.isSettled })
+      } else {
+        // SalaryRecord → PATCH /api/salaries/[id]
+        return api.patch(`/api/salaries/${item.id}`, { isSettled: !item.isSettled })
+      }
+    },
+    onSuccess: () => {
+      toast.success("وضعیت تسویه به‌روزرسانی شد")
+      qc.invalidateQueries({ queryKey: ["salary-history", selectedUserId] })
+    },
+    onError: (e: Error) => toast.error(e.message || "به‌روزرسانی ناموفق بود"),
+  })
+
+  const items = data?.items ?? []
+
+  return (
+    <SectionCard
+      title="تاریخچه حقوق"
+      description="نمایش همه‌ی پاداش‌ها، جریمه‌ها و حقوق‌های پروژه‌ای هر کارمند با وضعیت تسویه"
+    >
+      <div className="mb-3 max-w-sm">
+        <Label>انتخاب کارمند</Label>
+        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+          <SelectTrigger><SelectValue placeholder="انتخاب کارمند" /></SelectTrigger>
+          <SelectContent>
+            {(users || []).map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.firstName} {u.lastName} ({ROLE_LABELS[u.role as Role] ?? u.role})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!selectedUserId ? (
+        <EmptyState icon="👤" title="یک کارمند را انتخاب کنید" description="برای مشاهده‌ی تاریخچه حقوق‌ها یک کارمند انتخاب کنید." />
+      ) : isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon="💰" title="موردی وجود ندارد" description="این کارمند هنوز پاداش/جریمه/حقوق پروژه‌ای ندارد." />
+      ) : (
+        <div className="overflow-x-auto">
+          <Table dir="rtl">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-right">پروژه</TableHead>
+                <TableHead className="text-right">نوع</TableHead>
+                <TableHead className="text-right">مبلغ</TableHead>
+                <TableHead className="text-right">توضیحات</TableHead>
+                <TableHead className="text-right">تگ‌ها</TableHead>
+                <TableHead className="text-right">تاریخ</TableHead>
+                <TableHead className="text-right">وضعیت</TableHead>
+                <TableHead className="text-right">عملیات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((it) => {
+                const isPenalty = it.source === "salary_record" && (it.manualType === "penalty" || it.amount < 0)
+                const isBonus = it.source === "salary_record" && (it.manualType === "bonus" || (it.manualType !== "penalty" && it.amount > 0))
+                const label = it.source === "project_salary"
+                  ? "حقوق پروژه"
+                  : isPenalty
+                    ? "جریمه"
+                    : isBonus
+                      ? "پاداش"
+                      : "حقوق دستی"
+                return (
+                  <TableRow key={`${it.source}-${it.id}`} className={cn(it.isSettled && "opacity-50")}>
+                    <TableCell className="text-right text-sm">{it.projectName}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="outline" className={cn("text-[10px]", isPenalty ? "border-rose-300 text-rose-600 dark:border-rose-700 dark:text-rose-400" : "border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400")}>
+                        {label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm whitespace-nowrap">
+                      {isPenalty ? "−" : ""}
+                      {formatRials(Math.abs(it.amount))} <span className="text-muted-foreground">تومان</span>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground max-w-[200px] truncate">
+                      {it.description || it.note || "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {it.tags.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          it.tags.map((t, i) => (
+                            <Badge key={i} variant="secondary" className="text-[9px]">{t}</Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDateTime(it.date)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {it.isSettled ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> تسویه شده
+                        </span>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-amber-700 dark:text-amber-400">باز</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        disabled={settleMut.isPending}
+                        onClick={() => settleMut.mutate(it)}
+                      >
+                        {it.isSettled ? "برداشتن تسویه" : "علامت‌گذاری تسویه"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </SectionCard>
   )
 }
 

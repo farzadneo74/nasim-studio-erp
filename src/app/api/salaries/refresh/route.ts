@@ -12,7 +12,8 @@ function forbidden() {
 /**
  * Recompute SalaryRecords for the current Jalali month.
  *
- * For each project whose `actualEndDatetime` (delivery date) falls within the
+ * For each project whose `updatedAt` (last status change, used as proxy for
+ * delivery date since `actualEndDatetime` was removed) falls within the
  * current Jalali month, walk the field/studio/delivery teams and find the
  * matching active SalaryRule (by role + applyOn). If a SalaryRecord already
  * exists for (userId, projectId, ruleUsedId) it is skipped — this keeps the
@@ -43,7 +44,8 @@ export async function POST() {
   const projects = await db.project.findMany({
     where: {
       status: "delivered",
-      actualEndDatetime: {
+      // ✅ actualEndDatetime removed — use updatedAt as delivery date proxy
+      updatedAt: {
         gte: startGreg,
         lt: endGreg,
       },

@@ -78,6 +78,15 @@ export async function POST(req: Request, { params }: Ctx) {
 
   const [studio, defaultText] = await Promise.all([getStudioName(db), getContractDefaultText(db)])
 
+  // ✅ بررسی قالب قرارداد اختصاصی
+  let customTemplate: { htmlContent: string; cssContent: string } | null = null
+  try {
+    const tpl = await (db as any).contractTemplate.findFirst({
+      where: { isDefault: true, isActive: true },
+    })
+    if (tpl) customTemplate = { htmlContent: tpl.htmlContent, cssContent: tpl.cssContent || "" }
+  } catch { /* table not found — use default */ }
+
   // Fetch selected projects — sort by CREATION time, newest first.
   const projects = ids.length
     ? await db.project.findMany({
@@ -86,6 +95,7 @@ export async function POST(req: Request, { params }: Ctx) {
           servicePackage: true,
           contract: true,
           payments: true,
+          tasks: true,
         },
         orderBy: { createdAt: "desc" },
       })
@@ -101,7 +111,11 @@ export async function POST(req: Request, { params }: Ctx) {
     totalPaid: number
     balance: number
     discountAmount: number
+    priceAdjustment: number
     packageDescription: string | null
+    defaultTasks: any[]
+    defaultEquipment: any[]
+    projectAddress: string | null
   }
 
   const rows: Row[] = projects.map((p) => {
@@ -130,7 +144,21 @@ export async function POST(req: Request, { params }: Ctx) {
       totalPaid: confirmedPaid,
       balance: Math.max(0, eff - confirmedPaid),
       discountAmount: Number(p.discountAmount ?? 0),
+      priceAdjustment: Number((p as any).priceAdjustment ?? 0),
       packageDescription: p.servicePackage.defaultDescription ?? null,
+      defaultTasks: (() => {
+        try {
+          const v = JSON.parse(p.servicePackage.defaultTasks)
+          return Array.isArray(v) ? v : []
+        } catch { return [] }
+      })(),
+      defaultEquipment: (() => {
+        try {
+          const v = JSON.parse(p.servicePackage.defaultEquipment)
+          return Array.isArray(v) ? v : []
+        } catch { return [] }
+      })(),
+      projectAddress: (p as any).projectAddress ?? null,
     }
   })
 
@@ -165,11 +193,34 @@ export async function POST(req: Request, { params }: Ctx) {
         ${r.packageDescription ? `<div class="proj-desc">${esc(r.packageDescription)}</div>` : ""}
         <div class="proj-meta">
           <span><span class="k">تاریخ اجرا:</span> <span class="v">${esc(scheduleTxt)}</span></span>
-          <span><span class="k">قیمت:</span> <span class="v price" dir="ltr">${formatRials(r.effectivePrice)} تومان</span></span>
+          ${r.projectAddress ? `<span><span class="k">آدرس:</span> <span class="v">${esc(r.projectAddress)}</span></span>` : ""}
+          <span><span class="k">قیمت پکیج:</span> <span class="v" dir="ltr">${formatRials(r.effectivePrice + r.discountAmount - r.priceAdjustment)} تومان</span></span>
+          ${r.priceAdjustment !== 0 ? `<span><span class="k">اصلاح قیمت:</span> <span class="v" dir="ltr">${r.priceAdjustment > 0 ? "+" : "−"}${formatRials(Math.abs(r.priceAdjustment))} تومان</span></span>` : ""}
+          <span><span class="k">قیمت نهایی:</span> <span class="v price" dir="ltr">${formatRials(r.effectivePrice)} تومان</span></span>
           <span><span class="k">تخفیف:</span> <span class="${discountCls}" dir="ltr">${discountTxt}${r.discountAmount > 0 ? " تومان" : ""}</span></span>
           <span><span class="k">پرداخت‌شده:</span> <span class="v paid" dir="ltr">${formatRials(r.totalPaid)} تومان</span></span>
           <span><span class="k">مانده:</span> <span class="${balanceCls}" dir="ltr">${formatRials(r.balance)} تومان</span></span>
         </div>
+        ${r.defaultTasks.length > 0 ? `
+        <div class="proj-tasks">
+          <div class="tasks-title">کارها:</div>
+          <ul class="tasks-list">
+            ${r.defaultTasks.map((t: any) => {
+              const item = typeof t === "string" ? { name: t, price: 0 } : t
+              return `<li>${esc(item.name)}${item.price > 0 ? ` — <span dir="ltr">${formatRials(item.price * 10)} ت</span>` : ""}</li>`
+            }).join("")}
+          </ul>
+        </div>` : ""}
+        ${r.defaultEquipment.length > 0 ? `
+        <div class="proj-tasks">
+          <div class="tasks-title">تجهیزات:</div>
+          <ul class="tasks-list">
+            ${r.defaultEquipment.map((e: any) => {
+              const item = typeof e === "string" ? { name: e, price: 0 } : e
+              return `<li>${esc(item.name)}${item.price > 0 ? ` — <span dir="ltr">${formatRials(item.price * 10)} ت</span>` : ""}</li>`
+            }).join("")}
+          </ul>
+        </div>` : ""}
       </div>
       <hr class="proj-divider" />`
         })
@@ -234,6 +285,44 @@ export async function POST(req: Request, { params }: Ctx) {
       </div>
     </div>`
 
+  // ✅ اگه قالب اختصاصی وجود داره، از اون استفاده کن
+  if (customTemplate) {
+    // جایگزینی متغیرها در قالب اختصاصی
+    let customHtml = customTemplate.htmlContent
+    const customCss = customTemplate.cssContent || ""
+
+    // متغیرهای سراسری
+    customHtml = customHtml
+      .replace(/\{customer_name\}/g, esc(customer.name))
+      .replace(/\{studio_name\}/g, esc(studio.fa))
+      .replace(/\{issued_at\}/g, issuedAt)
+      .replace(/\{terms_text\}/g, termsInnerHtml)
+      .replace(/\{projects_html\}/g, projectsHtml)
+      .replace(/\{total_price\}/g, formatRials(totalEff) + " تومان")
+      .replace(/\{total_paid\}/g, formatRials(totalPaid) + " تومان")
+      .replace(/\{total_balance\}/g, formatRials(totalBalance) + " تومان")
+      .replace(/\{total_discount\}/g, formatRials(totalDiscount) + " تومان")
+
+    // متغیرهای پروژه اول (برای قراردادهای تک‌پروژه‌ای)
+    if (rows.length > 0) {
+      const r = rows[0]
+      customHtml = customHtml
+        .replace(/\{contract_number\}/g, esc(r.contractNumber))
+        .replace(/\{project_title\}/g, esc(r.title))
+        .replace(/\{project_date\}/g, r.startDatetime ? formatDate(r.startDatetime) : "—")
+        .replace(/\{price\}/g, formatRials(r.effectivePrice) + " تومان")
+        .replace(/\{discount\}/g, formatRials(r.discountAmount) + " تومان")
+        .replace(/\{paid\}/g, formatRials(r.totalPaid) + " تومان")
+        .replace(/\{balance\}/g, formatRials(r.balance) + " تومان")
+    }
+
+    return new Response(
+      `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>${customCss}</style></head><body>${customHtml}</body></html>`,
+      { headers: { "Content-Type": "text/html; charset=utf-8" } }
+    )
+  }
+
+  // قالب پیش‌فرض (کد موجود)
   const html = `<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -249,6 +338,7 @@ export async function POST(req: Request, { params }: Ctx) {
     margin: 0;
     padding: 0;
     font-family: "Vazirmatn", "IRANSans", "Tahoma", system-ui, -apple-system, sans-serif;
+    font-size: 10px;
     color: #1f2937;
     background: #f3f4f6;
     -webkit-print-color-adjust: exact;
@@ -257,8 +347,8 @@ export async function POST(req: Request, { params }: Ctx) {
   .page {
     width: 210mm;
     min-height: 297mm;
-    margin: 16px auto;
-    padding: 14mm 14mm;
+    margin: 10px auto;
+    padding: 10mm 10mm;
     background: #ffffff;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     border-radius: 6px;
@@ -307,19 +397,19 @@ export async function POST(req: Request, { params }: Ctx) {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    border-bottom: 3px solid #0f766e;
-    padding-bottom: 8px;
-    margin-bottom: 10px;
+    border-bottom: 2px solid #0f766e;
+    padding-bottom: 5px;
+    margin-bottom: 6px;
   }
-  .studio { display: flex; flex-direction: column; gap: 2px; }
-  .studio .fa { font-size: 18px; font-weight: 700; color: #0f766e; }
-  .studio .en { font-size: 10px; letter-spacing: 2px; color: #6b7280; }
-  .contract-meta { text-align: left; font-size: 10px; color: #6b7280; }
+  .studio { display: flex; flex-direction: column; gap: 1px; }
+  .studio .fa { font-size: 15px; font-weight: 700; color: #0f766e; }
+  .studio .en { font-size: 9px; letter-spacing: 2px; color: #6b7280; }
+  .contract-meta { text-align: left; font-size: 9px; color: #6b7280; }
   .contract-meta .title {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     color: #111827;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
 
   /* ---- Compact customer row ---- */
@@ -327,71 +417,71 @@ export async function POST(req: Request, { params }: Ctx) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 10px;
-    padding: 6px 10px;
+    gap: 3px 8px;
+    padding: 4px 8px;
     background: #f9fafb;
     border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    margin-bottom: 12px;
-    font-size: 11px;
-    line-height: 1.6;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    font-size: 10px;
+    line-height: 1.5;
   }
-  .customer-row .name { font-weight: 700; color: #111827; font-size: 12px; }
+  .customer-row .name { font-weight: 700; color: #111827; font-size: 11px; }
   .customer-row .k { color: #6b7280; }
   .customer-row .v { color: #111827; font-weight: 600; }
   .customer-row .sep { color: #d1d5db; margin: 0 2px; }
 
   /* ---- Section title ---- */
   h2.section-title {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: #111827;
-    margin: 0 0 6px 0;
-    padding-right: 8px;
+    margin: 0 0 4px 0;
+    padding-right: 6px;
     border-right: 3px solid #0f766e;
   }
 
   /* ---- Per-project blocks (compact, thin dividers) ---- */
-  .projects { margin-top: 4px; }
+  .projects { margin-top: 2px; }
   .proj {
-    padding: 5px 0;
-    font-size: 11px;
-    line-height: 1.55;
+    padding: 3px 0;
+    font-size: 10px;
+    line-height: 1.4;
     page-break-inside: avoid;
   }
   .proj-head {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 3px;
+    gap: 4px;
+    margin-bottom: 2px;
   }
   .proj-num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
+    min-width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: #0f766e;
     color: #ffffff;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
   }
-  .proj-title { font-size: 12px; font-weight: 700; color: #111827; }
-  .proj-contract { font-size: 10px; color: #6b7280; }
+  .proj-title { font-size: 11px; font-weight: 700; color: #111827; }
+  .proj-contract { font-size: 9px; color: #6b7280; }
   .proj-status {
     margin-right: auto;
-    font-size: 10px;
-    padding: 1px 7px;
+    font-size: 9px;
+    padding: 1px 5px;
     border-radius: 999px;
   }
   .proj-meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
-    padding-right: 24px;
-    font-size: 11px;
+    gap: 1px 10px;
+    padding-right: 20px;
+    font-size: 10px;
   }
   .proj-meta .k { color: #6b7280; }
   .proj-meta .v { font-weight: 600; color: #111827; }
@@ -403,68 +493,94 @@ export async function POST(req: Request, { params }: Ctx) {
   .proj-meta .v.muted-num { color: #9ca3af; }
   .proj-divider { border: 0; border-top: 1px dashed #e5e7eb; margin: 0; }
   .proj-desc {
-    font-size: 10px;
+    font-size: 9px;
     color: #4b5563;
-    line-height: 1.5;
-    padding: 4px 8px 2px;
-    margin-bottom: 2px;
+    line-height: 1.4;
+    padding: 2px 6px 1px;
+    margin-bottom: 1px;
     white-space: pre-wrap;
     border-right: 2px solid #d1d5db;
-    margin-right: 8px;
+    margin-right: 6px;
+  }
+  .proj-tasks {
+    padding: 2px 6px 1px;
+    margin-right: 6px;
+    margin-top: 2px;
+  }
+  .tasks-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 1px;
+  }
+  .tasks-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .tasks-list li {
+    font-size: 8.5px;
+    color: #4b5563;
+    padding: 1px 4px;
+    background: #f3f4f6;
+    border-radius: 3px;
   }
   .proj-empty {
     text-align: center;
     color: #6b7280;
-    padding: 14px 8px;
-    font-size: 11px;
+    padding: 10px 8px;
+    font-size: 10px;
   }
 
   /* ---- Totals — horizontal cards ---- */
   .totals {
-    margin-top: 10px;
-    padding: 8px 12px;
+    margin-top: 6px;
+    padding: 5px 8px;
     background: #f9fafb;
     border: 1px solid #e5e7eb;
-    border-radius: 6px;
+    border-radius: 5px;
     page-break-inside: avoid;
   }
   .totals-title {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
     color: #111827;
-    margin-bottom: 6px;
-    padding-bottom: 3px;
+    margin-bottom: 3px;
+    padding-bottom: 2px;
     border-bottom: 1px solid #e5e7eb;
   }
   .totals-cards {
     display: flex;
-    gap: 8px;
+    gap: 5px;
     flex-wrap: wrap;
   }
   .total-card {
     flex: 1;
-    min-width: 120px;
+    min-width: 100px;
     text-align: center;
-    padding: 8px 6px;
-    border-radius: 6px;
+    padding: 5px 4px;
+    border-radius: 5px;
     border: 1px solid #e5e7eb;
     background: #fff;
   }
   .total-card .tc-label {
-    font-size: 10px;
+    font-size: 9px;
     color: #6b7280;
     font-weight: 600;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
   .total-card .tc-value {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
     line-height: 1.2;
   }
   .total-card .tc-unit {
-    font-size: 9px;
+    font-size: 8px;
     color: #9ca3af;
-    margin-top: 2px;
+    margin-top: 1px;
   }
   .total-card-price { border-color: #a7f3d0; background: #ecfdf5; }
   .total-card-price .tc-value { color: #047857; }
@@ -478,21 +594,21 @@ export async function POST(req: Request, { params }: Ctx) {
   .total-card-balance-zero .tc-value { color: #047857; }
 
   /* ---- Editable blocks (terms / description) ---- */
-  .editable { margin-top: 10px; page-break-inside: avoid; }
+  .editable { margin-top: 6px; page-break-inside: avoid; }
   .block-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #0f766e;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
   }
   .block-body {
-    font-size: 11px;
-    line-height: 1.75;
+    font-size: 10px;
+    line-height: 1.55;
     color: #1f2937;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border: 1px dashed #d1d5db;
-    border-radius: 6px;
-    min-height: 36px;
+    border-radius: 5px;
+    min-height: 28px;
     white-space: pre-wrap;
     background: #fdfdfd;
   }
@@ -511,35 +627,35 @@ export async function POST(req: Request, { params }: Ctx) {
 
   /* ---- Signature areas ---- */
   .sign-row {
-    margin-top: 18px;
+    margin-top: 10px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    gap: 16px;
     page-break-inside: avoid;
   }
   .sign-box { display: flex; flex-direction: column; }
   .sign-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: #374151;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     text-align: center;
   }
   .sign-space {
     border: 1px solid #9ca3af;
-    border-radius: 6px;
-    height: 75px;
+    border-radius: 5px;
+    height: 50px;
     background: #fafafa;
   }
 
   /* ---- Footer ---- */
   footer.contract-foot {
-    margin-top: 14px;
-    padding-top: 6px;
+    margin-top: 8px;
+    padding-top: 4px;
     border-top: 1px dashed #d1d5db;
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 8px;
     color: #6b7280;
   }
 
@@ -550,7 +666,7 @@ export async function POST(req: Request, { params }: Ctx) {
       width: 210mm;
       min-height: 297mm;
       margin: 0;
-      padding: 12mm 12mm;
+      padding: 8mm 8mm;
       box-shadow: none;
       border-radius: 0;
     }

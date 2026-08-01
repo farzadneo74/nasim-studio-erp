@@ -58,7 +58,7 @@ import { useWorkspace } from "@/stores/workspace"
 import { STATUS_LABELS, STATUS_COLORS, STATUS_FLOW, CATEGORY_COLORS, CATEGORY_LABELS, type ProjectStatus } from "@/lib/constants"
 import { formatRials, formatRialsShort, formatDateTime, timeAgo, toPersianDigits } from "@/lib/format"
 import { PageHeader, StatCard, SectionCard, EmptyState } from "./_shared"
-import { RemindersWidget, EnhancedNotificationsWidget, OccasionsWidget } from "./_dashboard-widgets"
+import { RemindersWidget, EnhancedNotificationsWidget } from "./_dashboard-widgets"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -302,9 +302,6 @@ export function DashboardView() {
         <RemindersWidget />
         <EnhancedNotificationsWidget />
       </div>
-
-      {/* مناسبت‌ها (تولد و سالگرد مشتریان) */}
-      <OccasionsWidget />
 
       {/* شاخص‌ها */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">

@@ -33,10 +33,13 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
   const { id } = await params
   const body = await req.json().catch(() => ({}))
-  const { isConfirmed, amount, note } = body as {
+  const { isConfirmed, amount, note, paymentType, method, datePaid } = body as {
     isConfirmed?: boolean
     amount?: number
     note?: string
+    paymentType?: string
+    method?: string
+    datePaid?: string
   }
 
   const existing = await db.payment.findUnique({
@@ -58,13 +61,25 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 })
   }
 
+  // ✅ Build update data — accept all editable fields so "edit payment" actually
+  //    updates instead of being silently dropped (previously only isConfirmed /
+  //    amount / note were persisted, so changing the date or method appeared to
+  //    "do nothing" and the user reported it as "editing creates a new payment").
+  const data: Record<string, unknown> = {}
+  if (isConfirmed !== undefined) data.isConfirmed = willBeConfirmed
+  if (amount !== undefined) data.amount = newAmount
+  if (note !== undefined) data.note = note || null
+  if (paymentType !== undefined) data.paymentType = paymentType
+  if (method !== undefined) data.method = method
+  if (datePaid !== undefined) {
+    try {
+      data.datePaid = new Date(datePaid)
+    } catch { /* ignore invalid date */ }
+  }
+
   const updated = await db.payment.update({
     where: { id },
-    data: {
-      ...(isConfirmed !== undefined ? { isConfirmed: willBeConfirmed } : {}),
-      ...(amount !== undefined ? { amount: newAmount } : {}),
-      ...(note !== undefined ? { note: note || null } : {}),
-    },
+    data,
   })
 
   // Update customer revenue cache if confirmation state changed OR amount changed on a confirmed payment

@@ -12,6 +12,9 @@ function shape(p: {
   paperType: string
   laminateType: string
   photoLocation: string
+  isFormal?: boolean
+  printOrder?: string
+  priority?: string
   price: { toString(): string }
   isActive: boolean
   createdAt: Date
@@ -23,6 +26,9 @@ function shape(p: {
     paperType: p.paperType,
     laminateType: p.laminateType,
     photoLocation: p.photoLocation,
+    isFormal: (p as any).isFormal ?? false,
+    printOrder: (p as any).printOrder ?? "none",
+    priority: (p as any).priority ?? "normal",
     price: Number(p.price.toString()),
     isActive: p.isActive,
     createdAt: p.createdAt,
@@ -104,6 +110,18 @@ export async function PATCH(
 
   if (typeof body.isActive === "boolean") {
     data.isActive = body.isActive
+  }
+
+  // ✅ priority: normal | formal
+  if (typeof body.priority === "string") {
+    data.priority = body.priority === "formal" ? "formal" : "normal"
+  }
+  // isFormal و printOrder هم قابل آپدیت باشن
+  if (typeof body.isFormal === "boolean") {
+    data.isFormal = body.isFormal
+  }
+  if (typeof body.printOrder === "string") {
+    data.printOrder = ["none", "first", "second"].includes(body.printOrder) ? body.printOrder : "none"
   }
 
   // Duplicate check (excluding the current row) if any identity field changed

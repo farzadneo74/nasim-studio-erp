@@ -10,10 +10,10 @@ export type CustomerType = (typeof CUSTOMER_TYPES)[number]
 export const PACKAGE_CATEGORIES = ["photo", "video", "mix", "other"] as const
 export type PackageCategory = (typeof PACKAGE_CATEGORIES)[number]
 
-export const PACKAGE_QUALITIES = ["fullhd", "4k"] as const
+export const PACKAGE_QUALITIES = ["fullhd", "4k", "none"] as const
 export type PackageQuality = (typeof PACKAGE_QUALITIES)[number]
 
-export const PRICING_STRATEGIES = ["variable", "delayed"] as const
+export const PRICING_STRATEGIES = ["fixed", "variable", "delayed"] as const
 export type PricingStrategy = (typeof PRICING_STRATEGIES)[number]
 
 export const PROJECT_STATUSES = [
@@ -100,9 +100,11 @@ export const CATEGORY_LABELS: Record<PackageCategory, string> = {
 export const QUALITY_LABELS: Record<PackageQuality, string> = {
   fullhd: "FullHD",
   "4k": "4K",
+  none: "خالی",
 }
 
 export const PRICING_STRATEGY_LABELS: Record<PricingStrategy, string> = {
+  fixed: "ثابت",
   variable: "متغیر",
   delayed: "مهلت‌دار",
 }
@@ -112,6 +114,14 @@ export const PHOTO_LOCATION_LABELS: Record<string, string> = {
   studio: "آتلیه",
   outdoor: "فضای بیرون",
   customer: "مشتری",
+}
+
+// ✅ Print photo priority labels
+export const PHOTO_PRIORITIES = ["normal", "formal"] as const
+export type PhotoPriority = (typeof PHOTO_PRIORITIES)[number]
+export const PRIORITY_LABELS: Record<PhotoPriority, string> = {
+  normal: "معمولی",
+  formal: "سرمجلسی",
 }
 
 export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {

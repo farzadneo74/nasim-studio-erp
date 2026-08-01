@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Save, Image as ImageIcon, MessageSquare, Info, Bell, Volume2, Play, Square, Upload, Bold, Italic, Underline, Smile } from "lucide-react"
+import { Save, Image as ImageIcon, MessageSquare, Info, Bell, Volume2, Play, Square, Upload, Bold, Italic, Underline, Smile, Gift, Sparkles, Plus, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -19,11 +19,13 @@ import { PageHeader, EmptyState, SectionCard } from "./_shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
   Select,
   SelectTrigger,
@@ -572,6 +574,16 @@ export function SettingsSystemView() {
         <PricingSettingsCard />
       </div>
 
+      {/* Referral credit strategy */}
+      <div className="mt-4">
+        <ReferralStrategyCard />
+      </div>
+
+      {/* USD exchange rate */}
+      <div className="mt-4">
+        <UsdRateCard />
+      </div>
+
       {/* Default contract text — rich text editor */}
       <div className="mt-4">
         <SectionCard
@@ -600,7 +612,177 @@ export function SettingsSystemView() {
       <div className="mt-4">
         <ReminderSettingsCard canManage={!!canManage} />
       </div>
+
+      {/* ✅ قالب‌های قرارداد اختصاصی */}
+      <div className="mt-4">
+        <ContractTemplateCard canManage={!!canManage} />
+      </div>
     </div>
+  )
+}
+
+// ============================================================
+// ✅ Contract Template Card — قالب قرارداد اختصاصی
+// ============================================================
+function ContractTemplateCard({ canManage }: { canManage: boolean }) {
+  const api = useApi()
+  const qc = useQueryClient()
+  const [editing, setEditing] = React.useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [form, setForm] = React.useState({ name: "", htmlContent: "", cssContent: "", isDefault: false })
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["contract-templates"],
+    queryFn: () => api.get<{ items: any[] }>("/api/contract-templates"),
+  })
+
+  const templates = data?.items ?? []
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      if (!form.name.trim() || !form.htmlContent.trim()) throw new Error("نام و محتوای HTML الزامی است")
+      if (editing) {
+        return api.patch(`/api/contract-templates/${editing}`, form)
+      } else {
+        return api.post("/api/contract-templates", form)
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing ? "قالب آپدیت شد" : "قالب ایجاد شد")
+      setDialogOpen(false)
+      setEditing(null)
+      setForm({ name: "", htmlContent: "", cssContent: "", isDefault: false })
+      qc.invalidateQueries({ queryKey: ["contract-templates"] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.del(`/api/contract-templates/${id}`),
+    onSuccess: () => {
+      toast.success("قالب حذف شد")
+      qc.invalidateQueries({ queryKey: ["contract-templates"] })
+    },
+    onError: () => toast.error("حذف ناموفق بود"),
+  })
+
+  function openEdit(t: any) {
+    setEditing(t.id)
+    setForm({ name: t.name, htmlContent: t.htmlContent, cssContent: t.cssContent || "", isDefault: t.isDefault })
+    setDialogOpen(true)
+  }
+
+  function openCreate() {
+    setEditing(null)
+    setForm({
+      name: "",
+      htmlContent: `<div dir="rtl" style="font-family: Vazirmatn, sans-serif; padding: 20px;">\n  <h1>{studio_name}</h1>\n  <h2>قرارداد: {contract_number}</h2>\n  <p>مشتری: {customer_name}</p>\n  <p>تاریخ: {project_date}</p>\n  <p>قیمت: {price}</p>\n  <p>پرداخت‌شده: {paid}</p>\n  <p>مانده: {balance}</p>\n  <hr>\n  <div>{projects_html}</div>\n  <hr>\n  <div>{terms_text}</div>\n</div>`,
+      cssContent: "",
+      isDefault: templates.length === 0,
+    })
+    setDialogOpen(true)
+  }
+
+  return (
+    <SectionCard
+      title="قالب‌های قرارداد"
+      description="قالب HTML اختصاصی برای خروجی قرارداد — با متغیرهای پویا"
+      actions={canManage ? <Button size="sm" onClick={openCreate}><Plus className="ml-1.5 h-3.5 w-3.5" /> قالب جدید</Button> : undefined}
+    >
+      {isLoading ? (
+        <Skeleton className="h-20 w-full" />
+      ) : templates.length === 0 ? (
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          قالبی تعریف نشده. از قالب پیش‌فرض سیستم استفاده می‌شود.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {templates.map((t) => (
+            <div key={t.id} className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">{t.name}</span>
+                  {t.isDefault && <Badge className="bg-emerald-100 text-emerald-700">پیش‌فرض</Badge>}
+                  {!t.isActive && <Badge variant="secondary">غیرفعال</Badge>}
+                </div>
+                <div className="mt-0.5 text-[10px] text-muted-foreground">
+                  {t.htmlContent.length} کاراکتر HTML
+                </div>
+              </div>
+              {canManage && (
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(t)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => { if (confirm("حذف قالب؟")) deleteMut.mutate(t.id) }}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* متغیرهای قابل استفاده */}
+      <div className="mt-3 rounded-lg bg-muted/30 p-3 text-[10px] text-muted-foreground">
+        <strong>متغیرهای قابل استفاده:</strong>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {["{customer_name}", "{studio_name}", "{contract_number}", "{project_title}", "{project_date}", "{price}", "{discount}", "{paid}", "{balance}", "{total_price}", "{total_paid}", "{total_balance}", "{terms_text}", "{projects_html}", "{issued_at}"].map(v => (
+            <code key={v} className="rounded bg-muted px-1 py-0.5 text-[9px]">{v}</code>
+          ))}
+        </div>
+      </div>
+
+      {/* Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) { setEditing(null); setForm({ name: "", htmlContent: "", cssContent: "", isDefault: false }) } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "ویرایش قالب" : "قالب جدید"}</DialogTitle>
+            <DialogDescription>HTML قالب قرارداد را با متغیرهای پویا وارد کنید</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">نام قالب</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثلاً قرارداد عروسی" />
+              </div>
+              <div className="flex items-end gap-2">
+                <Switch checked={form.isDefault} onCheckedChange={(v) => setForm({ ...form, isDefault: v })} />
+                <Label className="cursor-pointer text-xs">قالب پیش‌فرض</Label>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">محتوای HTML</Label>
+              <Textarea
+                value={form.htmlContent}
+                onChange={(e) => setForm({ ...form, htmlContent: e.target.value })}
+                rows={10}
+                className="font-mono text-xs"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">CSS اختصاصی (اختیاری)</Label>
+              <Textarea
+                value={form.cssContent}
+                onChange={(e) => setForm({ ...form, cssContent: e.target.value })}
+                rows={4}
+                className="font-mono text-xs"
+                dir="ltr"
+                placeholder="body { font-family: Vazirmatn; } ..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>انصراف</Button>
+            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+              {saveMut.isPending ? "در حال ذخیره..." : "ذخیره"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SectionCard>
   )
 }
 
@@ -1025,6 +1207,350 @@ function PricingSettingsCard() {
           {canManage && (
             <div className="flex justify-end">
               <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+                <Save className="mr-1.5 h-4 w-4" />
+                {saveMut.isPending ? "در حال ذخیره…" : "ذخیره"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
+// ============================================================
+// Referral credit strategy — per-studio
+// ============================================================
+type ReferralStrategy = "none" | "fixed" | "percent" | "per_project"
+
+const REFERRAL_STRATEGY_OPTIONS: Array<{ value: ReferralStrategy; label: string; desc: string }> = [
+  {
+    value: "none",
+    label: "بدون پاداش",
+    desc: "هیچ پاداش معرفی‌ای به مشتریان اعمال نمی‌شود.",
+  },
+  {
+    value: "fixed",
+    label: "مبلغ ثابت",
+    desc: "برای هر مشتری معرفی‌شده، یک مبلغ ثابت (تومان) به اعتبار معرف اضافه می‌شود.",
+  },
+  {
+    value: "percent",
+    label: "درصدی از پروژه",
+    desc: "درصدی از مبلغ پروژه به‌عنوان پاداش به معرف اضافه می‌شود (به مدت مشخص).",
+  },
+  {
+    value: "per_project",
+    label: "هر پروژه (دل‌خواه)",
+    desc: "پاداش معرف به‌صورت جداگانه در هر پکیج/پروژه تعیین می‌شود.",
+  },
+]
+
+function parseSettingValue<T>(value: string | undefined, fallback: T, asNumber = false): T {
+  if (!value) return fallback
+  try {
+    const parsed = JSON.parse(value)
+    if (asNumber) {
+      const n = Number(parsed)
+      return (Number.isFinite(n) ? n : fallback) as unknown as T
+    }
+    return (parsed as T) ?? fallback
+  } catch {
+    if (asNumber) {
+      const n = Number(value)
+      return (Number.isFinite(n) ? n : fallback) as unknown as T
+    }
+    return (value as unknown as T) ?? fallback
+  }
+}
+
+function ReferralStrategyCard() {
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = hasPermission(role, "system")
+
+  const { data, isLoading } = useQuery<Setting[]>({
+    queryKey: ["system-settings"],
+    queryFn: () => api.get("/api/system"),
+  })
+
+  const [strategy, setStrategy] = React.useState<ReferralStrategy>("none")
+  const [fixedAmount, setFixedAmount] = React.useState<number>(0)
+  const [percent, setPercent] = React.useState<number>(5)
+  const [durationDays, setDurationDays] = React.useState<number>(365)
+  const [dirty, setDirty] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!data) return
+    const sStrat = data.find((s) => s.key === "referral_strategy")
+    const sFixed = data.find((s) => s.key === "referral_fixed_amount_toman")
+    const sPercent = data.find((s) => s.key === "referral_percent")
+    const sDur = data.find((s) => s.key === "referral_percent_duration_days")
+    const nextStrat = parseSettingValue<ReferralStrategy>(
+      sStrat?.value,
+      "none"
+    )
+    if (["none", "fixed", "percent", "per_project"].includes(nextStrat)) {
+      setStrategy(nextStrat)
+    }
+    setFixedAmount(parseSettingValue<number>(sFixed?.value, 0, true))
+    setPercent(parseSettingValue<number>(sPercent?.value, 5, true))
+    setDurationDays(parseSettingValue<number>(sDur?.value, 365, true))
+    setDirty(false)
+  }, [data])
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/system", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-demo-role": role },
+        body: JSON.stringify({
+          settings: {
+            referral_strategy: strategy,
+            referral_fixed_amount_toman: Number(fixedAmount) || 0,
+            referral_percent: Number(percent) || 0,
+            referral_percent_duration_days: Number(durationDays) || 0,
+          },
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error((d as { error?: string })?.error || `Request failed (${res.status})`)
+      }
+      return d
+    },
+    onSuccess: () => {
+      toast.success("استراتژی اعتبار معرف ذخیره شد")
+      setDirty(false)
+      qc.invalidateQueries({ queryKey: ["system-settings"] })
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
+
+  return (
+    <SectionCard
+      title="استراتژی اعتبار معرف"
+      description="نحوه اعمال پاداش معرفی برای مشتریان این استودیو"
+    >
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : (
+        <div className="space-y-5">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Gift className="h-4 w-4 text-rose-500" />
+            انتخاب استراتژی
+          </div>
+
+          <RadioGroup
+            value={strategy}
+            onValueChange={(v) => {
+              setStrategy(v as ReferralStrategy)
+              setDirty(true)
+            }}
+            className="gap-2"
+            disabled={!canManage}
+          >
+            {REFERRAL_STRATEGY_OPTIONS.map((opt, idx) => (
+              <label
+                key={opt.value}
+                htmlFor={`ref-strat-${idx}`}
+                className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-rose-500/50 has-[[data-state=checked]]:bg-rose-500/5"
+              >
+                <RadioGroupItem id={`ref-strat-${idx}`} value={opt.value} className="mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{opt.label}</div>
+                  <div className="text-xs text-muted-foreground">{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </RadioGroup>
+
+          {strategy === "fixed" && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                مبلغ پاداش ثابت (تومان)
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                dir="ltr"
+                className="text-left"
+                value={fixedAmount}
+                disabled={!canManage}
+                onChange={(e) => {
+                  setFixedAmount(Math.max(0, Number(e.target.value) || 0))
+                  setDirty(true)
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                این مبلغ به‌محض ثبت پروژه برای مشتری معرفی‌شده، به اعتبار معرف اضافه می‌شود.
+              </p>
+            </div>
+          )}
+
+          {strategy === "percent" && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  درصد پاداش (٪)
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  dir="ltr"
+                  className="text-left"
+                  value={percent}
+                  disabled={!canManage}
+                  onChange={(e) => {
+                    setPercent(Math.max(0, Math.min(100, Number(e.target.value) || 0)))
+                    setDirty(true)
+                  }}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  درصدی از مبلغ پروژه به معرف اضافه می‌شود (مثلاً ۵ = ۵٪).
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground">
+                  مدت اعمال (روز)
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  dir="ltr"
+                  className="text-left"
+                  value={durationDays}
+                  disabled={!canManage}
+                  onChange={(e) => {
+                    setDurationDays(Math.max(1, Number(e.target.value) || 365))
+                    setDirty(true)
+                  }}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  پاداش درصدی برای پروژه‌هایی که در این مدت (از زمان ثبت) ایجاد می‌شوند اعمال می‌گردد.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {strategy === "per_project" && (
+            <div className="rounded-lg border bg-violet-500/5 p-3 text-xs text-muted-foreground">
+              <div className="mb-1 flex items-center gap-1.5 font-semibold text-violet-700 dark:text-violet-400">
+                <Sparkles className="h-3.5 w-3.5" />
+                پاداش دل‌خواه هر پروژه
+              </div>
+              در این حالت، مبلغ پاداش معرف به‌صورت جداگانه در هر پکیج (فیلد «سود معرف پیش‌فرض») یا هر پروژه (فیلد «سود معرف» در صفحه پروژه) تعیین می‌شود. اگر برای پروژه مقداری تعیین نکرده باشید، از مقدار پیش‌فرض پکیج استفاده می‌شود.
+            </div>
+          )}
+
+          {strategy === "none" && (
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+              هیچ پاداش معرفی‌ای به‌صورت خودکار اعمال نخواهد شد. (در صورت نیاز می‌توانید به‌صورت دستی از پروفایل مشتری اعتبار اضافه کنید.)
+            </div>
+          )}
+
+          {canManage && (
+            <div className="flex justify-end">
+              <Button
+                onClick={() => saveMut.mutate()}
+                disabled={saveMut.isPending || !dirty}
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                {saveMut.isPending ? "در حال ذخیره…" : "ذخیره"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
+// ============================================================
+// USD exchange rate (Toman per 1 USD)
+// ============================================================
+function UsdRateCard() {
+  const api = useApi()
+  const qc = useQueryClient()
+  const role = useWorkspace((s) => s.role)
+  const canManage = hasPermission(role, "system")
+
+  const { data, isLoading } = useQuery<Setting[]>({
+    queryKey: ["system-settings"],
+    queryFn: () => api.get("/api/system"),
+  })
+
+  const [rate, setRate] = React.useState<number>(60000)
+  const [dirty, setDirty] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!data) return
+    const s = data.find((x) => x.key === "usd_rate_toman")
+    if (s) {
+      setRate(parseSettingValue<number>(s.value, 60000, true))
+    }
+    setDirty(false)
+  }, [data])
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/system", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-demo-role": role },
+        body: JSON.stringify({
+          settings: {
+            usd_rate_toman: Number(rate) || 0,
+          },
+        }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error((d as { error?: string })?.error || `Request failed (${res.status})`)
+      }
+      return d
+    },
+    onSuccess: () => {
+      toast.success("نرخ دلار ذخیره شد")
+      setDirty(false)
+      qc.invalidateQueries({ queryKey: ["system-settings"] })
+    },
+    onError: (e: Error) => toast.error(e.message || "ذخیره ناموفق بود"),
+  })
+
+  return (
+    <SectionCard
+      title="نرخ دلار (تومان)"
+      description="نرخ تبدیل دلار به تومان — برای محاسبه هزینه‌های دلاری"
+    >
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <Label className="mb-1.5 block text-xs">هر ۱ دلار = چند تومان؟</Label>
+              <Input
+                type="number"
+                min={0}
+                dir="ltr"
+                className="text-left"
+                value={rate}
+                disabled={!canManage}
+                onChange={(e) => {
+                  setRate(Math.max(0, Number(e.target.value) || 0))
+                  setDirty(true)
+                }}
+              />
+            </div>
+            <span className="text-sm text-muted-foreground">تومان</span>
+          </div>
+          {canManage && (
+            <div className="flex justify-end">
+              <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !dirty}>
                 <Save className="mr-1.5 h-4 w-4" />
                 {saveMut.isPending ? "در حال ذخیره…" : "ذخیره"}
               </Button>

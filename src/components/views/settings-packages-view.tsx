@@ -78,16 +78,22 @@ interface Pkg {
   defaultDescription: string | null
   defaultTasks: Array<string | { name: string; price: number }>
   defaultEquipment: Array<string | { name: string; price: number }>
+  defaultReferralReward?: number // Rials (DB) — shown as Toman in UI
   isActive: boolean
 }
 
-// Legacy "fixed" strategy is treated as "variable" everywhere in the UI.
+// Legacy "fixed" strategy (from before the engine upgrade) is treated as
+// "variable" everywhere in the UI. The new canonical "fixed" strategy is
+// preserved as a first-class option.
 function normalizeStrategy(s: string): PricingStrategy {
-  return s === "delayed" ? "delayed" : "variable"
+  if (s === "fixed" || s === "variable" || s === "delayed") return s as PricingStrategy
+  return "variable"
 }
 
 function normalizeQuality(q: string): PackageQuality {
-  return q === "4k" ? "4k" : "fullhd"
+  if (q === "4k") return "4k"
+  if (q === "none") return "none"
+  return "fullhd"
 }
 
 function normalizeCategory(c: string): PackageCategory {
@@ -96,19 +102,22 @@ function normalizeCategory(c: string): PackageCategory {
     : "other"
 }
 
-// Quality badge colors — sky for FullHD, amber for 4K (no indigo/blue primary).
+// Quality badge colors — sky for FullHD, amber for 4K, slate for none.
 const QUALITY_BADGE: Record<PackageQuality, string> = {
   fullhd: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
   "4k": "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  none: "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400",
 }
 
 const STRATEGY_BADGE: Record<PricingStrategy, string> = {
+  fixed: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
   variable: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   delayed: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
 }
 
 const STRATEGY_DESCRIPTIONS: Record<PricingStrategy, string> = {
-  variable: "تغییر قیمت فوراً روی تمام پروژه‌های این پکیج اعمال می‌شود",
+  fixed: "قیمت در زمان ایجاد پروژه قفل می‌شود و هرگز با تغییر قیمت پکیج تغییر نمی‌کند",
+  variable: "تغییر قیمت فوراً روی تمام پروژه‌های این پکیج اعمال می‌شود (مگر فریز شده یا ۷۰٪+ پرداخت شده باشد)",
   delayed: "تغییر قیمت بعد از وضعیت «آماده تحویل» و گذشت ۳۰ روز اعمال می‌شود",
 }
 
@@ -121,6 +130,7 @@ interface FormState {
   category: PackageCategory
   pricingStrategy: PricingStrategy
   priceToman: number
+  defaultReferralRewardToman: number
   defaultDescription: string
   defaultTasks: TaskItem[]
   defaultEquipment: EquipmentItem[]
@@ -133,6 +143,7 @@ const EMPTY_FORM: FormState = {
   category: "photo",
   pricingStrategy: "variable",
   priceToman: 0,
+  defaultReferralRewardToman: 0,
   defaultDescription: "",
   defaultTasks: [],
   defaultEquipment: [],
@@ -191,20 +202,27 @@ export function SettingsPackagesView() {
   const saveMut = useMutation({
     mutationFn: async () => {
       const priceRials = tomanToRials(form.priceToman)
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: form.title.trim(),
         quality: form.quality,
         category: form.category,
-        pricingStrategy: form.pricingStrategy,
         basePrice: priceRials,
         currentPrice: priceRials,
         defaultDescription: form.defaultDescription.trim() || undefined,
         defaultTasks: form.defaultTasks.filter((t) => t.name.trim().length > 0),
         defaultEquipment: form.defaultEquipment.filter((t) => t.name.trim().length > 0),
+        // ✅ سود معرف پیش‌فرض — Toman ارسال می‌شود؛ API در داخل ×10 می‌کند تا Rials ذخیره شود.
+        defaultReferralReward: Math.max(0, Number(form.defaultReferralRewardToman || 0)),
         isActive: form.isActive,
       }
+      // ✅ pricingStrategy only sent on CREATE — the API silently ignores it on PATCH,
+      // but we also omit it client-side so the request body stays clean.
+      if (!editing) {
+        payload.pricingStrategy = form.pricingStrategy
+      }
       if (!payload.title) throw new Error("عنوان الزامی است")
-      if (!Number.isFinite(payload.currentPrice) || payload.currentPrice < 0) {
+      const currentPriceNum = Number(payload.currentPrice)
+      if (!Number.isFinite(currentPriceNum) || currentPriceNum < 0) {
         throw new Error("قیمت پکیج باید عددی نامنفی باشد")
       }
       if (editing) {
@@ -221,6 +239,7 @@ export function SettingsPackagesView() {
     },
     onError: (e: Error) => toast.error(e.message),
   })
+  // (placeholder for next edit hook)
 
   const toggleActiveMut = useMutation({
     mutationFn: (p: Pkg) =>
@@ -242,41 +261,45 @@ export function SettingsPackagesView() {
   })
 
 
-  const duplicateMut = useMutation({
-    mutationFn: async (id: string) => {
-      const pkg = data?.find((p) => p.id === id)
-      if (!pkg) throw new Error("پکیج یافت نشد")
-      const priceRials = Number(pkg.currentPrice)
-      return mutateFn("/api/packages", "POST", {
-        title: pkg.title + " (کپی)",
-        quality: normalizeQuality(pkg.quality),
-        category: normalizeCategory(pkg.category),
-        pricingStrategy: normalizeStrategy(pkg.pricingStrategy),
-        basePrice: priceRials,
-        currentPrice: priceRials,
-        defaultDescription: pkg.defaultDescription || undefined,
-        defaultTasks: (pkg.defaultTasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
-        defaultEquipment: (pkg.defaultEquipment || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
-        isActive: true,
-      }, role)
-    },
-    onSuccess: () => {
-      toast.success("کپی پکیج ایجاد شد")
-      qc.invalidateQueries({ queryKey: ["packages"] })
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
+  // ✅ Duplicate — opens the CREATE dialog pre-filled with the source package's data.
+  // The pricingStrategy Select is enabled because `editing` is null (creating new, not editing).
+  // After saving, editing the new package will show the strategy as disabled.
+  function duplicatePackage(id: string) {
+    const pkg = data?.find((p) => p.id === id)
+    if (!pkg) {
+      toast.error("پکیج یافت نشد")
+      return
+    }
+    const priceToman = Math.round(Number(pkg.currentPrice) / 10)
+    const refToman = Math.max(0, Math.round(Number(pkg.defaultReferralReward ?? 0) / 10))
+    setEditing(null) // ✅ null = creating new → strategy Select is ENABLED
+    setForm({
+      title: pkg.title + " (کپی)",
+      quality: normalizeQuality(pkg.quality),
+      category: normalizeCategory(pkg.category),
+      pricingStrategy: normalizeStrategy(pkg.pricingStrategy),
+      priceToman,
+      defaultReferralRewardToman: refToman,
+      defaultDescription: pkg.defaultDescription || "",
+      defaultTasks: (pkg.defaultTasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
+      defaultEquipment: (pkg.defaultEquipment || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
+      isActive: true,
+    })
+    setDialogOpen(true)
+  }
 
   function editPkg(p: Pkg) {
     setEditing(p)
     // Prices stored in DB as Rials; TomanInput works in Toman (÷10).
     const toman = Math.round(Number(p.currentPrice) / 10)
+    const refToman = Math.max(0, Math.round(Number(p.defaultReferralReward ?? 0) / 10))
     setForm({
       title: p.title,
       quality: normalizeQuality(p.quality),
       category: normalizeCategory(p.category),
       pricingStrategy: normalizeStrategy(p.pricingStrategy),
       priceToman: toman,
+      defaultReferralRewardToman: refToman,
       defaultDescription: p.defaultDescription || "",
       defaultTasks: (p.defaultTasks || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
       defaultEquipment: (p.defaultEquipment || []).map((t: any) => typeof t === "string" ? { name: t, price: 0 } : t),
@@ -317,7 +340,7 @@ export function SettingsPackagesView() {
 
       <SectionCard
         title="کاتالوگ خدمات"
-        description="استراتژی «متغیر» قیمت را فوراً اعمال می‌کند؛ «مهلت‌دار» بعد از ۳۰ روز از آماده تحویل."
+        description="استراتژی «ثابت» قیمت را در زمان ایجاد قفل می‌کند؛ «متغیر» قیمت جدید را فوراً اعمال می‌کند؛ «مهلت‌دار» بعد از ۳۰ روز از آماده تحویل."
       >
         {/* Filter toolbar — mobile responsive */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -343,6 +366,7 @@ export function SettingsPackagesView() {
             <SelectTrigger className="h-9 w-full sm:w-[140px]"><SelectValue placeholder="استراتژی" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">همه استراتژی‌ها</SelectItem>
+              <SelectItem value="fixed">ثابت</SelectItem>
               <SelectItem value="variable">متغیر</SelectItem>
               <SelectItem value="delayed">مهلت‌دار</SelectItem>
             </SelectContent>
@@ -414,17 +438,25 @@ export function SettingsPackagesView() {
                     </Badge>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-2 border-t pt-2">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[10px] text-muted-foreground">قیمت</div>
                       <div className="text-base font-bold tabular-nums text-emerald-600">
                         {formatRials(p.currentPrice)} <span className="text-[10px] font-normal">تومان</span>
                       </div>
+                      {Number(p.defaultReferralReward ?? 0) > 0 && (
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          سود معرف:{" "}
+                          <span className="font-medium text-rose-600 dark:text-rose-400">
+                            {formatRials(p.defaultReferralReward)} ت
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editPkg(p)} aria-label="ویرایش">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => duplicateMut.mutate(p.id)} aria-label="کپی" title="ساخت کپی">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => duplicatePackage(p.id)} aria-label="کپی" title="ساخت کپی">
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:text-rose-600" onClick={() => setDeleteTarget(p)} aria-label="حذف">
@@ -592,6 +624,7 @@ function PackageDialog({
               onValueChange={(v) =>
                 setForm((f) => ({ ...f, pricingStrategy: v as PricingStrategy }))
               }
+              disabled={editing}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -608,6 +641,12 @@ function PackageDialog({
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>{STRATEGY_DESCRIPTIONS[form.pricingStrategy]}</span>
             </div>
+            {editing && (
+              <div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>استراتژی قیمت‌گذاری بعد از ایجاد قابل تغییر نیست.</span>
+              </div>
+            )}
           </div>
 
           {/* 5. قیمت پکیج */}
@@ -621,6 +660,21 @@ function PackageDialog({
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
               مبلغ به تومان وارد می‌شود و در پایگاه داده به ریال ذخیره می‌گردد.
+            </p>
+          </div>
+
+          {/* 5b. سود معرف پیش‌فرض */}
+          <div className="sm:col-span-2">
+            <Label htmlFor="pkg-referral">سود معرف پیش‌فرض (تومان)</Label>
+            <TomanInput
+              id="pkg-referral"
+              value={form.defaultReferralRewardToman}
+              onValueChange={(toman) => setForm((f) => ({ ...f, defaultReferralRewardToman: toman }))}
+              placeholder="مثلاً ۵۰۰٬۰۰۰"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              مبلغ ثابتی که به‌عنوان پاداش معرفی برای این پکیج در نظر گرفته می‌شود.
+              در هر پروژه قابل override است. صفر = بدون پاداش.
             </p>
           </div>
 
@@ -800,9 +854,10 @@ function PackageDialog({
         <div className="mt-2 flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            استراتژی «متغیر» قیمت جدید را روی تمام پروژه‌های این پکیج اعمال
-            می‌کند. استراتژی «مهلت‌دار» فقط بعد از گذشت ۳۰ روز از وضعیت
-            «آماده تحویل» قیمت را به‌روزرسانی می‌کند.
+            «ثابت»: قیمت پروژه در زمان ایجاد قفل می‌شود و هرگز تغییر نمی‌کند.
+            «متغیر»: تغییر قیمت پکیج روی پروژه‌ها اعمال می‌شود (مگر فریز شده یا ۷۰٪+ پرداخت شده باشد).
+            «مهلت‌دار»: فقط بعد از گذشت ۳۰ روز از وضعیت «آماده تحویل» قیمت به‌روزرسانی می‌شود.
+            استراتژی بعد از ایجاد قابل تغییر نیست.
           </span>
         </div>
 

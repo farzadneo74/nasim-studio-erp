@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getCurrentStudioDb, getCurrentRole, getCurrentUser } from "@/lib/auth-helpers"
+import { getCurrentStudioDb, getCurrentRole, getCurrentUser, getCurrentStudioUserId } from "@/lib/auth-helpers"
 import {
   tracksForCategory,
   STAGE_ASSIGNEE_ROLES,
@@ -137,7 +137,9 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         },
       }).catch(() => {})
 
-      // Create or find a "در صف" kanban column for the assignee
+      // Create or find a "در صف" kanban column for the assignee.
+      // (The kanban GET endpoint also auto-creates this, but we want to be safe
+      // here so the workflow assignment never silently fails to create a card.)
       let queueColumn = await db.kanbanColumn.findFirst({
         where: { userId: body.assigneeId, title: "در صف" },
         select: { id: true },
@@ -153,24 +155,50 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         })
       }
 
-      // Check if a card already exists for this project+stage+user
+      // ✅ Dedup check: don't create duplicate cards for the same project+user.
+      // Match by sourceProjectId OR by linkType="project"+linkId=projectId,
+      // so cards created by either code path are deduplicated.
       const existingCard = await db.kanbanCard.findFirst({
         where: {
           userId: body.assigneeId,
-          sourceProjectId: id,
-          title: { contains: projectTitle },
+          OR: [
+            { sourceProjectId: id },
+            { linkType: "project", linkId: id },
+          ],
         },
         select: { id: true },
       })
       if (!existingCard) {
+        // ✅ Resolve the assigner's studio user id so we can pre-set notifyUserId —
+        // when the card is later moved to the "انجام شده" column, the kanban API
+        // auto-notifies this person (the one who assigned the task).
+        const assignerStudioUserId = await getCurrentStudioUserId()
+        let assignerName: string | null = null
+        if (assignerStudioUserId) {
+          const assigner = await db.user.findUnique({
+            where: { id: assignerStudioUserId },
+            select: { firstName: true, lastName: true },
+          })
+          if (assigner) assignerName = `${assigner.firstName} ${assigner.lastName}`.trim()
+        }
         await db.kanbanCard.create({
           data: {
             columnId: queueColumn.id,
             userId: body.assigneeId,
             title: `${projectTitle} — ${label}`,
-            description: `مرحله: ${label} | مسیر: ${body.track === "photo" ? "عکس" : "فیلم"}`,
+            description: "از گردش کار پروژه",
             order: 0,
+            // ✅ Link the card to the project (per FIXES-7B spec):
+            //   linkType: "project", linkId: projectId
+            // We ALSO set sourceProjectId so the legacy parseMultiLink fallback
+            // (which checks sourceProjectId) keeps working in the existing UI.
+            linkType: "project",
+            linkId: id,
             sourceProjectId: id,
+            // ✅ Pre-configure the assigner as the notify recipient so moving the
+            // card to "انجام شده" auto-notifies them.
+            notifyUserId: assignerStudioUserId ?? null,
+            notifyUserName: assignerName,
           },
         })
       }

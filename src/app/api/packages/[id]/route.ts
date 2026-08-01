@@ -3,34 +3,35 @@ import { getCurrentRole, getCurrentStudioDb } from "@/lib/auth-helpers"
 import {
   PACKAGE_CATEGORIES,
   PACKAGE_QUALITIES,
-  PRICING_STRATEGIES,
 } from "@/lib/constants"
 
 export const dynamic = "force-dynamic"
 
 /**
- * Legacy "fixed" strategy is treated as "variable" everywhere now.
- * Old DB rows (still strategy="fixed") stay compatible via this normalizer.
+ * Pricing strategy is NOT editable after creation. This function is only
+ * used to normalize legacy DB rows that may still carry the legacy "fixed"
+ * value — those are upgraded to "variable" for backward compat (legacy
+ * "fixed" was treated as "variable" in the old engine). The new "fixed"
+ * strategy is a first-class option and is preserved as-is.
  */
 function normalizeStrategy(s: string): string {
-  return s === "delayed" ? "delayed" : "variable"
+  if (s === "fixed" || s === "variable" || s === "delayed") return s
+  // Legacy "fixed" rows from before the new engine upgrade → variable.
+  return "variable"
 }
 
-function safeParseTasks(s: string | null): string[] {
+function safeParseItems(s: string | null | undefined): Array<{ name: string; price: number }> {
   if (!s) return []
   try {
     const v = JSON.parse(s)
-    return Array.isArray(v) ? v.map(String) : []
-  } catch {
-    return []
-  }
-}
-
-function safeParseStringArray(s: string | null | undefined): string[] {
-  if (!s) return []
-  try {
-    const v = JSON.parse(s)
-    return Array.isArray(v) ? v.map(String) : []
+    if (!Array.isArray(v)) return []
+    return v.map((item: any) => {
+      if (typeof item === "string") return { name: item, price: 0 }
+      if (typeof item === "object" && item !== null) {
+        return { name: String(item.name ?? ""), price: Number(item.price ?? 0) || 0 }
+      }
+      return { name: String(item), price: 0 }
+    }).filter((item) => item.name.trim().length > 0)
   } catch {
     return []
   }
@@ -83,19 +84,9 @@ export async function PATCH(
       : "fullhd"
   }
 
-  if (typeof body.pricingStrategy === "string") {
-    // Legacy "fixed" is silently upgraded to "variable".
-    const normalized =
-      body.pricingStrategy === "delayed"
-        ? "delayed"
-        : body.pricingStrategy === "variable" || body.pricingStrategy === "fixed"
-          ? "variable"
-          : ""
-    if (!normalized || !PRICING_STRATEGIES.includes(normalized as never)) {
-      return NextResponse.json({ error: "Invalid pricing strategy" }, { status: 400 })
-    }
-    data.pricingStrategy = normalized
-  }
+  // ✅ pricingStrategy is NOT editable after creation — silently ignore it
+  // (per product decision: "استراتژی قیمت‌گذاری بعد از ایجاد قابل تغییر نیست").
+  // The check below intentionally does nothing with body.pricingStrategy.
 
   if (body.basePrice !== undefined) {
     const v = Number(body.basePrice)
@@ -118,19 +109,35 @@ export async function PATCH(
   }
 
   if (Array.isArray(body.defaultTasks)) {
-    const tasks = body.defaultTasks.map(String).filter((s) => s.trim().length > 0)
+    const tasks = body.defaultTasks.map((t: any) => {
+      if (typeof t === "string") return { name: t.trim(), price: 0 }
+      if (typeof t === "object" && t !== null) {
+        return { name: String(t.name ?? "").trim(), price: Number(t.price ?? 0) || 0 }
+      }
+      return null
+    }).filter((t: any) => t && t.name.length > 0)
     data.defaultTasks = JSON.stringify(tasks)
   }
 
   if (Array.isArray(body.defaultEquipment)) {
-    const equipment = body.defaultEquipment
-      .map(String)
-      .filter((s) => s.trim().length > 0)
+    const equipment = body.defaultEquipment.map((t: any) => {
+      if (typeof t === "string") return { name: t.trim(), price: 0 }
+      if (typeof t === "object" && t !== null) {
+        return { name: String(t.name ?? "").trim(), price: Number(t.price ?? 0) || 0 }
+      }
+      return null
+    }).filter((t: any) => t && t.name.length > 0)
     data.defaultEquipment = JSON.stringify(equipment)
   }
 
   if (typeof body.isActive === "boolean") {
     data.isActive = body.isActive
+  }
+
+  // ✅ سود معرف پیش‌فرض — Toman (از UI) → Rials (در DB)
+  if (body.defaultReferralReward !== undefined) {
+    const toman = Math.max(0, Number(body.defaultReferralReward || 0))
+    data.defaultReferralReward = toman * 10
   }
 
   const updated = await db.servicePackage.update({ where: { id }, data })
@@ -144,8 +151,9 @@ export async function PATCH(
     currentPrice: Number(updated.currentPrice),
     pricingStrategy: normalizeStrategy(updated.pricingStrategy),
     defaultDescription: updated.defaultDescription,
-    defaultTasks: safeParseTasks(updated.defaultTasks),
-    defaultEquipment: safeParseStringArray(updated.defaultEquipment),
+    defaultTasks: safeParseItems(updated.defaultTasks),
+    defaultEquipment: safeParseItems(updated.defaultEquipment),
+    defaultReferralReward: Number(updated.defaultReferralReward ?? 0),
     isActive: updated.isActive,
     createdAt: updated.createdAt,
     updatedAt: updated.updatedAt,

@@ -39,8 +39,10 @@ export async function GET(req: NextRequest) {
       currentPrice: Number(p.currentPrice),
       pricingStrategy: normalizeStrategy(p.pricingStrategy),
       defaultDescription: p.defaultDescription,
-      defaultTasks: safeParseTasks(p.defaultTasks),
-      defaultEquipment: safeParseStringArray(p.defaultEquipment),
+      defaultTasks: safeParseItems(p.defaultTasks),
+      defaultEquipment: safeParseItems(p.defaultEquipment),
+      // ✅ سود معرف پیش‌فرض (Rials) → تبدیل به Toman در response (÷10)
+      defaultReferralReward: Number(p.defaultReferralReward ?? 0),
       isActive: p.isActive,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
@@ -49,29 +51,34 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Legacy "fixed" strategy is treated as "variable" everywhere now.
- * This keeps old DB rows (which may still have strategy="fixed") compatible
- * with the new pricing engine and UI.
+ * Normalize pricing strategy — preserve the canonical strategies. Legacy
+ * values from before the engine upgrade (e.g. old "fixed") are silently
+ * upgraded to "variable" for backward compat.
  */
 function normalizeStrategy(s: string): string {
-  return s === "delayed" ? "delayed" : "variable"
+  if (s === "fixed" || s === "variable" || s === "delayed") return s
+  return "variable"
 }
 
-function safeParseTasks(s: string | null): string[] {
+/**
+ * Parse tasks/equipment JSON. Supports both legacy string arrays and new
+ * {name, price} object arrays.
+ */
+function safeParseItems(s: string | null | undefined): Array<{ name: string; price: number }> {
   if (!s) return []
   try {
     const v = JSON.parse(s)
-    return Array.isArray(v) ? v.map(String) : []
-  } catch {
-    return []
-  }
-}
-
-function safeParseStringArray(s: string | null | undefined): string[] {
-  if (!s) return []
-  try {
-    const v = JSON.parse(s)
-    return Array.isArray(v) ? v.map(String) : []
+    if (!Array.isArray(v)) return []
+    return v.map((item: any) => {
+      if (typeof item === "string") return { name: item, price: 0 }
+      if (typeof item === "object" && item !== null) {
+        return {
+          name: String(item.name ?? ""),
+          price: Number(item.price ?? 0) || 0,
+        }
+      }
+      return { name: String(item), price: 0 }
+    }).filter((item) => item.name.trim().length > 0)
   } catch {
     return []
   }
@@ -102,14 +109,13 @@ export async function POST(req: NextRequest) {
   }
 
   const pricingStrategyRaw = String(body.pricingStrategy || "")
-  // Legacy "fixed" strategy is upgraded to "variable" silently.
-  const pricingStrategy =
-    pricingStrategyRaw === "delayed"
-      ? "delayed"
-      : pricingStrategyRaw === "variable" || pricingStrategyRaw === "fixed"
-        ? "variable"
-        : ""
-  if (!pricingStrategy || !PRICING_STRATEGIES.includes(pricingStrategy as never)) {
+  // ✅ Accept canonical strategies: fixed | variable | delayed. Legacy rows
+  // are upgraded via normalizeStrategy, but new POSTs accept "fixed" as a
+  // first-class strategy.
+  const pricingStrategy = PRICING_STRATEGIES.includes(pricingStrategyRaw as never)
+    ? pricingStrategyRaw
+    : ""
+  if (!pricingStrategy) {
     return NextResponse.json({ error: "Invalid pricing strategy" }, { status: 400 })
   }
 
@@ -132,15 +138,33 @@ export async function POST(req: NextRequest) {
       ? body.defaultDescription.trim()
       : null
 
+  // ✅ از این پس tasks و equipment به‌صورت {name, price} ذخیره می‌شن
+  // اما با backward-compat: اگه string فرستاده شد، به {name, price: 0} تبدیل می‌شه
   const tasks = Array.isArray(body.defaultTasks)
-    ? body.defaultTasks.map(String).filter((s) => s.trim().length > 0)
+    ? body.defaultTasks.map((t: any) => {
+        if (typeof t === "string") return { name: t.trim(), price: 0 }
+        if (typeof t === "object" && t !== null) {
+          return { name: String(t.name ?? "").trim(), price: Number(t.price ?? 0) || 0 }
+        }
+        return null
+      }).filter((t: any) => t && t.name.length > 0)
     : []
 
   const equipment = Array.isArray(body.defaultEquipment)
-    ? body.defaultEquipment.map(String).filter((s) => s.trim().length > 0)
+    ? body.defaultEquipment.map((t: any) => {
+        if (typeof t === "string") return { name: t.trim(), price: 0 }
+        if (typeof t === "object" && t !== null) {
+          return { name: String(t.name ?? "").trim(), price: Number(t.price ?? 0) || 0 }
+        }
+        return null
+      }).filter((t: any) => t && t.name.length > 0)
     : []
 
   const isActive = body.isActive === undefined ? true : Boolean(body.isActive)
+
+  // ✅ سود معرف پیش‌فرض — Toman (از UI) → Rials (در DB)
+  const referralRewardToman = Math.max(0, Number(body.defaultReferralReward || 0))
+  const referralRewardRials = referralRewardToman * 10
 
   const created = await db.servicePackage.create({
     data: {
@@ -153,6 +177,7 @@ export async function POST(req: NextRequest) {
       defaultDescription,
       defaultTasks: JSON.stringify(tasks),
       defaultEquipment: JSON.stringify(equipment),
+      defaultReferralReward: referralRewardRials,
       isActive,
     },
   })
@@ -167,8 +192,9 @@ export async function POST(req: NextRequest) {
       currentPrice: Number(created.currentPrice),
       pricingStrategy: created.pricingStrategy,
       defaultDescription: created.defaultDescription,
-      defaultTasks: safeParseTasks(created.defaultTasks),
-      defaultEquipment: safeParseStringArray(created.defaultEquipment),
+      defaultTasks: safeParseItems(created.defaultTasks),
+      defaultEquipment: safeParseItems(created.defaultEquipment),
+      defaultReferralReward: Number(created.defaultReferralReward ?? 0),
       isActive: created.isActive,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,

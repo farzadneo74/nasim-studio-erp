@@ -44,6 +44,8 @@ model User {
   managedLeaves    LeaveRequest[] @relation("Approver")
   notes            ProjectNote[]
   salaryRecords    SalaryRecord[]
+  projectSalaries  ProjectSalary[]          @relation("ProjectSalaryUser")
+  settledProjectSalaries ProjectSalary[]    @relation("SalarySettler")
   creditActions    CreditTransaction[] @relation("CreatedBy")
   recordedPayments Payment[] @relation("PaymentRecorder")
   workflowAssignments ProjectWorkflow[] @relation("WorkflowAssignee")
@@ -167,12 +169,19 @@ model CreditTransaction {
   customerId       String
   customer         Customer         @relation("CustomerCreditTransactions", fields: [customerId], references: [id])
   amount           Decimal
-  transactionType  String            // reward_referral | manual_adjustment | used
+  transactionType  String            // reward_referral | manual_adjustment | used | settlement | referral_per_project | referral_percent | referral_fixed
   relatedContractId String?
   relatedContract  Contract?         @relation(fields: [relatedContractId], references: [id])
+  // ✅ ثبت دقیق منبع اعتبار: کدوم مشتری معرف بوده و کدام پروژه باعث افزایش اعتبار شده
+  referrerCustomerId String?         // شناسه مشتری معرف (کسی که اعتبار گرفته)
+  relatedProjectId   String?         // شناسه پروژه‌ای که باعث افزایش اعتبار شده
+  relatedProject     Project?        @relation("ProjectCreditTransactions", fields: [relatedProjectId], references: [id])
   createdById      String?
   createdBy        User?             @relation("CreatedBy", fields: [createdById], references: [id])
   note             String?
+  // ✅ تسویه اعتبار
+  isSettled        Boolean          @default(false)
+  settledAt        DateTime?
   createdAt        DateTime          @default(now())
 }
 
@@ -180,14 +189,16 @@ model CreditTransaction {
 model ServicePackage {
   id                 String   @id @default(cuid())
   title              String
-  quality            String   @default("fullhd") // fullhd | 4k
+  quality            String   @default("fullhd") // fullhd | 4k | none
   category           String   // photo | video | mix | other
   basePrice          Decimal
   currentPrice       Decimal
   pricingStrategy    String   // variable | delayed
   defaultDescription String?
-  defaultTasks       String   @default("[]") // JSON array of strings
-  defaultEquipment   String   @default("[]") // JSON array of equipment strings
+  defaultTasks       String   @default("[]") // JSON array of {name, price}
+  defaultEquipment   String   @default("[]") // JSON array of {name, price}
+  // ✅ سود معرف پیش‌فرض این پکیج (Rials) — قابل override در هر پروژه
+  defaultReferralReward Decimal @default(0)
   isActive           Boolean  @default(true)
   projects           Project[]
   createdAt          DateTime @default(now())
@@ -199,11 +210,13 @@ model ServicePackage {
 model PrintPhotoPrice {
   id              String   @id @default(cuid())
   size            String   // e.g. "10x15", "20x30", "A4"
-  paperType       String   // e.g. "مات", "براق"
-  laminateType    String   @default("none") // "none" | "glossy" | "matte"
+  paperType       String   // e.g. "مات", "براق" — قابل تنظیم توسط استودیو
+  laminateType    String   @default("none") // "none" | "glossy" | "matte" — قابل تنظیم توسط استودیو
   photoLocation   String   // studio | outdoor | customer
   isFormal        Boolean  @default(false) // سرمجلسی است یا نه
   printOrder      String   @default("none") // "none" | "first" | "second" — چاپ اول یا دوم
+  // ✅ اولویت: معمولی | سرمجلسی — برای دسته‌بندی و فیلتر
+  priority        String   @default("normal") // "normal" | "formal"
   price           Decimal  // Rials per photo
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -258,6 +271,11 @@ model Project {
   lockedPrice           Decimal?
   isPriceFrozen         Boolean  @default(false)
   discountAmount        Decimal  @default(0) // manual per-project discount (Rials)
+  // ✅ اصلاح قیمت: افزایش یا کاهش قیمت اصلی پکیج (Rials)
+  // این مبلغ روی calculatedPrice تاثیر می‌ذاره (نه روی discountAmount)
+  priceAdjustment       Decimal  @default(0) // positive = increase, negative = decrease
+  // ✅ سود معرف این پروژه (Rials) — override می‌کنه defaultReferralReward پکیج رو
+  referralRewardOverride Decimal? // null = use package default, otherwise per-project value
   startDatetime         DateTime?
   endDatetime           DateTime?
   deliveryDeadline      DateTime?
@@ -265,13 +283,22 @@ model Project {
   photoStatus           String   @default("scheduled") // photo track status
   videoStatus           String   @default("scheduled") // video track status
   printedDescription    String?
+  // ✅ Per-project overrides for tasks/equipment (JSON of {name, price}[]).
+  // When non-empty, these override the package's defaults for display & contract output.
+  customTasksJson       String?  @default("[]") // JSON array of {name, price}
+  customEquipmentJson   String?  @default("[]") // JSON array of {name, price}
   isReadyForDelivery    Boolean  @default(false)
   readyDate             DateTime?
   priceAtReadyTime      Decimal?
-  actualStartDatetime   DateTime?
-  actualEndDatetime     DateTime?
+  // ✅ actualStartDatetime و actualEndDatetime حذف شدند — مورد اضافی بودن
   exemptFromPhotoPriceUpdate Boolean @default(false) // exempt from live print photo price changes
   delayedPricingDaysOverride Int? // per-project override of the global delayed pricing window
+  // ✅ آتلیه — این پروژه در آتلیه استودیو انجام می‌شود
+  isStudio               Boolean  @default(false)
+  // ✅ آدرس پروژه + مکان اجرا
+  projectAddress        String?
+  projectLocationId     String?  // شناسه مکان از قبل ثبت‌شده (ProjectLocation)
+  projectLocation       ProjectLocation? @relation("ProjectLocations", fields: [projectLocationId], references: [id])
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -284,9 +311,35 @@ model Project {
   payments      Payment[]
   printPhotos   ProjectPrintPhoto[]
   salaryRecords SalaryRecord[]
+  projectSalaries ProjectSalary[]
   referralCodes ReferralCode[] @relation("ReferralCodesForProject")
   referrals     Referral[]     @relation("ReferralProject")
   smsAssignments ProjectSmsAssignment[]
+  creditTransactions CreditTransaction[] @relation("ProjectCreditTransactions")
+  schedules          ProjectSchedule[]
+}
+
+// ✅ زمان‌بندی‌های پروژه — هر مکان با زمان شروع/پایان جداگانه
+// برای پروژه‌هایی که در چند مکان و زمان مختلف اجرا می‌شن
+model ProjectSchedule {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // مکان (می‌تونه از ProjectLocation انتخاب بشه یا آدرس دستی)
+  locationId  String?
+  location    ProjectLocation? @relation("ProjectScheduleLocations", fields: [locationId], references: [id])
+  address     String?  // آدرس دستی (اگه location انتخاب نشد)
+  // زمان شروع و پایان این بخش از پروژه
+  startDatetime DateTime?
+  endDatetime   DateTime?
+  // یادداشت برای این زمان‌بندی
+  note        String?
+  // ترتیب نمایش
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
 }
 
 model Task {
@@ -326,6 +379,8 @@ model Payment {
   amount       Decimal
   paymentType  String   // deposit | installment | settlement
   method       String   // cash | card | pos | cheque
+  // ✅ پرداخت برای کدام بخش: project (پروژه اصلی) | print_photo (عکس‌های چاپی)
+  paymentFor   String   @default("project") // "project" | "print_photo"
   datePaid     DateTime @default(now())
   note         String?
   isConfirmed  Boolean  @default(false)
@@ -416,7 +471,34 @@ model SalaryRecord {
   rolePriceId String?
   // For manual salary entries (photo editor, bonuses, etc.)
   isManual    Boolean     @default(false)
+  // ✅ Type for manual entries: "bonus" | "penalty" | "manual_salary" (default for plain manual salary)
+  manualType  String      @default("manual_salary")
+  // ✅ Optional tags (JSON array of strings) — used for both manual & per-project salaries
+  tags        String      @default("[]")
   createdAt  DateTime    @default(now())
+}
+
+// ✅ Per-project salary entries (manual, set by manager from the project's Team tab).
+//    Decoupled from SalaryRecord (which is for rule-based + monthly manual entries).
+//    Amounts stored in Rials; UI shows Toman (÷10).
+model ProjectSalary {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation("ProjectSalaryUser", fields: [userId], references: [id])
+  amount      Decimal  // Rials
+  description String?
+  tags        String   @default("[]") // JSON array of tag strings
+  isSettled   Boolean  @default(false)
+  settledAt   DateTime?
+  settledById String?
+  settledBy   User?    @relation("SalarySettler", fields: [settledById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([userId])
 }
 
 model Invoice {
@@ -534,6 +616,24 @@ model City {
   createdAt DateTime @default(now())
 }
 
+// ✅ مکان‌های پروژه از قبل ثبت‌شده (preset locations) — قابل سرچ و انتخاب در پروژه‌ها
+model ProjectLocation {
+  id          String   @id @default(cuid())
+  name        String   // نام مکان (مثلاً "هتل اسپیناس")
+  address     String?  // آدرس کامل
+  city        String?  // شهر
+  phone       String?  // شماره تماس مکان
+  notes       String?  // یادداشت (مثلاً "پارکینگ رایگان")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects    Project[] @relation("ProjectLocations")
+  schedules   ProjectSchedule[] @relation("ProjectScheduleLocations")
+
+  @@index([isActive])
+}
+
 // ===================== QR TEMPLATES =====================
 // Predefined templates for QR discount codes (like project packages).
 model QrTemplate {
@@ -548,6 +648,18 @@ model QrTemplate {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ✅ قالب‌های قرارداد اختصاصی هر استودیو
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  name        String   // نام قالب
+  htmlContent String   // محتوای HTML قالب با متغیرها
+  cssContent  String   @default("") // CSS اختصاصی
+  isDefault   Boolean  @default(false) // قالب پیش‌فرض
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ===================== HOLIDAYS (DB-backed) =====================
