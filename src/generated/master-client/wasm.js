@@ -225,7 +225,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/home/z/my-project/src/generated/master-client",
+      "value": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\03-main - Copy\\nasim-studio-ERP\\src\\generated\\master-client",
       "fromEnvVar": null
     },
     "config": {
@@ -234,12 +234,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "debian-openssl-3.0.x",
+        "value": "windows",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/home/z/my-project/prisma/schema-master.prisma",
+    "sourceFilePath": "E:\\01-PRJs Farzad\\04-nasim-studio-ERP (Z.ai) Source\\02-new Z.ai Programing\\03-main - Copy\\nasim-studio-ERP\\prisma\\schema-master.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
